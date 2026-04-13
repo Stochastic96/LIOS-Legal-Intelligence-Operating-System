@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -36,6 +38,6 @@ async def init_db() -> None:
     logger.info("Database initialised at %s", settings.db_path)
 
 
-async def get_session() -> AsyncSession:  # used as a FastAPI dependency
+async def get_session() -> AsyncGenerator[AsyncSession, None]:  # used as a FastAPI dependency
     async with AsyncSessionFactory() as session:
         yield session

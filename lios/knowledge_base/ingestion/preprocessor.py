@@ -39,6 +39,7 @@ class TextPreprocessor:
     def __init__(self, chunk_size: int = 1_500, overlap: int = 200) -> None:
         self.chunk_size = chunk_size
         self.overlap = overlap
+        self.stride = chunk_size - overlap
 
     def clean(self, text: str) -> str:
         """Normalise whitespace and remove boilerplate unicode artefacts."""
@@ -73,7 +74,7 @@ class TextPreprocessor:
                     char_end=end,
                 )
             )
-            pos += self.chunk_size - self.overlap
+            pos += self.stride
 
         logger.debug("Chunked regulation %s into %d chunks", regulation_id, len(chunks))
         return chunks

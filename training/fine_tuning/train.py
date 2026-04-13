@@ -91,7 +91,7 @@ def main(
             f"### Input:\n{example['input']}\n\n"
             f"### Response:\n{example['output']}"
         )
-        return tokenizer(text, truncation=True, max_length=max_seq_len, padding="max_length")
+        return tokenizer(text, truncation=True, max_length=max_seq_len)
 
     tokenised = raw_ds.map(_tokenise, batched=False, remove_columns=raw_ds.column_names)
     tokenised = tokenised.train_test_split(test_size=0.05, seed=42)
