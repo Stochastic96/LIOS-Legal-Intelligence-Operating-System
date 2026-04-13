@@ -58,7 +58,8 @@ class RegulatoryDecayScorer:
             last_updated_date = datetime.date(2000, 1, 1)
 
         days_since = (as_of_date - last_updated_date).days
-        # Score formula: each 3.65 days = 1 point of decay (365 days ≈ 100 points)
+        # Score formula: score decreases by ~1 point per 3.65 days;
+        # at 365 days the score reaches 0, reflecting a fully outdated regulation.
         score = max(0, min(100, round(100 - days_since / 3.65)))
         label = self._label(score)
 

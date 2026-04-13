@@ -94,7 +94,10 @@ class LegalBreakdownGenerator:
             return LegalBreakdown(
                 topic=topic,
                 regulation=regulation,
-                summary=f"Regulation '{regulation}' not found in LIOS knowledge base.",
+                summary=(
+                    f"Regulation '{regulation}' not found in LIOS knowledge base. "
+                    "Valid regulation names are: CSRD, ESRS, EU_TAXONOMY, SFDR."
+                ),
                 key_articles=[],
                 obligations=[],
                 penalties=[],

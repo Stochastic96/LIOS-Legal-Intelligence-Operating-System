@@ -45,7 +45,7 @@ def test_decay_score_formula():
     scorer = RegulatoryDecayScorer()
     # Use a fixed as_of_date to make test deterministic
     # CSRD last_updated = 2023-01-05
-    fixed_date = datetime.date(2024, 1, 5)  # exactly 365 days after 2023-01-05 (2023 is not a leap year)
+    fixed_date = datetime.date(2024, 1, 5)  # exactly 365 days after 2023-01-05 (2023 has 365 days, no leap year)
     result = scorer.decay_score("CSRD", as_of_date=fixed_date)
     expected = max(0, min(100, round(100 - 365 / 3.65)))
     assert result.score == expected
