@@ -153,8 +153,9 @@ class JurisdictionConflictDetector:
                 conflict.eu_regulation.upper() == reg_upper
                 or reg_upper in conflict.eu_regulation.upper()
             )
-            jur_match = conflict.jurisdiction.lower() in jur_lower or any(
-                j in conflict.jurisdiction.lower() for j in jur_lower
+            conflict_jur_lower = conflict.jurisdiction.lower()
+            jur_match = conflict_jur_lower in jur_lower or any(
+                j in conflict_jur_lower for j in jur_lower
             )
             if reg_match and (not jurisdictions or jur_match):
                 results.append(conflict)

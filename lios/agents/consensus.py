@@ -66,7 +66,7 @@ class ConsensusEngine:
         for t in threads:
             t.start()
         for t in threads:
-            t.join(timeout=30)
+            t.join(timeout=30)  # 30s is generous for rule-based agents; LLM calls may be slower
 
         # Replace None/errors with fallback responses
         final: list[AgentResponse] = []
