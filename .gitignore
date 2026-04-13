@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data (not committed – populated at runtime)
+data/regulations/*
+data/vector_store/*
+data/db/*
+!data/regulations/.gitkeep
+!data/vector_store/.gitkeep
+!data/db/.gitkeep
+
+# Training datasets (can be large)
+training/datasets/*
+!training/datasets/.gitkeep
+training/fine_tuning/checkpoints/
+
+# Secrets
+.env
+*.pem
+*.key
+
+# Testing / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.coveragerc
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
