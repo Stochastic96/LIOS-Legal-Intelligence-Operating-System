@@ -1,0 +1,97 @@
+---
+# LIOS Regulation Configuration
+# This file defines regulation metadata, thresholds, and agent mappings
+# Update this file to add new regulations or modify existing ones
+
+regulations:
+  CSRD:
+    name: CSRD
+    full_name: Corporate Sustainability Reporting Directive
+    description: Requires large EU and non-EU companies to report sustainability
+    jurisdictions:
+      - EU
+      - Germany
+      - France
+    effective_date: "2025-01-01"
+    last_updated: "2024-12-01"
+    primary_agents:
+      - sustainability
+      - supply_chain
+    secondary_agents:
+      - finance
+    enabled: true
+    thresholds:
+      large_enterprise:
+        employees_min: 500
+        turnover_eur_min: 250000000
+        balance_sheet_eur_min: 125000000
+      medium_enterprise:
+        employees_min: 250
+        turnover_eur_min: 40000000
+        balance_sheet_eur_min: 20000000
+
+  ESRS:
+    name: ESRS
+    full_name: European Sustainability Reporting Standards
+    description: Standards for sustainability disclosures under CSRD
+    jurisdictions:
+      - EU
+    effective_date: "2024-01-01"
+    last_updated: "2024-12-01"
+    primary_agents:
+      - sustainability
+    secondary_agents: []
+    enabled: true
+
+  EU_TAXONOMY:
+    name: EU_TAXONOMY
+    full_name: EU Taxonomy for Sustainable Activities
+    description: Framework for classifying sustainable economy activities
+    jurisdictions:
+      - EU
+    effective_date: "2022-01-01"
+    last_updated: "2024-06-01"
+    primary_agents:
+      - finance
+    secondary_agents:
+      - sustainability
+    enabled: true
+    thresholds:
+      large_enterprise:
+        employees_min: 500
+        turnover_eur_min: 250000000
+
+  SFDR:
+    name: SFDR
+    full_name: Sustainable Finance Disclosure Regulation
+    description: Requires financial market participants to disclose sustainability info
+    jurisdictions:
+      - EU
+    effective_date: "2021-03-10"
+    last_updated: "2023-12-01"
+    primary_agents:
+      - finance
+    secondary_agents: []
+    enabled: true
+    thresholds:
+      large_enterprise:
+        assets_under_management_min: 100000000
+        employees_min: 500
+
+  # Template for adding new regulations:
+  # CGD:
+  #   name: CGD
+  #   full_name: Corporate Governance Directive
+  #   description: Requirements for board diversity and governance
+  #   jurisdictions:
+  #     - EU
+  #   effective_date: "2025-07-01"
+  #   last_updated: "2025-01-01"
+  #   primary_agents:
+  #     - governance
+  #   secondary_agents:
+  #     - finance
+  #   enabled: true
+  #   thresholds:
+  #     large_enterprise:
+  #       employees_min: 250

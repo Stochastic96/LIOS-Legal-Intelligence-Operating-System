@@ -1,0 +1,2 @@
+{"timestamp": "2026-04-13T12:33:04.896565", "level": "INFO", "logger": "lios.agents.registry", "message": "Disabled agent: sustainability", "module": "registry", "function": "disable_agent", "line": 265}
+{"timestamp": "2026-04-13T12:33:04.896819", "level": "INFO", "logger": "lios.agents.registry", "message": "Enabled agent: sustainability", "module": "registry", "function": "enable_agent", "line": 248}

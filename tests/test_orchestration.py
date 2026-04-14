@@ -199,7 +199,7 @@ class TestOrchestrationEngine:
         assert len(result.answer) > 10
 
     def test_route_query_has_decay_scores(self, engine):
-        result = engine.route_query("CSRD reporting requirements")
+        result = engine.route_query("CSRD reporting requirements", lightweight=False)
         assert len(result.decay_scores) > 0
 
     def test_route_query_has_citations(self, engine):
@@ -248,3 +248,25 @@ class TestOrchestrationEngine:
             INTENT_APPLICABILITY, INTENT_ROADMAP, INTENT_BREAKDOWN,
             INTENT_CONFLICT, INTENT_GENERAL
         }
+
+    def test_route_query_uses_single_agent_by_default(self, engine):
+        result = engine.route_query("Does CSRD apply to large companies?")
+        assert len(result.consensus_result.agent_responses) == 1
+        assert result.consensus_result.agreeing_agents == [
+            result.consensus_result.agent_responses[0].agent_name
+        ]
+
+    def test_route_query_lightweight_skips_heavy_outputs(self, engine):
+        result = engine.route_query("What is CSRD?")
+        assert result.decay_scores == []
+        assert result.conflicts == []
+
+    def test_route_query_can_use_direction_hint_on_generic_followup(self, engine):
+        result = engine.route_query(
+            "and what about timeline?",
+            preferred_intent=INTENT_BREAKDOWN,
+            preferred_regulation="CSRD",
+        )
+        assert result.intent == INTENT_BREAKDOWN
+        assert result.parsed_query is not None
+        assert "CSRD" in result.parsed_query.regulations

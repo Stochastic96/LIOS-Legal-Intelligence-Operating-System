@@ -56,6 +56,7 @@ def query_cmd(
     )
 
     if json_output:
+        agent_count = len(result.consensus_result.agent_responses)
         click.echo(
             json.dumps(
                 {
@@ -64,6 +65,7 @@ def query_cmd(
                     "answer": result.answer,
                     "consensus_reached": result.consensus_result.consensus_reached,
                     "confidence": result.consensus_result.confidence,
+                    "agent_count": agent_count,
                 },
                 indent=2,
             )
@@ -71,8 +73,11 @@ def query_cmd(
         return
 
     # Rich output
+    agent_count = len(result.consensus_result.agent_responses)
     consensus_label = (
-        "✅ Consensus reached" if result.consensus_result.consensus_reached else "⚠️  No consensus"
+        f"Single-agent mode ({result.consensus_result.agreeing_agents[0]})"
+        if agent_count == 1 and result.consensus_result.agreeing_agents
+        else ("✅ Consensus reached" if result.consensus_result.consensus_reached else "⚠️  No consensus")
     )
     console.print(Panel(result.answer, title=f"[bold cyan]LIOS Answer[/] – {consensus_label}"))
 

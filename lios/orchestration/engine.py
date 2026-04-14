@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from lios.agents.base_agent import AgentResponse, BaseAgent
 from lios.agents.consensus import ConsensusEngine, ConsensusResult
 from lios.agents.finance_agent import FinanceAgent
 from lios.agents.sustainability_agent import SustainabilityAgent
 from lios.agents.supply_chain_agent import SupplyChainAgent
+from lios.config import settings
 from lios.features.applicability_checker import ApplicabilityChecker, ApplicabilityResult
 from lios.features.citation_engine import Citation, CitationEngine
 from lios.features.compliance_roadmap import ComplianceRoadmap, ComplianceRoadmapGenerator
@@ -17,6 +20,7 @@ from lios.features.decay_scoring import DecayScore, RegulatoryDecayScorer
 from lios.features.jurisdiction_conflict import Conflict, JurisdictionConflictDetector
 from lios.features.legal_breakdown import LegalBreakdown, LegalBreakdownGenerator
 from lios.knowledge.regulatory_db import RegulatoryDatabase
+from lios.llm import LLMRefiner
 from lios.orchestration.query_parser import (
     INTENT_APPLICABILITY,
     INTENT_BREAKDOWN,
@@ -58,12 +62,16 @@ class OrchestrationEngine:
         self.applicability_checker = ApplicabilityChecker()
         self.conflict_mapper = ConflictMapper()
         self.breakdown_generator = LegalBreakdownGenerator(self.db)
+        self.llm_refiner = LLMRefiner()
+        self.chat_mode = settings.CHAT_MODE
+        self._agent_cache: dict[str, BaseAgent] = {}
 
-        # Build agents
-        sus_agent = SustainabilityAgent(self.db)
-        sc_agent = SupplyChainAgent(self.db)
-        fin_agent = FinanceAgent(self.db)
-        self.consensus_engine = ConsensusEngine([sus_agent, sc_agent, fin_agent])
+        self.consensus_engine: ConsensusEngine | None = None
+        if self.chat_mode == "consensus":
+            sus_agent = self._get_agent("sustainability")
+            sc_agent = self._get_agent("supply_chain")
+            fin_agent = self._get_agent("finance")
+            self.consensus_engine = ConsensusEngine([sus_agent, sc_agent, fin_agent])
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -74,6 +82,10 @@ class OrchestrationEngine:
         query: str,
         company_profile: dict[str, Any] | None = None,
         jurisdictions: list[str] | None = None,
+        preferred_intent: str | None = None,
+        preferred_regulation: str | None = None,
+        lightweight: bool | None = None,
+        concise: bool = True,
     ) -> FullResponse:
         context: dict[str, Any] = {}
         if company_profile:
@@ -81,33 +93,56 @@ class OrchestrationEngine:
 
         parsed = self.parser.parse(query, context)
 
+        # If the conversation has stabilized, bias generic follow-ups toward recent direction.
+        if preferred_intent and parsed.intent == "general_query":
+            parsed.intent = preferred_intent
+        if preferred_regulation and not parsed.regulations:
+            parsed.regulations = [preferred_regulation]
+
+        use_lightweight = self._should_use_lightweight(
+            parsed=parsed,
+            company_profile=company_profile,
+            jurisdictions=jurisdictions,
+            lightweight=lightweight,
+        )
+
         # Merge jurisdictions from args + parsed
         all_jurisdictions = list(dict.fromkeys(
             (jurisdictions or []) + parsed.jurisdictions
         ))
         all_regulations = parsed.regulations or list(self.db.REGULATION_MODULES.keys())
 
-        # Run three-agent consensus
-        consensus_result = self.consensus_engine.run(query, context)
+        primary_agent = self._select_primary_agent(parsed, query)
+        primary_response = primary_agent.analyze(query, context)
+
+        # Keep the first chat simple by default; consensus remains available when enabled.
+        if self.consensus_engine is not None:
+            consensus_result = self.consensus_engine.run(query, context)
+        else:
+            consensus_result = self._build_single_agent_consensus(primary_response)
 
         # Run aggregator
         aggregated = self.aggregator.aggregate(consensus_result.agent_responses)
 
-        # Decay scores for detected (or all) regulations
-        decay_scores = [
-            self.decay_scorer.decay_score(reg)
-            for reg in (parsed.regulations or list(self.db.REGULATION_MODULES.keys()))
-        ]
+        # Heavy analysis is skipped for lightweight/direct definition flows.
+        if use_lightweight:
+            decay_scores = []
+        else:
+            decay_scores = [
+                self.decay_scorer.decay_score(reg)
+                for reg in (parsed.regulations or list(self.db.REGULATION_MODULES.keys()))
+            ]
 
         # Jurisdiction conflicts
         jur_conflicts: list[Conflict] = []
-        if all_jurisdictions:
-            for reg in all_regulations:
-                jur_conflicts.extend(
-                    self.conflict_detector.detect_conflicts(reg, all_jurisdictions)
-                )
-        else:
-            jur_conflicts = self.conflict_detector.get_all_known_conflicts()[:3]
+        if not use_lightweight:
+            if all_jurisdictions:
+                for reg in all_regulations:
+                    jur_conflicts.extend(
+                        self.conflict_detector.detect_conflicts(reg, all_jurisdictions)
+                    )
+            else:
+                jur_conflicts = self.conflict_detector.get_all_known_conflicts()[:3]
 
         # Citations
         citations = self.citation_engine.get_citations(
@@ -136,7 +171,29 @@ class OrchestrationEngine:
 
         # Build final answer
         answer = self._build_final_answer(
-            parsed, consensus_result, applicability, roadmap, breakdown
+            parsed,
+            consensus_result,
+            applicability,
+            roadmap,
+            breakdown,
+            primary_response,
+        )
+        if concise:
+            answer = self._make_concise_answer(
+                draft=answer,
+                intent=parsed.intent,
+                citations=citations,
+            )
+
+        answer = self.llm_refiner.refine(
+            query=query,
+            draft_answer=answer,
+            context={
+                "intent": parsed.intent,
+                "regulations": parsed.regulations,
+                "jurisdictions": all_jurisdictions,
+                "lightweight": use_lightweight,
+            },
         )
 
         return FullResponse(
@@ -165,6 +222,7 @@ class OrchestrationEngine:
         applicability: ApplicabilityResult | None,
         roadmap: ComplianceRoadmap | None,
         breakdown: LegalBreakdown | None,
+        primary_response: AgentResponse | None = None,
     ) -> str:
         parts: list[str] = []
 
@@ -183,7 +241,9 @@ class OrchestrationEngine:
         if breakdown:
             parts.append(f"## Legal Breakdown: {breakdown.regulation}\n{breakdown.summary}")
 
-        if consensus.consensus_reached:
+        if len(consensus.agent_responses) == 1 and primary_response is not None:
+            parts.append(primary_response.answer)
+        elif consensus.consensus_reached:
             parts.append(f"## Consensus Answer (confidence: {consensus.confidence:.0%})")
             parts.append(consensus.answer)
         else:
@@ -191,3 +251,97 @@ class OrchestrationEngine:
             parts.append(consensus.conflict_report)
 
         return "\n\n".join(parts)
+
+    def _get_agent(self, name: str) -> BaseAgent:
+        if name in self._agent_cache:
+            return self._agent_cache[name]
+
+        if name == "sustainability":
+            agent: BaseAgent = SustainabilityAgent(self.db)
+        elif name == "supply_chain":
+            agent = SupplyChainAgent(self.db)
+        elif name == "finance":
+            agent = FinanceAgent(self.db)
+        else:
+            raise KeyError(f"Unknown agent: {name}")
+
+        self._agent_cache[name] = agent
+        return agent
+
+    def _select_primary_agent(self, parsed: ParsedQuery, query: str) -> BaseAgent:
+        query_lower = query.lower()
+
+        if any(keyword in query_lower for keyword in ["supply chain", "supplier", "due diligence", "value chain"]):
+            return self._get_agent("supply_chain")
+
+        if any(reg in {"SFDR", "EU_TAXONOMY"} for reg in parsed.regulations):
+            return self._get_agent("finance")
+
+        return self._get_agent("sustainability")
+
+    def _build_single_agent_consensus(self, response: AgentResponse) -> ConsensusResult:
+        return ConsensusResult(
+            consensus_reached=True,
+            answer=response.answer,
+            citations=response.citations,
+            conflict_report="",
+            agent_responses=[response],
+            confidence=response.confidence,
+            agreeing_agents=[response.agent_name],
+        )
+
+    def _should_use_lightweight(
+        self,
+        parsed: ParsedQuery,
+        company_profile: dict[str, Any] | None,
+        jurisdictions: list[str] | None,
+        lightweight: bool | None,
+    ) -> bool:
+        if lightweight is not None:
+            return lightweight
+
+        has_company_context = bool(company_profile)
+        has_jurisdictions = bool(jurisdictions)
+        return (
+            not has_company_context
+            and not has_jurisdictions
+            and parsed.intent in {"general_query", "legal_breakdown"}
+        )
+
+    def _make_concise_answer(
+        self,
+        draft: str,
+        intent: str,
+        citations: list[Citation],
+    ) -> str:
+        # Keep detailed structure for action/assessment workflows.
+        if intent in {"compliance_roadmap", "applicability_check"}:
+            return draft
+
+        lines = [ln.strip() for ln in draft.splitlines() if ln.strip() and not ln.strip().startswith("##")]
+        text = " ".join(lines)
+        text = re.sub(r"\[[^\]]+\]:\s*", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        selected: list[str] = []
+        total = 0
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(sentence) < 25:
+                continue
+            selected.append(sentence)
+            total += len(sentence)
+            if len(selected) >= 2 or total >= 380:
+                break
+
+        concise = " ".join(selected) if selected else text[:380]
+
+        if citations:
+            top = citations[:2]
+            sources = " | ".join(f"{c.regulation} {c.article_id}: {c.url}" for c in top)
+            concise = f"{concise}\n\nSources: {sources}"
+
+        return concise

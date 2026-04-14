@@ -5,6 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from lios.knowledge.config_loader import get_config_loader
+from lios.logging_setup import get_logger
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class ApplicabilityResult:
@@ -18,21 +23,34 @@ class ApplicabilityResult:
 class ApplicabilityChecker:
     """Check whether a specific regulation applies to a company."""
 
+    def __init__(self):
+        """Initialize applicability checker with config loader."""
+        self.config_loader = get_config_loader()
+
     def check_applicability(
         self,
         regulation: str,
         company_profile: dict[str, Any],
     ) -> ApplicabilityResult:
         reg_key = regulation.upper().replace(" ", "_").replace("-", "_")
-        handler = self._handlers().get(reg_key)
-        if handler is None:
-            return ApplicabilityResult(
-                regulation=regulation,
-                applicable=False,
-                reason=f"Regulation '{regulation}' is not in LIOS knowledge base.",
-                threshold_details={},
-            )
-        return handler(company_profile)
+        
+        # Use config loader to find handler
+        try:
+            handler = self._handlers().get(reg_key)
+            if handler is None:
+                logger.warning(f"No handler found for regulation: {regulation}")
+                return ApplicabilityResult(
+                    regulation=regulation,
+                    applicable=False,
+                    reason=f"Regulation '{regulation}' is not in LIOS knowledge base.",
+                    threshold_details={},
+                )
+            result = handler(company_profile)
+            logger.debug(f"Applicability check completed for {regulation}: {result.applicable}")
+            return result
+        except Exception as e:
+            logger.error(f"Error checking applicability for {regulation}: {e}")
+            raise
 
     # ------------------------------------------------------------------
     # Handlers per regulation
@@ -52,24 +70,46 @@ class ApplicabilityChecker:
         balance_sheet = profile.get("balance_sheet_eur", 0)
         listed = profile.get("listed", False)
 
+        # Load thresholds from config
+        large_threshold_employees = (
+            self.config_loader.get_threshold("CSRD", "large_enterprise", "employees_min") or 500
+        )
+        large_threshold_turnover = (
+            self.config_loader.get_threshold("CSRD", "large_enterprise", "turnover_eur_min") or 250_000_000
+        )
+        large_threshold_balance = (
+            self.config_loader.get_threshold("CSRD", "large_enterprise", "balance_sheet_eur_min") or 125_000_000
+        )
+        medium_threshold_employees = (
+            self.config_loader.get_threshold("CSRD", "medium_enterprise", "employees_min") or 250
+        )
+        medium_threshold_turnover = (
+            self.config_loader.get_threshold("CSRD", "medium_enterprise", "turnover_eur_min") or 40_000_000
+        )
+        medium_threshold_balance = (
+            self.config_loader.get_threshold("CSRD", "medium_enterprise", "balance_sheet_eur_min") or 20_000_000
+        )
+
         thresholds = {
             "employees": employees,
             "turnover_eur": turnover,
             "balance_sheet_eur": balance_sheet,
             "listed": listed,
-            "threshold_employees_large_pie": 500,
-            "threshold_employees_large": 250,
-            "threshold_turnover_eur": 40_000_000,
-            "threshold_balance_sheet_eur": 20_000_000,
+            "threshold_employees_large": large_threshold_employees,
+            "threshold_turnover_eur": large_threshold_turnover,
+            "threshold_balance_sheet_eur": large_threshold_balance,
+            "threshold_employees_medium": medium_threshold_employees,
+            "threshold_turnover_medium": medium_threshold_turnover,
+            "threshold_balance_sheet_medium": medium_threshold_balance,
         }
 
-        # Phase 1: Public-interest entities >500 employees
-        if employees > 500:
+        # Phase 1: Public-interest entities with large thresholds
+        if employees > large_threshold_employees:
             return ApplicabilityResult(
                 regulation="CSRD",
                 applicable=True,
                 reason=(
-                    f"Applicable (Phase 1): Company has {employees} employees (>500). "
+                    f"Applicable (Phase 1): Company has {employees} employees (>{large_threshold_employees}). "
                     f"Must report from financial year 2024 (report due 2025)."
                 ),
                 threshold_details=thresholds,
@@ -78,9 +118,9 @@ class ApplicabilityChecker:
 
         # Phase 2: Large companies (meet 2 of 3 criteria)
         criteria_met = sum([
-            employees > 250,
-            turnover > 40_000_000,
-            balance_sheet > 20_000_000,
+            employees > medium_threshold_employees,
+            turnover > medium_threshold_turnover,
+            balance_sheet > medium_threshold_balance,
         ])
         if criteria_met >= 2:
             return ApplicabilityResult(
@@ -88,8 +128,9 @@ class ApplicabilityChecker:
                 applicable=True,
                 reason=(
                     f"Applicable (Phase 2): Company meets {criteria_met} of 3 'large company' criteria "
-                    f"(employees>250: {employees>250}, turnover>40M: {turnover>40_000_000}, "
-                    f"balance_sheet>20M: {balance_sheet>20_000_000}). "
+                    f"(employees>{medium_threshold_employees}: {employees>medium_threshold_employees}, "
+                    f"turnover>{medium_threshold_turnover:,}: {turnover>medium_threshold_turnover}, "
+                    f"balance_sheet>{medium_threshold_balance:,}: {balance_sheet>medium_threshold_balance}). "
                     f"Must report from financial year 2025 (report due 2026)."
                 ),
                 threshold_details=thresholds,

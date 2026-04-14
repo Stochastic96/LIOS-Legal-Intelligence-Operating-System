@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lios.knowledge.regulatory_db import RegulatoryDatabase
+from lios.retrieval.hybrid_retriever import HybridRetriever
 
 # Base URLs for EU law
 _BASE_URLS: dict[str, str] = {
@@ -30,6 +31,7 @@ class CitationEngine:
 
     def __init__(self, db: RegulatoryDatabase | None = None) -> None:
         self.db = db or RegulatoryDatabase()
+        self.retriever = HybridRetriever()
 
     def get_citations(
         self,
@@ -37,6 +39,21 @@ class CitationEngine:
         regulations: list[str] | None = None,
     ) -> list[Citation]:
         """Return top citations for the given query, optionally filtered by regulation."""
+        # Prefer retrieval from provenance-aware corpus when available.
+        retrieved = self.retriever.search(query=query, regulations=regulations, top_k=10)
+        if retrieved:
+            return [
+                Citation(
+                    regulation=r.chunk.get("regulation", "UNKNOWN"),
+                    article_id=r.chunk.get("article", "unknown"),
+                    title=r.chunk.get("title", ""),
+                    relevance_score=max(1, int(round(r.total_score * 100))),
+                    url=r.chunk.get("source_url", "https://eur-lex.europa.eu"),
+                    excerpt=(r.chunk.get("text", "") or "")[:200],
+                )
+                for r in retrieved
+            ]
+
         if regulations:
             all_results = []
             for reg in regulations:
