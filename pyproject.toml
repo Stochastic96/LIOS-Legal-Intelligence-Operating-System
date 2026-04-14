@@ -42,5 +42,8 @@ lios = "lios.cli.interface:cli"
 requires = ["setuptools>=42"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = { find = { include = ["lios*"] } }
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
