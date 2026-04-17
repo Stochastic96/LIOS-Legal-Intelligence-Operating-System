@@ -331,9 +331,14 @@ class OrchestrationEngine:
                 if reg:
                     dates.append(reg.get("last_updated", ""))
             if dates:
-                latest = max(d for d in dates if d)
-                date_note = f"data as of {latest}"
-                freshness = "Current"
+                non_empty = [d for d in dates if d]
+                if non_empty:
+                    latest = max(non_empty)
+                    date_note = f"data as of {latest}"
+                    freshness = "Current"
+                else:
+                    date_note = "data freshness unknown"
+                    freshness = "Review Recommended"
             else:
                 date_note = "data freshness unknown"
                 freshness = "Review Recommended"
