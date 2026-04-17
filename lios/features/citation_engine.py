@@ -5,15 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lios.knowledge.regulatory_db import RegulatoryDatabase
+from lios.knowledge.regulations import REGULATION_BASE_URLS
 from lios.retrieval.hybrid_retriever import HybridRetriever
-
-# Base URLs for EU law
-_BASE_URLS: dict[str, str] = {
-    "CSRD": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022L2464",
-    "ESRS": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R2772",
-    "EU_TAXONOMY": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32020R0852",
-    "SFDR": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32019R2088",
-}
 
 
 @dataclass
@@ -70,7 +63,7 @@ class CitationEngine:
             if key not in seen:
                 seen.add(key)
                 reg_key = hit["regulation"]
-                url = _BASE_URLS.get(reg_key, "https://eur-lex.europa.eu")
+                url = REGULATION_BASE_URLS.get(reg_key, "https://eur-lex.europa.eu")
                 citations.append(
                     Citation(
                         regulation=reg_key,

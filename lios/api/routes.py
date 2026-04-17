@@ -127,13 +127,13 @@ def get_regulation(name: str) -> dict[str, Any]:
 
 @app.get("/chat", response_class=HTMLResponse)
 def chat_workspace() -> str:
-        """Serve a local-first visual chat workspace for iterative training runs."""
+        """Serve the LIOS legal chat assistant UI."""
         return """<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LIOS Chat Studio</title>
+    <title>LIOS – Legal Assistant</title>
     <style>
         :root {
             --bg: #f4f1e8;
@@ -157,11 +157,11 @@ def chat_workspace() -> str:
                 linear-gradient(160deg, #faf7f0 0%, #f1eee7 100%);
         }
         .shell {
-            max-width: 1180px;
+            max-width: 980px;
             margin: 24px auto;
             padding: 0 16px;
             display: grid;
-            grid-template-columns: 300px 1fr;
+            grid-template-columns: 260px 1fr;
             gap: 16px;
         }
         .card {
@@ -172,8 +172,8 @@ def chat_workspace() -> str:
             overflow: hidden;
         }
         .sidebar { padding: 16px; }
-        .title h1 { margin: 0; font-size: 1.25rem; }
-        .title p { margin: 6px 0 0; color: var(--muted); font-size: 0.92rem; }
+        .title h1 { margin: 0; font-size: 1.2rem; color: var(--brand); }
+        .title p { margin: 6px 0 0; color: var(--muted); font-size: 0.88rem; }
         .field { margin-top: 14px; }
         label {
             display: block;
@@ -183,19 +183,17 @@ def chat_workspace() -> str:
             text-transform: uppercase;
             color: var(--muted);
         }
-        input, textarea, button {
-            font: inherit;
-        }
-        input, textarea {
+        input, textarea, button { font: inherit; }
+        input {
             width: 100%;
             border: 1px solid var(--line);
             border-radius: 12px;
-            padding: 12px 12px;
+            padding: 10px 12px;
             background: #fff;
             color: var(--ink);
         }
-        textarea { resize: vertical; min-height: 80px; }
-        .help { margin-top: 10px; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+        .help { margin-top: 12px; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+        .help ul { margin: 6px 0 0; padding-left: 18px; }
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
         button {
             border: 0;
@@ -208,7 +206,6 @@ def chat_workspace() -> str:
         button:hover { transform: translateY(-1px); }
         button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .ghost { background: #ece7dc; color: #24302d; }
-        .primary { background: var(--brand); color: #fff; }
         .workspace {
             display: grid;
             grid-template-rows: auto 1fr auto;
@@ -241,17 +238,29 @@ def chat_workspace() -> str:
             gap: 12px;
         }
         .bubble {
-            max-width: 88%;
+            max-width: 90%;
             padding: 12px 14px;
             border-radius: 16px;
             border: 1px solid var(--line);
-            line-height: 1.45;
+            line-height: 1.5;
             white-space: pre-wrap;
             animation: rise 180ms ease;
         }
         .bubble.user { align-self: flex-end; background: #e9f3f0; border-color: #beddd7; }
         .bubble.assistant { align-self: flex-start; background: #fff; }
-        .meta { margin-top: 8px; color: var(--muted); font-size: 0.74rem; font-family: monospace; }
+        .trust {
+            margin-top: 8px;
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+        .citations { margin-top: 8px; font-size: 0.8rem; }
+        .citations a {
+            display: block;
+            color: var(--brand);
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .citations a:hover { text-decoration: underline; }
         .composer {
             padding: 14px;
             border-top: 1px solid var(--line);
@@ -260,13 +269,23 @@ def chat_workspace() -> str:
             grid-template-columns: 1fr 128px;
             gap: 12px;
         }
-        .composer textarea { min-height: 56px; max-height: 160px; }
+        .composer textarea {
+            width: 100%;
+            min-height: 56px;
+            max-height: 160px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: #fff;
+            color: var(--ink);
+            resize: vertical;
+        }
         .send { background: var(--accent); color: #fff; }
         @keyframes rise {
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        @media (max-width: 900px) {
+        @media (max-width: 860px) {
             .shell { grid-template-columns: 1fr; }
             .workspace { min-height: 70vh; }
             .bubble { max-width: 100%; }
@@ -279,8 +298,8 @@ def chat_workspace() -> str:
     <div class="shell">
         <aside class="card sidebar">
             <div class="title">
-                <h1>LIOS Chat Studio</h1>
-                <p>Local-first training workspace</p>
+                <h1>⚖️ LIOS Legal Assistant</h1>
+                <p>EU Sustainability Law — CSRD · ESRS · EU Taxonomy · SFDR</p>
             </div>
 
             <div class="field">
@@ -289,32 +308,36 @@ def chat_workspace() -> str:
             </div>
 
             <div class="field">
-                <label for="jurisdictions">Jurisdictions</label>
-                <input id="jurisdictions" placeholder="EU, Germany" />
-            </div>
-
-            <div class="field">
-                <label for="profile">Company profile JSON</label>
-                <textarea id="profile" placeholder='{"employees":750,"turnover_eur":350000000,"listed":true}'></textarea>
+                <label for="jurisdictions">Jurisdictions (optional)</label>
+                <input id="jurisdictions" placeholder="e.g. Germany, France" />
             </div>
 
             <div class="actions">
                 <button class="ghost" id="loadBtn">Load Session</button>
-                <button class="ghost" id="exportBtn">Export JSONL</button>
+                <button class="ghost" id="exportBtn">Export</button>
             </div>
 
-            <div class="help">Every exchange is stored locally in logs/chat_training.jsonl for iterative training and prompt tuning.</div>
+            <div class="help">
+                Ask any question about EU sustainability law. Every answer includes
+                the exact regulation article and a direct link to the official EUR-Lex source.
+                <ul>
+                    <li>What does CSRD require?</li>
+                    <li>Explain ESRS E1 climate disclosures</li>
+                    <li>What are SFDR Article 8 and 9?</li>
+                    <li>DNSH criteria under EU Taxonomy</li>
+                </ul>
+            </div>
         </aside>
 
         <section class="card workspace">
             <header class="header">
-                <strong>Interactive Legal Chat</strong>
+                <strong>Legal Chat</strong>
                 <span class="status" id="status">ready</span>
             </header>
             <main class="log" id="chatLog"></main>
             <footer class="composer">
-                <textarea id="prompt" placeholder="Ask LIOS a compliance question..."></textarea>
-                <button class="send" id="sendBtn">Send</button>
+                <textarea id="prompt" placeholder="Ask a legal question about EU sustainability regulations…"></textarea>
+                <button class="send" id="sendBtn">Ask</button>
             </footer>
         </section>
     </div>
@@ -328,47 +351,48 @@ def chat_workspace() -> str:
         const exportBtn = document.getElementById("exportBtn");
         const sessionEl = document.getElementById("sessionId");
         const jursEl = document.getElementById("jurisdictions");
-        const profileEl = document.getElementById("profile");
 
         sessionEl.value = `session-${Date.now().toString(36)}`;
 
-        function addBubble(text, role, meta = "") {
+        function addBubble(text, role, citations, trustLabel) {
             const bubble = document.createElement("div");
             bubble.className = `bubble ${role}`;
             bubble.textContent = text;
-            if (meta) {
-                const metaEl = document.createElement("div");
-                metaEl.className = "meta";
-                metaEl.textContent = meta;
-                bubble.appendChild(metaEl);
+
+            if (trustLabel) {
+                const trustEl = document.createElement("div");
+                trustEl.className = "trust";
+                trustEl.textContent = trustLabel;
+                bubble.appendChild(trustEl);
             }
+
+            if (citations && citations.length > 0) {
+                const citDiv = document.createElement("div");
+                citDiv.className = "citations";
+                citations.slice(0, 3).forEach((c) => {
+                    const link = document.createElement("a");
+                    link.href = c.url;
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+                    link.textContent = `📎 ${c.regulation} ${c.article_id}${c.title ? " — " + c.title : ""}`;
+                    citDiv.appendChild(link);
+                });
+                bubble.appendChild(citDiv);
+            }
+
             chatLog.appendChild(bubble);
             chatLog.scrollTop = chatLog.scrollHeight;
-        }
-
-        function parseProfile() {
-            const raw = profileEl.value.trim();
-            if (!raw) return null;
-            return JSON.parse(raw);
         }
 
         async function sendMessage() {
             const query = promptEl.value.trim();
             if (!query) return;
 
-            let companyProfile = null;
-            try {
-                companyProfile = parseProfile();
-            } catch {
-                addBubble("Invalid company profile JSON. Please fix it and try again.", "assistant");
-                return;
-            }
-
-            const jurisdictions = jursEl.value.split(",").map((value) => value.trim()).filter(Boolean);
+            const jurisdictions = jursEl.value.split(",").map((v) => v.trim()).filter(Boolean);
 
             addBubble(query, "user");
             promptEl.value = "";
-            statusEl.textContent = "thinking";
+            statusEl.textContent = "thinking…";
             sendBtn.disabled = true;
 
             try {
@@ -379,7 +403,6 @@ def chat_workspace() -> str:
                         query,
                         session_id: sessionEl.value,
                         jurisdictions,
-                        company_profile: companyProfile,
                     }),
                 });
 
@@ -389,11 +412,7 @@ def chat_workspace() -> str:
                     return;
                 }
 
-                const citations = (data.citations || [])
-                    .slice(0, 3)
-                    .map((citation) => `${citation.regulation} ${citation.article_id}`)
-                    .join(" | ");
-                addBubble(data.answer, "assistant", `intent=${data.intent}${citations ? " | " + citations : ""}`);
+                addBubble(data.answer, "assistant", data.citations, data.trust_label);
             } catch (error) {
                 addBubble(`Request failed: ${error}`, "assistant");
             } finally {
@@ -403,7 +422,7 @@ def chat_workspace() -> str:
         }
 
         async function loadSession() {
-            statusEl.textContent = "loading";
+            statusEl.textContent = "loading…";
             chatLog.innerHTML = "";
             try {
                 const response = await fetch(`/chat/api/history?session_id=${encodeURIComponent(sessionEl.value)}`);
@@ -414,7 +433,7 @@ def chat_workspace() -> str:
                 }
                 for (const turn of data.turns || []) {
                     addBubble(turn.user_query || "", "user");
-                    addBubble(turn.answer || "", "assistant", `intent=${turn.intent || "unknown"}`);
+                    addBubble(turn.answer || "", "assistant", turn.citations || []);
                 }
             } finally {
                 statusEl.textContent = "ready";
@@ -447,7 +466,7 @@ def chat_workspace() -> str:
             }
         });
 
-        addBubble("Workspace ready. Send your first query to begin local training capture.", "assistant");
+        addBubble("Hello! I'm LIOS, your EU sustainability law assistant. Ask me anything about CSRD, ESRS, EU Taxonomy, or SFDR — I'll give you a direct answer with the exact regulation article and official source.", "assistant");
     </script>
 </body>
 </html>"""
@@ -461,44 +480,48 @@ def chat_workspace_alias() -> RedirectResponse:
 
 @app.get("/chat-react", response_class=HTMLResponse)
 def chat_workspace_react() -> str:
-        """Serve a React-based chat workspace without a separate frontend build."""
+        """Serve a React-based legal chat assistant without a separate frontend build."""
         return """<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LIOS React Chat Studio</title>
+    <title>LIOS – Legal Assistant</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        :root { --bg: #f5f6f8; --panel: #ffffff; --ink: #1f2937; --muted: #6b7280; --line: #d9dee8; --brand: #0f766e; --accent: #0b7285; }
+        :root { --panel: #ffffff; --ink: #1f2937; --muted: #6b7280; --line: #d9dee8; --brand: #0f766e; --accent: #0b7285; }
         * { box-sizing: border-box; }
         body { margin: 0; background: linear-gradient(180deg, #eef2f6 0, #f7f8fb 100%); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif; }
-        .shell { max-width: 1120px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+        .shell { max-width: 980px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
         .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
         .side { padding: 14px; }
-        .side h1 { margin: 0 0 4px; font-size: 1.1rem; }
+        .side h1 { margin: 0 0 4px; font-size: 1.1rem; color: var(--brand); }
         .muted { color: var(--muted); font-size: 0.88rem; }
         label { display: block; margin-top: 10px; margin-bottom: 4px; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-        input, textarea, button { width: 100%; font: inherit; }
-        input, textarea { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
-        textarea { min-height: 80px; resize: vertical; }
+        input, button { width: 100%; font: inherit; }
+        input { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         button { border: 0; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-weight: 700; }
         .ghost { background: #e9edf3; color: #1f2937; }
-        .primary { background: var(--brand); color: #fff; }
+        .primary { background: var(--accent); color: #fff; }
+        .help { margin-top: 12px; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+        .help ul { margin: 6px 0 0; padding-left: 18px; }
         .chat { display: grid; grid-template-rows: auto 1fr auto; min-height: 74vh; }
         .head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
         .status { font-size: 0.78rem; color: var(--accent); background: #eaf5f8; border: 1px solid #c9e4eb; border-radius: 999px; padding: 4px 10px; }
         .log { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .msg { max-width: 88%; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; white-space: pre-wrap; line-height: 1.45; }
+        .msg { max-width: 90%; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; white-space: pre-wrap; line-height: 1.5; }
         .u { align-self: flex-end; background: #e8f5f4; }
         .a { align-self: flex-start; background: #fff; }
-        .meta { margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
+        .trust { margin-top: 6px; color: var(--muted); font-size: 0.78rem; }
+        .cits { margin-top: 6px; font-size: 0.8rem; }
+        .cits a { display: block; color: var(--brand); text-decoration: none; word-break: break-all; }
+        .cits a:hover { text-decoration: underline; }
         .compose { border-top: 1px solid var(--line); padding: 12px; display: grid; grid-template-columns: 1fr 120px; gap: 10px; }
-        .compose textarea { min-height: 56px; max-height: 150px; }
-        @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } .compose { grid-template-columns: 1fr; } .row { grid-template-columns: 1fr; } .msg { max-width: 100%; } }
+        .compose textarea { width: 100%; font: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-height: 56px; max-height: 150px; }
+        @media (max-width: 860px) { .shell { grid-template-columns: 1fr; } .compose { grid-template-columns: 1fr; } .row { grid-template-columns: 1fr; } .msg { max-width: 100%; } }
     </style>
 </head>
 <body>
@@ -506,44 +529,52 @@ def chat_workspace_react() -> str:
     <script type="text/babel">
         const { useMemo, useState } = React;
 
+        function Message({ m }) {
+            return (
+                <div className={`msg ${m.role === "user" ? "u" : "a"}`}>
+                    {m.text}
+                    {m.trustLabel ? <div className="trust">{m.trustLabel}</div> : null}
+                    {m.citations && m.citations.length > 0 ? (
+                        <div className="cits">
+                            {m.citations.slice(0, 3).map((c, i) => (
+                                <a key={i} href={c.url} target="_blank" rel="noopener noreferrer">
+                                    📎 {c.regulation} {c.article_id}{c.title ? " — " + c.title : ""}
+                                </a>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+            );
+        }
+
         function App() {
             const [sessionId, setSessionId] = useState(`session-${Date.now().toString(36)}`);
             const [jurisdictions, setJurisdictions] = useState("");
-            const [profile, setProfile] = useState('{"employees":750,"turnover_eur":350000000,"listed":true}');
             const [prompt, setPrompt] = useState("");
             const [status, setStatus] = useState("ready");
-            const [messages, setMessages] = useState([{ role: "assistant", text: "React workspace ready. Ask your first compliance question.", meta: "local" }]);
+            const [messages, setMessages] = useState([{
+                role: "assistant",
+                text: "Hello! I'm LIOS, your EU sustainability law assistant. Ask me anything about CSRD, ESRS, EU Taxonomy, or SFDR.",
+                citations: [],
+                trustLabel: "",
+            }]);
 
             const parsedJurisdictions = useMemo(
                 () => jurisdictions.split(",").map((v) => v.trim()).filter(Boolean),
                 [jurisdictions]
             );
 
-            function addMessage(role, text, meta = "") {
-                setMessages((prev) => [...prev, { role, text, meta }]);
-            }
-
-            function parseProfile() {
-                const raw = profile.trim();
-                if (!raw) return null;
-                return JSON.parse(raw);
+            function addMessage(role, text, citations = [], trustLabel = "") {
+                setMessages((prev) => [...prev, { role, text, citations, trustLabel }]);
             }
 
             async function sendMessage() {
                 const query = prompt.trim();
                 if (!query) return;
 
-                let companyProfile = null;
-                try {
-                    companyProfile = parseProfile();
-                } catch {
-                    addMessage("assistant", "Invalid company profile JSON. Fix JSON and retry.");
-                    return;
-                }
-
                 addMessage("user", query);
                 setPrompt("");
-                setStatus("thinking");
+                setStatus("thinking…");
 
                 try {
                     const response = await fetch("/chat/api/message", {
@@ -553,7 +584,6 @@ def chat_workspace_react() -> str:
                             query,
                             session_id: sessionId,
                             jurisdictions: parsedJurisdictions,
-                            company_profile: companyProfile,
                         }),
                     });
                     const data = await response.json();
@@ -561,13 +591,7 @@ def chat_workspace_react() -> str:
                         addMessage("assistant", `Error: ${data.error || "request failed"}`);
                         return;
                     }
-
-                    const citations = (data.citations || [])
-                        .slice(0, 3)
-                        .map((c) => `${c.regulation} ${c.article_id}`)
-                        .join(" | ");
-                    const meta = `intent=${data.intent}${citations ? " | " + citations : ""}`;
-                    addMessage("assistant", data.answer, meta);
+                    addMessage("assistant", data.answer, data.citations || [], data.trust_label || "");
                 } catch (error) {
                     addMessage("assistant", `Request failed: ${error}`);
                 } finally {
@@ -576,7 +600,7 @@ def chat_workspace_react() -> str:
             }
 
             async function loadSession() {
-                setStatus("loading");
+                setStatus("loading…");
                 try {
                     const response = await fetch(`/chat/api/history?session_id=${encodeURIComponent(sessionId)}`);
                     const data = await response.json();
@@ -586,10 +610,10 @@ def chat_workspace_react() -> str:
                     }
                     const loaded = [];
                     for (const turn of data.turns || []) {
-                        loaded.push({ role: "user", text: turn.user_query || "", meta: "" });
-                        loaded.push({ role: "assistant", text: turn.answer || "", meta: `intent=${turn.intent || "unknown"}` });
+                        loaded.push({ role: "user", text: turn.user_query || "", citations: [], trustLabel: "" });
+                        loaded.push({ role: "assistant", text: turn.answer || "", citations: turn.citations || [], trustLabel: "" });
                     }
-                    setMessages(loaded.length ? loaded : [{ role: "assistant", text: "No turns yet for this session.", meta: "" }]);
+                    setMessages(loaded.length ? loaded : [{ role: "assistant", text: "No turns yet for this session.", citations: [], trustLabel: "" }]);
                 } finally {
                     setStatus("ready");
                 }
@@ -597,10 +621,7 @@ def chat_workspace_react() -> str:
 
             async function exportSession() {
                 const response = await fetch(`/chat/api/export?session_id=${encodeURIComponent(sessionId)}`);
-                if (!response.ok) {
-                    addMessage("assistant", "Could not export session.");
-                    return;
-                }
+                if (!response.ok) { addMessage("assistant", "Could not export session."); return; }
                 const text = await response.text();
                 const blob = new Blob([text], { type: "application/x-ndjson" });
                 const url = URL.createObjectURL(blob);
@@ -614,36 +635,38 @@ def chat_workspace_react() -> str:
             return (
                 <div className="shell">
                     <aside className="card side">
-                        <h1>LIOS React Chat</h1>
-                        <div className="muted">No-build React UI on top of LIOS APIs</div>
+                        <h1>⚖️ LIOS Legal Assistant</h1>
+                        <div className="muted">EU Sustainability Law — CSRD · ESRS · EU Taxonomy · SFDR</div>
 
                         <label>Session ID</label>
                         <input value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
 
-                        <label>Jurisdictions</label>
-                        <input value={jurisdictions} onChange={(e) => setJurisdictions(e.target.value)} placeholder="EU, Germany" />
-
-                        <label>Company Profile JSON</label>
-                        <textarea value={profile} onChange={(e) => setProfile(e.target.value)} />
+                        <label>Jurisdictions (optional)</label>
+                        <input value={jurisdictions} onChange={(e) => setJurisdictions(e.target.value)} placeholder="e.g. Germany, France" />
 
                         <div className="row">
                             <button className="ghost" onClick={loadSession}>Load</button>
                             <button className="ghost" onClick={exportSession}>Export</button>
                         </div>
+
+                        <div className="help">
+                            Ask any question about EU sustainability law. Every answer includes the exact article and a link to the official EUR-Lex source.
+                            <ul>
+                                <li>What does CSRD require?</li>
+                                <li>Explain ESRS E1</li>
+                                <li>SFDR Article 8 vs 9</li>
+                                <li>DNSH under EU Taxonomy</li>
+                            </ul>
+                        </div>
                     </aside>
 
                     <section className="card chat">
                         <header className="head">
-                            <strong>React Chat Workspace</strong>
+                            <strong>Legal Chat</strong>
                             <span className="status">{status}</span>
                         </header>
                         <main className="log">
-                            {messages.map((m, i) => (
-                                <div key={i} className={`msg ${m.role === "user" ? "u" : "a"}`}>
-                                    {m.text}
-                                    {m.meta ? <div className="meta">{m.meta}</div> : null}
-                                </div>
-                            ))}
+                            {messages.map((m, i) => <Message key={i} m={m} />)}
                         </main>
                         <footer className="compose">
                             <textarea
@@ -655,9 +678,9 @@ def chat_workspace_react() -> str:
                                         sendMessage();
                                     }
                                 }}
-                                placeholder="Ask LIOS a compliance question..."
+                                placeholder="Ask a legal question about EU sustainability regulations…"
                             />
-                            <button className="primary" onClick={sendMessage}>Send</button>
+                            <button className="primary" onClick={sendMessage}>Ask</button>
                         </footer>
                     </section>
                 </div>
@@ -733,6 +756,7 @@ def chat_message(payload: dict[str, Any]) -> dict[str, Any]:
         "answer": result.answer,
         "intent": result.intent,
         "citations": citation_rows,
+        "trust_label": result.trust_label,
         "consensus": {
             "reached": result.consensus_result.consensus_reached,
             "confidence": result.consensus_result.confidence,

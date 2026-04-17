@@ -43,6 +43,7 @@ class RegulatoryDatabase:
                 "full_name": getattr(module, "FULL_NAME", ""),
                 "effective_date": getattr(module, "effective_date", ""),
                 "last_updated": getattr(module, "last_updated", ""),
+                "review_note": getattr(module, "review_note", ""),
                 "jurisdictions": getattr(module, "jurisdictions", ["EU"]),
                 "articles": getattr(module, "articles", []),
                 "module": module,

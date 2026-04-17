@@ -10,13 +10,7 @@ from pathlib import Path
 
 from lios.ingestion.models import LegalChunk
 from lios.knowledge.regulatory_db import RegulatoryDatabase
-
-_BASE_URLS: dict[str, str] = {
-    "CSRD": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022L2464",
-    "ESRS": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R2772",
-    "EU_TAXONOMY": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32020R0852",
-    "SFDR": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32019R2088",
-}
+from lios.knowledge.regulations import REGULATION_BASE_URLS as _BASE_URLS
 
 _CELEX_IDS: dict[str, str] = {
     "CSRD": "32022L2464",

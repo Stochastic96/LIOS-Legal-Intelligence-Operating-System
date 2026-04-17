@@ -14,14 +14,14 @@ def test_chat_page_renders() -> None:
     client = TestClient(routes.app)
     response = client.get("/chat")
     assert response.status_code == 200
-    assert "LIOS Chat Studio" in response.text
+    assert "LIOS Legal Assistant" in response.text
 
 
 def test_chat_react_page_renders() -> None:
     client = TestClient(routes.app)
     response = client.get("/chat-react")
     assert response.status_code == 200
-    assert "LIOS React Chat Studio" in response.text
+    assert "LIOS Legal Assistant" in response.text
 
 
 def test_root_redirects_to_chat() -> None:

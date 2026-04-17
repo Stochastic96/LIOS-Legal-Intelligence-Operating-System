@@ -42,6 +42,7 @@ class FullResponse:
     conflicts: list[Conflict]
     consensus_result: ConsensusResult
     aggregated_response: AggregatedResponse
+    trust_label: str = ""
     roadmap: ComplianceRoadmap | None = None
     breakdown: LegalBreakdown | None = None
     applicability: ApplicabilityResult | None = None
@@ -196,6 +197,8 @@ class OrchestrationEngine:
             },
         )
 
+        trust_label = self._build_trust_label(decay_scores, citations, self.db)
+
         return FullResponse(
             query=query,
             intent=parsed.intent,
@@ -205,6 +208,7 @@ class OrchestrationEngine:
             conflicts=jur_conflicts,
             consensus_result=consensus_result,
             aggregated_response=aggregated,
+            trust_label=trust_label,
             roadmap=roadmap,
             breakdown=breakdown,
             applicability=applicability,
@@ -244,10 +248,8 @@ class OrchestrationEngine:
         if len(consensus.agent_responses) == 1 and primary_response is not None:
             parts.append(primary_response.answer)
         elif consensus.consensus_reached:
-            parts.append(f"## Consensus Answer (confidence: {consensus.confidence:.0%})")
             parts.append(consensus.answer)
         else:
-            parts.append("## ⚠️ No Consensus")
             parts.append(consensus.conflict_report)
 
         return "\n\n".join(parts)
@@ -300,13 +302,48 @@ class OrchestrationEngine:
         if lightweight is not None:
             return lightweight
 
+        # Without company context or jurisdiction filtering, decay scores and
+        # conflict scanning add latency without providing value to the user.
         has_company_context = bool(company_profile)
-        has_jurisdictions = bool(jurisdictions)
-        return (
-            not has_company_context
-            and not has_jurisdictions
-            and parsed.intent in {"general_query", "legal_breakdown"}
-        )
+        has_jurisdictions = bool(jurisdictions) or bool(parsed.jurisdictions)
+        return not has_company_context and not has_jurisdictions
+
+    def _build_trust_label(
+        self,
+        decay_scores: list[DecayScore],
+        citations: list[Citation],
+        db: RegulatoryDatabase,
+    ) -> str:
+        """Return a human-readable trust label for the answer."""
+        citation_count = len(citations)
+
+        if decay_scores:
+            avg_score = sum(d.score for d in decay_scores) / len(decay_scores)
+            freshness = "Current" if avg_score >= 80 else "Aging" if avg_score >= 60 else "Review Recommended"
+            freshest = max(decay_scores, key=lambda d: d.score)
+            date_note = f"data as of {freshest.last_updated}"
+        else:
+            # Derive freshness from the regulations referenced in citations
+            reg_keys = list(dict.fromkeys(c.regulation for c in citations[:3]))
+            dates: list[str] = []
+            for key in reg_keys:
+                reg = db.get_regulation(key)
+                if reg:
+                    dates.append(reg.get("last_updated", ""))
+            if dates:
+                latest = max(d for d in dates if d)
+                date_note = f"data as of {latest}"
+                freshness = "Current"
+            else:
+                date_note = "data freshness unknown"
+                freshness = "Review Recommended"
+
+        if citation_count >= 3 and freshness == "Current":
+            return f"✅ High Confidence — {citation_count} source articles cited, {date_note}"
+        elif citation_count >= 1 and freshness != "Review Recommended":
+            return f"✅ Verified — {citation_count} source article{'s' if citation_count != 1 else ''} cited, {date_note}"
+        else:
+            return f"⚠️ Review Recommended — {citation_count} source article{'s' if citation_count != 1 else ''} cited, {date_note}"
 
     def _make_concise_answer(
         self,
@@ -340,8 +377,10 @@ class OrchestrationEngine:
         concise = " ".join(selected) if selected else text[:380]
 
         if citations:
-            top = citations[:2]
-            sources = " | ".join(f"{c.regulation} {c.article_id}: {c.url}" for c in top)
-            concise = f"{concise}\n\nSources: {sources}"
+            top = citations[:3]
+            citation_lines = "\n".join(
+                f"📎 {c.regulation} {c.article_id} — {c.url}" for c in top
+            )
+            concise = f"{concise}\n\n{citation_lines}"
 
         return concise

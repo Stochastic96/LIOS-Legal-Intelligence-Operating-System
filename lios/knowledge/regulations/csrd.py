@@ -6,7 +6,12 @@ NAME = "CSRD"
 FULL_NAME = "Corporate Sustainability Reporting Directive"
 DIRECTIVE_NUMBER = "2022/2464/EU"
 effective_date = "2023-01-05"
-last_updated = "2023-01-05"
+last_updated = "2024-07-25"
+review_note = (
+    "Phased application underway: large PIEs (>500 employees) reported first in 2024. "
+    "The European Commission's Omnibus simplification package (2025) may reduce scope "
+    "for smaller companies — monitor for amendments before the 2025 reporting deadline."
+)
 jurisdictions = ["EU"]
 
 applicable_from = {

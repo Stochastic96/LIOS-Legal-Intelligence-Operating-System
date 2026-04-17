@@ -6,7 +6,12 @@ NAME = "EU_TAXONOMY"
 FULL_NAME = "EU Taxonomy Regulation"
 REGULATION_NUMBER = "2020/852/EU"
 effective_date = "2020-06-22"
-last_updated = "2022-01-01"
+last_updated = "2024-06-13"
+review_note = (
+    "Complementary Climate Delegated Act (nuclear and gas) entered into force 2023. "
+    "The Commission reviewed technical screening criteria for additional sectors in 2024. "
+    "Taxonomy disclosure requirements (KPI reporting) fully apply from financial year 2024."
+)
 jurisdictions = ["EU"]
 
 environmental_objectives = [

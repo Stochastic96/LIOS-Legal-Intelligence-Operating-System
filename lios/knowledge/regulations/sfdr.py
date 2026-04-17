@@ -6,7 +6,12 @@ NAME = "SFDR"
 FULL_NAME = "Sustainable Finance Disclosure Regulation"
 REGULATION_NUMBER = "2019/2088/EU"
 effective_date = "2021-03-10"
-last_updated = "2022-01-01"
+last_updated = "2024-04-22"
+review_note = (
+    "SFDR Level 2 Regulatory Technical Standards (RTS) applying from January 2023. "
+    "The European Commission launched a targeted consultation on SFDR reform in 2023–2024; "
+    "a revised framework (potentially replacing Art.8/9 labels) is expected 2025–2026."
+)
 jurisdictions = ["EU"]
 
 fund_classifications = {

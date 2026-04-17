@@ -85,8 +85,11 @@ class TestQueryParser:
         assert len(result.keywords) > 0
 
     def test_parse_employee_count_extraction(self, parser):
+        # The parser no longer extracts employee count from free-text queries.
+        # Company data must be supplied explicitly via context, not inferred
+        # from natural language (prevents misclassification errors).
         result = parser.parse("We have 600 employees, does CSRD apply?")
-        assert result.company_profile.get("employees") == 600
+        assert result.company_profile.get("employees") is None
 
     def test_parse_stores_raw_query(self, parser):
         q = "Does EU Taxonomy apply to banks?"

@@ -6,7 +6,12 @@ NAME = "ESRS"
 FULL_NAME = "European Sustainability Reporting Standards"
 REGULATION_NUMBER = "Commission Delegated Regulation (EU) 2023/2772"
 effective_date = "2023-07-31"
-last_updated = "2023-07-31"
+last_updated = "2024-07-31"
+review_note = (
+    "ESRS Set 1 (12 cross-cutting and topical standards) was adopted July 2023. "
+    "Sector-specific ESRS (Set 2) development is ongoing — expected adoption 2026. "
+    "Proportionality provisions for SME-equivalent entities remain under review."
+)
 jurisdictions = ["EU"]
 
 standards = {

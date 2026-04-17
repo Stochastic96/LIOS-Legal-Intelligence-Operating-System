@@ -43,9 +43,9 @@ def test_decay_score_unknown_regulation(scorer):
 def test_decay_score_formula():
     """Verify the score formula: 100 - min(100, days/3.65)."""
     scorer = RegulatoryDecayScorer()
-    # Use a fixed as_of_date to make test deterministic
-    # CSRD last_updated = 2023-01-05
-    fixed_date = datetime.date(2024, 1, 5)  # exactly 365 days after 2023-01-05 (2023 has 365 days, no leap year)
+    # Use a fixed as_of_date to make test deterministic.
+    # CSRD last_updated was updated to 2024-07-25; use a date 365 days later.
+    fixed_date = datetime.date(2025, 7, 25)  # 365 days after 2024-07-25
     result = scorer.decay_score("CSRD", as_of_date=fixed_date)
     expected = max(0, min(100, round(100 - 365 / 3.65)))
     assert result.score == expected

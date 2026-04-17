@@ -163,34 +163,8 @@ class QueryParser:
     def _extract_company_profile(
         self, q: str, context: dict[str, Any]
     ) -> dict[str, Any]:
-        profile: dict[str, Any] = dict(context.get("company_profile", {}))
-
-        # Try to extract employee count from query
-        emp_match = re.search(r"(\d[\d,\.]*)\s*(employees?|staff|workers?|headcount|fte)", q)
-        if emp_match and "employees" not in profile:
-            profile["employees"] = int(emp_match.group(1).replace(",", "").replace(".", ""))
-
-        # Try to extract turnover
-        turnover_match = re.search(
-            r"(eur?|€|usd?|\$)?\s*(\d[\d,\.]*)\s*(m(?:illion)?|b(?:illion)?|k(?:ilo)?)?\s*"
-            r"(?:turnover|revenue|sales)",
-            q,
-        )
-        if turnover_match and "turnover_eur" not in profile:
-            raw = float(turnover_match.group(2).replace(",", "").replace(".", ""))
-            suffix = (turnover_match.group(3) or "").lower()
-            if suffix.startswith("b"):
-                raw *= 1_000_000_000
-            elif suffix.startswith("m"):
-                raw *= 1_000_000
-            elif suffix.startswith("k"):
-                raw *= 1_000
-            profile["turnover_eur"] = raw
-
-        # Jurisdiction from query
-        for kw, jur in _JUR_KEYWORDS.items():
-            if kw in q and "jurisdiction" not in profile:
-                profile["jurisdiction"] = jur
-                break
-
-        return profile
+        # Only pass through an explicitly provided company profile from context.
+        # We deliberately do NOT parse employee counts, turnover, or jurisdiction
+        # from free-text queries — company data should be provided explicitly when
+        # the caller needs applicability or roadmap analysis.
+        return dict(context.get("company_profile", {}))
