@@ -27,7 +27,10 @@ class HybridRetriever:
     def __init__(self, corpus_path: str | Path = "data/corpus/legal_chunks.jsonl") -> None:
         self.corpus_path = Path(corpus_path)
         self._chunks: list[dict[str, Any]] = self._load_chunks()
-        self._tokenized_docs = [self._tokenize(f"{c.get('title', '')} {c.get('text', '')}") for c in self._chunks]
+        self._tokenized_docs = [
+            self._tokenize(f"{c.get('regulation', '')} {c.get('title', '')} {c.get('text', '')}")
+            for c in self._chunks
+        ]
         self._bm25 = self._build_bm25_index(self._tokenized_docs)
 
     def _load_chunks(self) -> list[dict[str, Any]]:
