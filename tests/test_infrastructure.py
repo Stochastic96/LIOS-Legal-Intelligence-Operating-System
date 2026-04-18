@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from lios.api.routes import app, _rate_limiter
+from lios.api.routes import RateLimiter, app, _rate_limiter
 from lios.features.base_feature import BaseFeature, FeatureResult
 from lios.knowledge.regulatory_db import RegulatoryDatabase
 
@@ -79,21 +79,30 @@ class TestRegulatoryDatabaseIndex:
         assert r1 == r2
         assert len(db._search_cache) == 1
 
-    def test_search_cache_evicts_oldest_when_full(self, db):
-        """Cache should not grow beyond _search_cache_max entries."""
+    def test_search_cache_evicts_lru_entry_when_full(self, db):
+        """Cache should not grow beyond _search_cache_max and should evict LRU."""
         db._search_cache.clear()
         original_max = db._search_cache_max
         db._search_cache_max = 3
 
-        # Fill the cache
-        db.search_articles("reporting requirements")
-        db.search_articles("disclosure sustainability")
-        db.search_articles("climate emissions scope")
+        # Fill the cache with 3 distinct queries
+        db.search_articles("reporting requirements")       # key A (oldest)
+        db.search_articles("disclosure sustainability")    # key B
+        db.search_articles("climate emissions scope")      # key C (newest)
         assert len(db._search_cache) == 3
 
-        # This triggers an eviction
-        db.search_articles("taxonomy alignment activities")
-        assert len(db._search_cache) == 3  # still 3, oldest was evicted
+        # Re-access key A to make it the most recently used
+        db.search_articles("reporting requirements")       # moves A to front
+
+        # Adding a new query should evict key B (now the least recently used)
+        db.search_articles("taxonomy alignment activities")  # key D – triggers eviction
+        assert len(db._search_cache) == 3
+
+        # Key B should have been evicted (it was LRU); A, C, D should remain
+        remaining = set(db._search_cache.keys())
+        assert ("reporting requirements", None) in remaining     # A – recently accessed
+        assert ("climate emissions scope", None) in remaining    # C
+        assert ("taxonomy alignment activities", None) in remaining  # D – just inserted
 
         db._search_cache_max = original_max  # restore
 
@@ -171,20 +180,20 @@ class TestRateLimiter:
 
     def test_allows_requests_within_limit(self):
         """Requests within the window should be allowed."""
-        limiter = _rate_limiter.__class__(max_requests=5, window_seconds=60.0)
+        limiter = RateLimiter(max_requests=5, window_seconds=60.0)
         for _ in range(5):
             assert limiter.is_allowed("127.0.0.1") is True
 
     def test_blocks_requests_over_limit(self):
         """Requests exceeding the window limit should be blocked."""
-        limiter = _rate_limiter.__class__(max_requests=3, window_seconds=60.0)
+        limiter = RateLimiter(max_requests=3, window_seconds=60.0)
         for _ in range(3):
             limiter.is_allowed("10.0.0.1")
         assert limiter.is_allowed("10.0.0.1") is False
 
     def test_different_ips_are_independent(self):
         """Rate limits should be per-IP and not shared."""
-        limiter = _rate_limiter.__class__(max_requests=1, window_seconds=60.0)
+        limiter = RateLimiter(max_requests=1, window_seconds=60.0)
         limiter.is_allowed("1.1.1.1")
         # First IP blocked
         assert limiter.is_allowed("1.1.1.1") is False
@@ -195,26 +204,25 @@ class TestRateLimiter:
         """API should return HTTP 429 when rate limit is exceeded."""
         client = TestClient(app, raise_server_exceptions=False)
 
-        # Temporarily lower the global limiter's limit
+        # Temporarily lower the global limiter's limit to 1 request
         original_max = _rate_limiter._max
         _rate_limiter._max = 1
 
-        # Reset hit counters for the test IP
+        # Determine the IP TestClient uses and clear its hit counter
         test_ip = "testclient"
-        if test_ip in _rate_limiter._hits:
-            _rate_limiter._hits[test_ip].clear()
+        _rate_limiter._hits.pop(test_ip, None)
 
-        # First request should succeed (health is exempt, use /regulations)
-        client.get("/regulations")
-        # Second request should be rate-limited
-        response = client.get("/regulations")
-        assert response.status_code == 429
-        assert "Retry-After" in response.headers
-
-        # Restore
-        _rate_limiter._max = original_max
-        if test_ip in _rate_limiter._hits:
-            _rate_limiter._hits[test_ip].clear()
+        try:
+            # First request should succeed (/regulations is rate-limited)
+            client.get("/regulations")
+            # Second request should be rate-limited
+            response = client.get("/regulations")
+            assert response.status_code == 429
+            assert "Retry-After" in response.headers
+        finally:
+            # Always restore original settings
+            _rate_limiter._max = original_max
+            _rate_limiter._hits.pop(test_ip, None)
 
     def test_health_endpoint_exempt_from_rate_limit(self):
         """Health endpoint should never be rate-limited."""
@@ -223,7 +231,8 @@ class TestRateLimiter:
         original_max = _rate_limiter._max
         _rate_limiter._max = 0  # Block everything
 
-        response = client.get("/health")
-        assert response.status_code == 200  # still works
-
-        _rate_limiter._max = original_max
+        try:
+            response = client.get("/health")
+            assert response.status_code == 200  # still works
+        finally:
+            _rate_limiter._max = original_max

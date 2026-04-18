@@ -47,8 +47,12 @@ logger = get_logger(__name__)
 # Rate limiting middleware (sliding-window, in-memory, no external deps)
 # ---------------------------------------------------------------------------
 
-class _RateLimiter:
-    """Sliding-window counter rate limiter keyed by client IP."""
+class RateLimiter:
+    """Sliding-window counter rate limiter keyed by client IP.
+
+    Exported so it can be instantiated directly in tests without relying on
+    ``_rate_limiter.__class__()`` indirection.
+    """
 
     def __init__(self, max_requests: int = 60, window_seconds: float = 60.0) -> None:
         self._max = max_requests
@@ -68,7 +72,7 @@ class _RateLimiter:
         return True
 
 
-_rate_limiter = _RateLimiter(max_requests=60, window_seconds=60.0)
+_rate_limiter = RateLimiter(max_requests=60, window_seconds=60.0)
 
 # Paths that are exempt from rate limiting (static resources, health)
 _RATE_LIMIT_EXEMPT_PREFIXES = ("/health", "/favicon.ico", "/docs", "/openapi", "/redoc")

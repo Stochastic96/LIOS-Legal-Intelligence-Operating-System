@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from typing import Any
 
 from lios.knowledge.regulations import csrd, esrs, eu_taxonomy, sfdr
@@ -33,8 +33,11 @@ class RegulatoryDatabase:
         self._regulations: dict[str, dict[str, Any]] = {}
         # Inverted index: keyword -> list of (reg_key, article_index) tuples
         self._keyword_index: dict[str, list[tuple[str, int]]] = defaultdict(list)
-        # LRU cache for repeated search queries (max 256 unique queries)
-        self._search_cache: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+        # LRU cache for repeated search queries (max 256 unique queries).
+        # Uses OrderedDict so move_to_end() keeps the most-recently used entry last.
+        self._search_cache: OrderedDict[
+            tuple[str, str | None], list[dict[str, Any]]
+        ] = OrderedDict()
         self._search_cache_max = 256
         self._load_all()
         self._build_index()
@@ -56,7 +59,12 @@ class RegulatoryDatabase:
             }
 
     def _build_index(self) -> None:
-        """Build an inverted keyword index for O(1) keyword lookup."""
+        """Build an inverted keyword index for O(k) keyword lookup.
+
+        k = number of keywords in the search query.  The index maps each
+        word to the (regulation_key, article_index) pairs that contain it,
+        enabling sub-linear article retrieval compared to O(n) linear scan.
+        """
         self._keyword_index.clear()
         for reg_key, reg in self._regulations.items():
             for idx, article in enumerate(reg["articles"]):
@@ -109,6 +117,8 @@ class RegulatoryDatabase:
         """
         cache_key = (query.lower(), regulation)
         if cache_key in self._search_cache:
+            # Move to end to mark as most-recently used
+            self._search_cache.move_to_end(cache_key)
             return self._search_cache[cache_key]
 
         keywords = [w.lower() for w in query.split() if len(w) > 2]
@@ -152,11 +162,9 @@ class RegulatoryDatabase:
 
         matches.sort(key=lambda x: x["relevance_score"], reverse=True)
 
-        # Store in bounded cache
+        # Store in bounded LRU cache – evict least-recently used entry when full
         if len(self._search_cache) >= self._search_cache_max:
-            # Evict oldest entry (first key in insertion order)
-            oldest = next(iter(self._search_cache))
-            del self._search_cache[oldest]
+            self._search_cache.popitem(last=False)  # remove LRU (oldest) entry
         self._search_cache[cache_key] = matches
 
         return matches
