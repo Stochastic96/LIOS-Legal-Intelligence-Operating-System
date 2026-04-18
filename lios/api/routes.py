@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import collections
+import time
 from datetime import datetime, timezone
 import uuid
 from typing import Any
@@ -9,6 +11,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from lios.config import settings
 from lios.features.applicability_checker import ApplicabilityChecker
@@ -39,11 +42,67 @@ from lios.orchestration.engine import OrchestrationEngine
 
 logger = get_logger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Rate limiting middleware (sliding-window, in-memory, no external deps)
+# ---------------------------------------------------------------------------
+
+class _RateLimiter:
+    """Sliding-window counter rate limiter keyed by client IP."""
+
+    def __init__(self, max_requests: int = 60, window_seconds: float = 60.0) -> None:
+        self._max = max_requests
+        self._window = window_seconds
+        self._hits: dict[str, collections.deque] = {}
+
+    def is_allowed(self, client_ip: str) -> bool:
+        now = time.monotonic()
+        cutoff = now - self._window
+        dq = self._hits.setdefault(client_ip, collections.deque())
+        # Expire old entries
+        while dq and dq[0] < cutoff:
+            dq.popleft()
+        if len(dq) >= self._max:
+            return False
+        dq.append(now)
+        return True
+
+
+_rate_limiter = _RateLimiter(max_requests=60, window_seconds=60.0)
+
+# Paths that are exempt from rate limiting (static resources, health)
+_RATE_LIMIT_EXEMPT_PREFIXES = ("/health", "/favicon.ico", "/docs", "/openapi", "/redoc")
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Apply per-IP rate limiting to all non-exempt endpoints."""
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if any(path.startswith(p) for p in _RATE_LIMIT_EXEMPT_PREFIXES):
+            return await call_next(request)
+
+        client_ip = request.client.host if request.client else "unknown"
+        if not _rate_limiter.is_allowed(client_ip):
+            logger.warning(f"Rate limit exceeded for {client_ip} on {path}")
+            return JSONResponse(
+                status_code=429,
+                content=ErrorResponse(
+                    error="Too many requests. Please wait before retrying.",
+                    error_type="rate_limit",
+                ).model_dump(),
+                headers={"Retry-After": "60"},
+            )
+        return await call_next(request)
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     description="Legal Intelligence Operating System for EU sustainability compliance.",
 )
+
+app.add_middleware(RateLimitMiddleware)
 
 # Shared instances (initialised once at import time)
 _db = RegulatoryDatabase()

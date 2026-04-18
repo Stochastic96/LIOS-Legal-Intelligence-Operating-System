@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any
 
 from lios.knowledge.regulations import csrd, esrs, eu_taxonomy, sfdr
@@ -30,7 +31,13 @@ class RegulatoryDatabase:
 
     def __init__(self) -> None:
         self._regulations: dict[str, dict[str, Any]] = {}
+        # Inverted index: keyword -> list of (reg_key, article_index) tuples
+        self._keyword_index: dict[str, list[tuple[str, int]]] = defaultdict(list)
+        # LRU cache for repeated search queries (max 256 unique queries)
+        self._search_cache: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+        self._search_cache_max = 256
         self._load_all()
+        self._build_index()
 
     # ------------------------------------------------------------------
     # Loading
@@ -47,6 +54,20 @@ class RegulatoryDatabase:
                 "articles": getattr(module, "articles", []),
                 "module": module,
             }
+
+    def _build_index(self) -> None:
+        """Build an inverted keyword index for O(1) keyword lookup."""
+        self._keyword_index.clear()
+        for reg_key, reg in self._regulations.items():
+            for idx, article in enumerate(reg["articles"]):
+                combined = (
+                    article.get("text", "") + " "
+                    + article.get("title", "") + " "
+                    + article.get("topic", "")
+                ).lower()
+                words = set(w for w in combined.split() if len(w) > 2)
+                for word in words:
+                    self._keyword_index[word].append((reg_key, idx))
 
     # ------------------------------------------------------------------
     # Public API
@@ -79,43 +100,65 @@ class RegulatoryDatabase:
         query: str,
         regulation: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Keyword search over article texts.
+        """Keyword search over article texts using an inverted index and query cache.
 
+        Uses the pre-built inverted index for O(k) lookup (k = keyword count)
+        rather than O(n) linear scan. Results for repeated identical queries
+        are served from a bounded in-memory cache without re-computation.
         Returns list of matches sorted by relevance (number of keyword hits).
         """
+        cache_key = (query.lower(), regulation)
+        if cache_key in self._search_cache:
+            return self._search_cache[cache_key]
+
         keywords = [w.lower() for w in query.split() if len(w) > 2]
         if not keywords:
             return []
 
-        regulations_to_search: list[str]
+        filter_key: str | None = None
         if regulation:
-            key = self._resolve_key(regulation)
-            regulations_to_search = [key] if key in self._regulations else []
-        else:
-            regulations_to_search = list(self._regulations.keys())
+            resolved = self._resolve_key(regulation)
+            if resolved in self._regulations:
+                filter_key = resolved
+            else:
+                # Unknown regulation – return empty, consistent with original behaviour
+                return []
+
+        # Count keyword hits per (reg_key, article_index) via the inverted index
+        hit_counts: dict[tuple[str, int], int] = defaultdict(int)
+        for kw in keywords:
+            for reg_key, art_idx in self._keyword_index.get(kw, []):
+                if filter_key is None or reg_key == filter_key:
+                    hit_counts[(reg_key, art_idx)] += 1
+
+        if not hit_counts:
+            return []
 
         matches: list[dict[str, Any]] = []
-        for reg_key in regulations_to_search:
+        for (reg_key, art_idx), score in hit_counts.items():
             reg = self._regulations[reg_key]
-            for article in reg["articles"]:
-                text = (
-                    article.get("text", "") + " " + article.get("title", "") + " " + article.get("topic", "")
-                ).lower()
-                score = sum(1 for kw in keywords if kw in text)
-                if score > 0:
-                    matches.append(
-                        {
-                            "regulation": reg_key,
-                            "regulation_full_name": reg["full_name"],
-                            "article_id": article["id"],
-                            "title": article.get("title", ""),
-                            "text": article.get("text", ""),
-                            "topic": article.get("topic", ""),
-                            "relevance_score": score,
-                        }
-                    )
+            article = reg["articles"][art_idx]
+            matches.append(
+                {
+                    "regulation": reg_key,
+                    "regulation_full_name": reg["full_name"],
+                    "article_id": article["id"],
+                    "title": article.get("title", ""),
+                    "text": article.get("text", ""),
+                    "topic": article.get("topic", ""),
+                    "relevance_score": score,
+                }
+            )
 
         matches.sort(key=lambda x: x["relevance_score"], reverse=True)
+
+        # Store in bounded cache
+        if len(self._search_cache) >= self._search_cache_max:
+            # Evict oldest entry (first key in insertion order)
+            oldest = next(iter(self._search_cache))
+            del self._search_cache[oldest]
+        self._search_cache[cache_key] = matches
+
         return matches
 
     # ------------------------------------------------------------------
