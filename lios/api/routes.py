@@ -57,7 +57,7 @@ class RateLimiter:
     def __init__(self, max_requests: int = 60, window_seconds: float = 60.0) -> None:
         self._max = max_requests
         self._window = window_seconds
-        self._hits: dict[str, collections.deque] = {}
+        self._hits: dict[str, collections.deque[float]] = {}
 
     def is_allowed(self, client_ip: str) -> bool:
         now = time.monotonic()

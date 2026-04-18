@@ -81,6 +81,19 @@ class RegulatoryDatabase:
     # Public API
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _make_cache_key(query: str, regulation: str | None) -> tuple[str, str | None]:
+        """Build a normalised cache key for a search query.
+
+        Args:
+            query: Search query string.
+            regulation: Optional regulation filter key.
+
+        Returns:
+            Tuple of (lower-cased query, regulation) usable as a dict key.
+        """
+        return (query.lower(), regulation)
+
     def get_regulation(self, name: str) -> dict[str, Any] | None:
         """Return regulation data by name or alias."""
         key = self._resolve_key(name)
@@ -115,7 +128,7 @@ class RegulatoryDatabase:
         are served from a bounded in-memory cache without re-computation.
         Returns list of matches sorted by relevance (number of keyword hits).
         """
-        cache_key = (query.lower(), regulation)
+        cache_key = self._make_cache_key(query, regulation)
         if cache_key in self._search_cache:
             # Move to end to mark as most-recently used
             self._search_cache.move_to_end(cache_key)

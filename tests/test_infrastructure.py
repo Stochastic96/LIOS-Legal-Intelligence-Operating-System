@@ -100,9 +100,14 @@ class TestRegulatoryDatabaseIndex:
 
         # Key B should have been evicted (it was LRU); A, C, D should remain
         remaining = set(db._search_cache.keys())
-        assert ("reporting requirements", None) in remaining     # A – recently accessed
-        assert ("climate emissions scope", None) in remaining    # C
-        assert ("taxonomy alignment activities", None) in remaining  # D – just inserted
+        key_a = db._make_cache_key("reporting requirements", None)
+        key_b = db._make_cache_key("disclosure sustainability", None)
+        key_c = db._make_cache_key("climate emissions scope", None)
+        key_d = db._make_cache_key("taxonomy alignment activities", None)
+        assert key_a in remaining     # A – recently accessed
+        assert key_b not in remaining  # B – was LRU, evicted
+        assert key_c in remaining    # C
+        assert key_d in remaining  # D – just inserted
 
         db._search_cache_max = original_max  # restore
 
