@@ -30,6 +30,7 @@ from lios.orchestration.query_parser import (
     QueryParser,
 )
 from lios.orchestration.response_aggregator import AggregatedResponse, ResponseAggregator
+from lios.retrieval.hybrid_retriever import HybridRetriever
 
 
 @dataclass
@@ -57,7 +58,9 @@ class OrchestrationEngine:
         self.aggregator = ResponseAggregator()
         self.decay_scorer = RegulatoryDecayScorer(self.db)
         self.conflict_detector = JurisdictionConflictDetector()
-        self.citation_engine = CitationEngine(self.db)
+        # Shared HybridRetriever instance – one model load, one doc-vector computation.
+        self.retriever = HybridRetriever()
+        self.citation_engine = CitationEngine(self.db, retriever=self.retriever)
         self.roadmap_generator = ComplianceRoadmapGenerator()
         self.applicability_checker = ApplicabilityChecker()
         self.conflict_mapper = ConflictMapper()

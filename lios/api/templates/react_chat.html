@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LIOS React Chat Studio</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        :root { --bg: #f5f6f8; --panel: #ffffff; --ink: #1f2937; --muted: #6b7280; --line: #d9dee8; --brand: #0f766e; --accent: #0b7285; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: linear-gradient(180deg, #eef2f6 0, #f7f8fb 100%); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif; }
+        .shell { max-width: 1120px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+        .side { padding: 14px; }
+        .side h1 { margin: 0 0 4px; font-size: 1.1rem; }
+        .muted { color: var(--muted); font-size: 0.88rem; }
+        label { display: block; margin-top: 10px; margin-bottom: 4px; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+        input, textarea, button { width: 100%; font: inherit; }
+        input, textarea { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+        textarea { min-height: 80px; resize: vertical; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        button { border: 0; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-weight: 700; }
+        .ghost { background: #e9edf3; color: #1f2937; }
+        .primary { background: var(--brand); color: #fff; }
+        .chat { display: grid; grid-template-rows: auto 1fr auto; min-height: 74vh; }
+        .head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+        .status { font-size: 0.78rem; color: var(--accent); background: #eaf5f8; border: 1px solid #c9e4eb; border-radius: 999px; padding: 4px 10px; }
+        .log { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 88%; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; white-space: pre-wrap; line-height: 1.45; }
+        .u { align-self: flex-end; background: #e8f5f4; }
+        .a { align-self: flex-start; background: #fff; }
+        .meta { margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
+        .compose { border-top: 1px solid var(--line); padding: 12px; display: grid; grid-template-columns: 1fr 120px; gap: 10px; }
+        .compose textarea { min-height: 56px; max-height: 150px; }
+        @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } .compose { grid-template-columns: 1fr; } .row { grid-template-columns: 1fr; } .msg { max-width: 100%; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useMemo, useState } = React;
+
+        function App() {
+            const [sessionId, setSessionId] = useState(`session-${Date.now().toString(36)}`);
+            const [jurisdictions, setJurisdictions] = useState("");
+            const [profile, setProfile] = useState('{"employees":750,"turnover_eur":350000000,"listed":true}');
+            const [prompt, setPrompt] = useState("");
+            const [status, setStatus] = useState("ready");
+            const [messages, setMessages] = useState([{ role: "assistant", text: "React workspace ready. Ask your first compliance question.", meta: "local" }]);
+
+            const parsedJurisdictions = useMemo(
+                () => jurisdictions.split(",").map((v) => v.trim()).filter(Boolean),
+                [jurisdictions]
+            );
+
+            function addMessage(role, text, meta = "") {
+                setMessages((prev) => [...prev, { role, text, meta }]);
+            }
+
+            function parseProfile() {
+                const raw = profile.trim();
+                if (!raw) return null;
+                return JSON.parse(raw);
+            }
+
+            async function sendMessage() {
+                const query = prompt.trim();
+                if (!query) return;
+
+                let companyProfile = null;
+                try {
+                    companyProfile = parseProfile();
+                } catch {
+                    addMessage("assistant", "Invalid company profile JSON. Fix JSON and retry.");
+                    return;
+                }
+
+                addMessage("user", query);
+                setPrompt("");
+                setStatus("thinking");
+
+                try {
+                    const response = await fetch("/chat/api/message", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            query,
+                            session_id: sessionId,
+                            jurisdictions: parsedJurisdictions,
+                            company_profile: companyProfile,
+                        }),
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        addMessage("assistant", `Error: ${data.error || "request failed"}`);
+                        return;
+                    }
+
+                    const citations = (data.citations || [])
+                        .slice(0, 3)
+                        .map((c) => `${c.regulation} ${c.article_id}`)
+                        .join(" | ");
+                    const meta = `intent=${data.intent}${citations ? " | " + citations : ""}`;
+                    addMessage("assistant", data.answer, meta);
+                } catch (error) {
+                    addMessage("assistant", `Request failed: ${error}`);
+                } finally {
+                    setStatus("ready");
+                }
+            }
+
+            async function loadSession() {
+                setStatus("loading");
+                try {
+                    const response = await fetch(`/chat/api/history?session_id=${encodeURIComponent(sessionId)}`);
+                    const data = await response.json();
+                    if (!response.ok) {
+                        addMessage("assistant", `Error: ${data.error || "unable to load session"}`);
+                        return;
+                    }
+                    const loaded = [];
+                    for (const turn of data.turns || []) {
+                        loaded.push({ role: "user", text: turn.user_query || "", meta: "" });
+                        loaded.push({ role: "assistant", text: turn.answer || "", meta: `intent=${turn.intent || "unknown"}` });
+                    }
+                    setMessages(loaded.length ? loaded : [{ role: "assistant", text: "No turns yet for this session.", meta: "" }]);
+                } finally {
+                    setStatus("ready");
+                }
+            }
+
+            async function exportSession() {
+                const response = await fetch(`/chat/api/export?session_id=${encodeURIComponent(sessionId)}`);
+                if (!response.ok) {
+                    addMessage("assistant", "Could not export session.");
+                    return;
+                }
+                const text = await response.text();
+                const blob = new Blob([text], { type: "application/x-ndjson" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `${sessionId}.jsonl`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+
+            return (
+                <div className="shell">
+                    <aside className="card side">
+                        <h1>LIOS React Chat</h1>
+                        <div className="muted">No-build React UI on top of LIOS APIs</div>
+
+                        <label>Session ID</label>
+                        <input value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
+
+                        <label>Jurisdictions</label>
+                        <input value={jurisdictions} onChange={(e) => setJurisdictions(e.target.value)} placeholder="EU, Germany" />
+
+                        <label>Company Profile JSON</label>
+                        <textarea value={profile} onChange={(e) => setProfile(e.target.value)} />
+
+                        <div className="row">
+                            <button className="ghost" onClick={loadSession}>Load</button>
+                            <button className="ghost" onClick={exportSession}>Export</button>
+                        </div>
+                    </aside>
+
+                    <section className="card chat">
+                        <header className="head">
+                            <strong>React Chat Workspace</strong>
+                            <span className="status">{status}</span>
+                        </header>
+                        <main className="log">
+                            {messages.map((m, i) => (
+                                <div key={i} className={`msg ${m.role === "user" ? "u" : "a"}`}>
+                                    {m.text}
+                                    {m.meta ? <div className="meta">{m.meta}</div> : null}
+                                </div>
+                            ))}
+                        </main>
+                        <footer className="compose">
+                            <textarea
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        sendMessage();
+                                    }
+                                }}
+                                placeholder="Ask LIOS a compliance question..."
+                            />
+                            <button className="primary" onClick={sendMessage}>Send</button>
+                        </footer>
+                    </section>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+</body>
+</html>
