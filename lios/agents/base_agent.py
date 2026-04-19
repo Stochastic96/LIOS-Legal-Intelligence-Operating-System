@@ -34,6 +34,21 @@ class DomainRule:
         text: The guidance text appended to the answer when the rule fires.
         require_all: When True *all* keywords must match (AND-semantics).
             Defaults to False (OR-semantics).
+
+    Examples::
+
+        # OR-semantics: fires when 'climate' OR 'ghg' appears in the query
+        DomainRule(
+            keywords=["climate", "ghg"],
+            text="ESRS E1 requires GHG emission disclosure..."
+        )
+
+        # AND-semantics: fires only when BOTH 'double' AND 'materiality' appear
+        DomainRule(
+            keywords=["double", "materiality"],
+            text="CSRD Art.4 requires a double materiality assessment...",
+            require_all=True,
+        )
     """
 
     keywords: list[str]

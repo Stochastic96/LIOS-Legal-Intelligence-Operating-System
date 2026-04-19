@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import functools
 import re
+from collections import OrderedDict
 from typing import Any
 
 from lios.knowledge.regulations import csrd, esrs, eu_taxonomy, sfdr
@@ -11,7 +11,7 @@ from lios.logging_setup import get_logger
 
 logger = get_logger(__name__)
 
-# Maximum number of distinct query strings to cache
+# Maximum number of distinct query strings to cache per RegulatoryDatabase instance
 _SEARCH_CACHE_MAXSIZE = 256
 
 
@@ -21,8 +21,8 @@ class RegulatoryDatabase:
     Performance characteristics (after init):
     - ``search_articles`` is O(k) per query word where *k* is the number of
       articles that contain that word, versus the previous O(n·m) full scan.
-    - Results for identical (query, regulation) pairs are memoised in an LRU
-      cache bounded to ``_SEARCH_CACHE_MAXSIZE`` entries.
+    - Results for identical (query, regulation) pairs are memoised in an
+      instance-level LRU cache bounded to ``_SEARCH_CACHE_MAXSIZE`` entries.
     """
 
     REGULATION_MODULES: dict[str, Any] = {
@@ -49,6 +49,8 @@ class RegulatoryDatabase:
         self._keyword_index: dict[str, list[tuple[str, dict[str, Any]]]] = {}
         # Flat article lookup: (reg_key, article_id) → enriched article dict
         self._article_cache: dict[tuple[str, str], dict[str, Any]] = {}
+        # Instance-level LRU search result cache: OrderedDict used as an LRU
+        self._search_cache: OrderedDict[tuple[str, str | None], tuple[tuple, ...]] = OrderedDict()
         self._load_all()
         self._build_indices()
 
@@ -135,43 +137,65 @@ class RegulatoryDatabase:
             )
         return result
 
-    @functools.lru_cache(maxsize=_SEARCH_CACHE_MAXSIZE)
     def _cached_search(
         self,
         query: str,
         regulation: str | None,
-    ) -> tuple[dict[tuple[str, str], int], ...]:
-        """Return a tuple of ((reg_key, art_id), score) sorted by score desc.
+    ) -> tuple[tuple, ...]:
+        """Return a sorted tuple of ((reg_key, art_id), score) pairs.
 
-        This method is cached so identical (query, regulation) calls are free
-        after the first invocation.  The LRU cache is automatically invalidated
-        only when the instance is replaced (e.g. after an admin reload).
+        Results are stored in an instance-level OrderedDict LRU cache so that
+        the cache is bound to this object's lifetime (no class-level shared
+        state) and does not prevent garbage collection of the instance.
         """
+        cache_key = (query, regulation)
+        if cache_key in self._search_cache:
+            # Move to end (most recently used)
+            self._search_cache.move_to_end(cache_key)
+            return self._search_cache[cache_key]
+
+        # Compute result
         keywords = [w for w in re.findall(r"[a-z0-9]{3,}", query.lower())]
+        result: tuple[tuple, ...]
         if not keywords:
-            return ()
+            result = ()
+        else:
+            allowed_regs: set[str] | None = None
+            if regulation:
+                key = self._resolve_key(regulation)
+                if key not in self._regulations:
+                    result = ()
+                    self._store_in_cache(cache_key, result)
+                    return result
+                allowed_regs = {key}
 
-        allowed_regs: set[str] | None = None
-        if regulation:
-            key = self._resolve_key(regulation)
-            if key not in self._regulations:
-                return ()
-            allowed_regs = {key}
+            # Aggregate scores using the inverted index (O(k) per keyword)
+            scores: dict[tuple[str, str], int] = {}
+            for kw in keywords:
+                for reg_key, enriched in self._keyword_index.get(kw, []):
+                    if allowed_regs and reg_key not in allowed_regs:
+                        continue
+                    cache_k = (reg_key, enriched["article_id"])
+                    scores[cache_k] = scores.get(cache_k, 0) + 1
 
-        # Aggregate scores using the inverted index (O(k) per keyword)
-        scores: dict[tuple[str, str], int] = {}
-        for kw in keywords:
-            for reg_key, enriched in self._keyword_index.get(kw, []):
-                if allowed_regs and reg_key not in allowed_regs:
-                    continue
-                cache_key = (reg_key, enriched["article_id"])
-                scores[cache_key] = scores.get(cache_key, 0) + 1
+            # Sort by descending score, then deterministically by article id
+            sorted_items = sorted(
+                scores.items(), key=lambda kv: (-kv[1], kv[0][0], kv[0][1])
+            )
+            result = tuple(sorted_items)
 
-        # Sort by descending score, then deterministically by article id
-        sorted_items = sorted(
-            scores.items(), key=lambda kv: (-kv[1], kv[0][0], kv[0][1])
-        )
-        return tuple(sorted_items)
+        self._store_in_cache(cache_key, result)
+        return result
+
+    def _store_in_cache(
+        self,
+        cache_key: tuple[str, str | None],
+        result: tuple[tuple, ...],
+    ) -> None:
+        """Insert into the LRU cache, evicting the oldest entry if at capacity."""
+        if len(self._search_cache) >= _SEARCH_CACHE_MAXSIZE:
+            self._search_cache.popitem(last=False)
+        self._search_cache[cache_key] = result
 
     def search_articles(
         self,
@@ -182,7 +206,7 @@ class RegulatoryDatabase:
 
         Time complexity: O(k) per keyword where *k* is the number of articles
         containing that keyword (was O(n·m) before).  Identical queries are
-        served from an LRU cache in O(1).
+        served from an instance-level LRU cache in O(1).
 
         Returns:
             List of article dicts sorted by relevance score (descending).
@@ -198,7 +222,7 @@ class RegulatoryDatabase:
 
     def invalidate_cache(self) -> None:
         """Clear the LRU search cache (call after hot-reloading regulations)."""
-        self._cached_search.cache_clear()
+        self._search_cache.clear()
         logger.info("Search cache cleared.")
 
     # ------------------------------------------------------------------

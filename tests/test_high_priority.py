@@ -70,22 +70,18 @@ class TestRegulatoryDatabaseIndex:
         assert results == []
 
     def test_lru_cache_hit(self):
-        """Second call with same args should be served from cache (verify via cache_info)."""
-        self.db._cached_search.cache_clear()
+        """Second call with same args should be served from cache."""
+        self.db.invalidate_cache()
         self.db.search_articles("climate emissions")
-        info_after_first = self.db._cached_search.cache_info()
-        assert info_after_first.misses == 1
-        assert info_after_first.hits == 0
+        assert len(self.db._search_cache) == 1, "First call should populate cache"
 
         self.db.search_articles("climate emissions")
-        info_after_second = self.db._cached_search.cache_info()
-        assert info_after_second.hits == 1, "Second identical query should be a cache hit"
+        assert len(self.db._search_cache) == 1, "Same query should reuse existing cache entry"
 
     def test_invalidate_cache_clears_lru(self):
         self.db.search_articles("climate")
         self.db.invalidate_cache()
-        info = self.db._cached_search.cache_info()
-        assert info.currsize == 0
+        assert len(self.db._search_cache) == 0
 
     def test_search_article_fields_present(self):
         results = self.db.search_articles("double materiality CSRD")

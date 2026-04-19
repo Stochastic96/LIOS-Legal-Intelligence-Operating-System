@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from typing import Annotated, Any
 
 from fastapi import Header, HTTPException, Security
@@ -42,11 +43,14 @@ def require_api_key(x_api_key: str | None = Security(_api_key_header)) -> str | 
 
     * If ``LIOS_API_KEY`` is not set (or empty), all requests are allowed.
     * If ``LIOS_API_KEY`` is set, the ``X-API-Key`` header must match.
+
+    Uses ``secrets.compare_digest`` for constant-time comparison to prevent
+    timing-based side-channel attacks.
     """
     if not settings.API_KEY_REQUIRED:
         return x_api_key
 
-    if not x_api_key or x_api_key != settings.API_KEY:
+    if not x_api_key or not secrets.compare_digest(x_api_key, settings.API_KEY):
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing API key. Provide a valid X-API-Key header.",
