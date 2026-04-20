@@ -194,6 +194,15 @@ class OrchestrationEngine:
             logger.warning("CitationEngine failed: %s", exc)
             citations = []
 
+        # Retrieve BM25 context chunks for the LLM prompt
+        rag_context = ""
+        try:
+            top_chunks = self.retriever.search(query, top_k=5)
+            if top_chunks:
+                rag_context = self.retriever.format_context(top_chunks)
+        except Exception as exc:
+            logger.warning("HybridRetriever.search failed: %s", exc)
+
         # Intent-specific extras
         roadmap: ComplianceRoadmap | None = None
         breakdown: LegalBreakdown | None = None
@@ -247,6 +256,7 @@ class OrchestrationEngine:
                     "regulations": parsed.regulations,
                     "jurisdictions": all_jurisdictions,
                     "lightweight": use_lightweight,
+                    "rag_context": rag_context,
                 },
             )
         except Exception as exc:

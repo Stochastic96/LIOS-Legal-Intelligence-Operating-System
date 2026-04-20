@@ -296,3 +296,61 @@ class HybridRetriever:
         fields = [has_source, has_article, has_doc]
         return sum(1.0 for ok in fields if ok) / len(fields)
 
+    # ------------------------------------------------------------------
+    # Context formatting
+    # ------------------------------------------------------------------
+
+    def format_context(self, chunks: list[RetrievedChunk], max_chars: int = 4000) -> str:
+        """Format retrieved chunks into a single context string for an LLM prompt.
+
+        Args:
+            chunks:    Ranked list of retrieved chunks.
+            max_chars: Soft character limit; stops adding chunks once exceeded.
+
+        Returns:
+            A newline-delimited string of labelled excerpts.
+        """
+        parts: list[str] = []
+        total = 0
+        for i, rc in enumerate(chunks, start=1):
+            chunk = rc.chunk
+            regulation = chunk.get("regulation", "")
+            article = chunk.get("article", "")
+            title = chunk.get("title", "")
+            text = chunk.get("text", "").strip()
+            header = f"[{i}] {regulation}"
+            if article:
+                header += f" {article}"
+            if title:
+                header += f" – {title}"
+            entry = f"{header}\n{text}"
+            if total + len(entry) > max_chars and parts:
+                break
+            parts.append(entry)
+            total += len(entry)
+        return "\n\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Module-level singleton
+# ---------------------------------------------------------------------------
+
+import threading as _threading
+
+_retriever_singleton: HybridRetriever | None = None
+_retriever_lock = _threading.Lock()
+
+
+def get_retriever() -> HybridRetriever:
+    """Return the shared HybridRetriever singleton, creating it on first call.
+
+    Thread-safe: uses a lock to prevent duplicate initialisation under concurrent
+    requests at startup.
+    """
+    global _retriever_singleton
+    if _retriever_singleton is None:
+        with _retriever_lock:
+            if _retriever_singleton is None:
+                _retriever_singleton = HybridRetriever()
+    return _retriever_singleton
+
