@@ -63,7 +63,7 @@ def test_decay_score_as_of_date(scorer):
 
 def test_decay_score_all(scorer):
     scores = scorer.score_all()
-    assert len(scores) == 4  # CSRD, ESRS, EU_TAXONOMY, SFDR
+    assert len(scores) >= 4  # at least CSRD, ESRS, EU_TAXONOMY, SFDR (plus GDPR, BGB, StGB)
     regulation_names = [s.regulation for s in scores]
     assert "CSRD" in regulation_names
     assert "SFDR" in regulation_names
