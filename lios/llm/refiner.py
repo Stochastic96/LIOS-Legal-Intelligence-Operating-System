@@ -37,16 +37,19 @@ class LLMRefiner:
         )
 
     def _build_messages(self, query: str, draft_answer: str, context: dict[str, Any] | None):
-        ctx_line = ""
-        if context:
-            ctx_line = f"\nContext JSON: {context}"
+        rag_context = context.get("rag_context", "") if context else ""
+        rag_section = f"\nRetrieved legal context:\n{rag_context}\n" if rag_context else ""
+
+        extra = {k: v for k, v in context.items() if k != "rag_context"} if context else {}
+        ctx_line = f"\nContext JSON: {extra}" if extra else ""
 
         user_msg = (
-            f"User query: {query}\n\n"
-            f"Draft answer:\n{draft_answer}\n"
+            f"User query: {query}\n"
+            f"{rag_section}"
+            f"\nDraft answer:\n{draft_answer}\n"
             f"{ctx_line}\n\n"
             "Rewrite this into a concise, well-structured answer with short headings. "
-            "Do not add claims not present in the draft."
+            "Do not add claims not present in the draft or retrieved context."
         )
 
         return [
