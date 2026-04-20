@@ -78,8 +78,7 @@ def _chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OV
     step = max(1, chunk_size - overlap)
     for start in range(0, len(words), step):
         chunk = " ".join(words[start : start + chunk_size])
-        if chunk:
-            chunks.append(chunk)
+        chunks.append(chunk)
     return chunks
 
 
