@@ -13,7 +13,13 @@ def save_index(index: Any, path: str | Path) -> None:
         index: A FAISS index object.
         path:  Destination file path (e.g. ``data/index.faiss``).
     """
-    import faiss  # type: ignore
+    try:
+        import faiss  # type: ignore
+    except ImportError as exc:
+        raise ImportError(
+            "faiss-cpu is required for FAISS index persistence. "
+            "Install it with: pip install faiss-cpu  (or pip install lios[data])"
+        ) from exc
 
     dest = Path(path)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -31,8 +37,15 @@ def load_index(path: str | Path) -> Any:
 
     Raises:
         FileNotFoundError: If *path* does not exist.
+        ImportError: If ``faiss-cpu`` is not installed.
     """
-    import faiss  # type: ignore
+    try:
+        import faiss  # type: ignore
+    except ImportError as exc:
+        raise ImportError(
+            "faiss-cpu is required to load a FAISS index. "
+            "Install it with: pip install faiss-cpu  (or pip install lios[data])"
+        ) from exc
 
     src = Path(path)
     if not src.exists():
@@ -46,11 +59,17 @@ def build_flat_index(vectors: Any) -> Any:
     Args:
         vectors: numpy.ndarray of shape (n, dim), L2-normalised.
 
-    Returns:
-        A populated faiss.IndexFlatIP.
+    Raises:
+        ImportError: If ``faiss-cpu`` is not installed.
     """
-    import faiss  # type: ignore
-    import numpy as np
+    try:
+        import faiss  # type: ignore
+        import numpy as np
+    except ImportError as exc:
+        raise ImportError(
+            "faiss-cpu and numpy are required to build a FAISS index. "
+            "Install them with: pip install faiss-cpu  (or pip install lios[data])"
+        ) from exc
 
     vecs = np.asarray(vectors, dtype="float32")
     dim = vecs.shape[1]

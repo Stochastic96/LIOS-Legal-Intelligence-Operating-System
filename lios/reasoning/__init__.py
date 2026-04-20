@@ -1,1 +1,1 @@
-"""lios.reasoning – legal reasoning and prompt construction."""
+"""Legal reasoning utilities for structured IRAC-style prompting."""

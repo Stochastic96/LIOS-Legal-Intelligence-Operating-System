@@ -6,7 +6,7 @@ import re
 from collections import OrderedDict
 from typing import Any
 
-from lios.knowledge.regulations import csrd, esrs, eu_taxonomy, sfdr
+from lios.knowledge.regulations import bgb, csrd, esrs, eu_taxonomy, gdpr, sfdr, stgb
 from lios.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -30,6 +30,9 @@ class RegulatoryDatabase:
         "ESRS": esrs,
         "EU_TAXONOMY": eu_taxonomy,
         "SFDR": sfdr,
+        "GDPR": gdpr,
+        "BGB": bgb,
+        "StGB": stgb,
     }
 
     # Alias map so callers can use common names
@@ -41,6 +44,14 @@ class RegulatoryDatabase:
         "eu_taxonomy": "EU_TAXONOMY",
         "sfdr": "SFDR",
         "sustainable finance": "SFDR",
+        "gdpr": "GDPR",
+        "data protection": "GDPR",
+        "bgb": "BGB",
+        "german civil code": "BGB",
+        "bürgerliches gesetzbuch": "BGB",
+        "stgb": "StGB",
+        "german criminal code": "StGB",
+        "strafgesetzbuch": "StGB",
     }
 
     def __init__(self) -> None:

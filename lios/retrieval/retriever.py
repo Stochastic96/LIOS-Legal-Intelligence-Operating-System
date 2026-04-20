@@ -36,8 +36,12 @@ def retrieve(
         Each dict contains at least ``title``, ``text``, and ``source``.
 
     Raises:
+        ValueError: If *top_k* is not a positive integer.
         FileNotFoundError: If the index or chunks file does not exist.
     """
+    if top_k <= 0:
+        raise ValueError(f"top_k must be a positive integer, got {top_k!r}")
+
     import numpy as np
 
     index = load_index(index_path)

@@ -2,10 +2,9 @@
 
 Covers:
 - lios.ingestion.cleaner
-- lios.ingestion.ingest  (chunk logic; embeddings are mocked)
-- lios.retrieval.embedder  (mocked – model not available in CI)
-- lios.retrieval.vector_store
-- lios.retrieval.retriever  (embeddings mocked)
+- lios.ingestion.ingest  (chunk logic; FAISS tests skipped without faiss-cpu)
+- lios.retrieval.vector_store  (skipped without faiss-cpu)
+- lios.retrieval.retriever     (skipped without faiss-cpu)
 - lios.reasoning.legal_reasoner
 - lios.validation.validator
 - lios.main.run_pipeline (Ollama + embeddings mocked)
@@ -15,15 +14,15 @@ from __future__ import annotations
 
 import json
 import pickle
-from pathlib import Path
 from unittest.mock import patch
 
-import numpy as np
 import pytest
 
 
-def _make_random_vecs(n: int, dim: int = 64) -> np.ndarray:
+def _make_random_vecs(n: int, dim: int = 64):
     """Return L2-normalised random float32 vectors for mocking embeddings."""
+    import numpy as np
+
     vecs = np.random.rand(n, dim).astype("float32")
     norms = np.linalg.norm(vecs, axis=1, keepdims=True)
     return vecs / np.maximum(norms, 1e-8)
@@ -61,7 +60,7 @@ class TestCleaner:
 
 
 # ---------------------------------------------------------------------------
-# ingest – chunking logic (no model needed)
+# ingest -- chunking logic (no model needed)
 # ---------------------------------------------------------------------------
 
 
@@ -73,7 +72,6 @@ class TestIngestionChunking:
         text = " ".join(words)
         chunks = _chunk_words(text, size=400, overlap=50)
         assert len(chunks) >= 2
-        # Each chunk should be at most 400 words
         for chunk in chunks:
             assert len(chunk.split()) <= 400
 
@@ -94,15 +92,15 @@ class TestIngestionChunking:
 
         text = " ".join(str(i) for i in range(100))
         chunks = _chunk_words(text, size=20, overlap=5)
-        # Second chunk should share last 5 words of first chunk
         first_end = chunks[0].split()[-5:]
         second_start = chunks[1].split()[:5]
         assert first_end == second_start
 
     def test_run_ingestion_produces_index_and_pkl(self, tmp_path):
+        faiss = pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
         from lios.ingestion.ingest import run_ingestion
 
-        # Create a minimal JSON dataset
         dataset = [
             {
                 "title": "BGB § 280",
@@ -117,11 +115,10 @@ class TestIngestionChunking:
         index_path = tmp_path / "index.faiss"
         chunks_path = tmp_path / "chunks.pkl"
 
-        # Mock embed_texts so no real model is needed
         def _fake_embed(texts):
             return _make_random_vecs(len(texts))
 
-        with patch("lios.ingestion.ingest.embed_texts", side_effect=_fake_embed):
+        with patch("lios.retrieval.embedder.embed_texts", side_effect=_fake_embed):
             total = run_ingestion(input_file, index_path, chunks_path)
 
         assert total > 0
@@ -136,13 +133,13 @@ class TestIngestionChunking:
 
 
 # ---------------------------------------------------------------------------
-# vector_store
+# vector_store (requires faiss-cpu)
 # ---------------------------------------------------------------------------
 
 
 class TestVectorStore:
     def test_build_save_load_round_trip(self, tmp_path):
-        import numpy as np
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
 
         from lios.retrieval.vector_store import build_flat_index, load_index, save_index
 
@@ -158,19 +155,42 @@ class TestVectorStore:
         assert loaded.ntotal == 10
 
     def test_load_index_raises_on_missing_file(self, tmp_path):
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
         from lios.retrieval.vector_store import load_index
 
         with pytest.raises(FileNotFoundError):
             load_index(tmp_path / "nonexistent.faiss")
 
+    def test_load_index_raises_import_error_without_faiss(self, tmp_path, monkeypatch):
+        """Verify a clear ImportError is raised when faiss is absent."""
+        import sys
+
+        # Temporarily hide faiss if it is installed
+        faiss_mod = sys.modules.get("faiss")
+        if faiss_mod is None:
+            # faiss not installed -- check the error message
+            from lios.retrieval.vector_store import load_index
+
+            with pytest.raises(ImportError, match="faiss-cpu"):
+                load_index(tmp_path / "nonexistent.faiss")
+        else:
+            # faiss is installed; just verify the FileNotFoundError path
+            from lios.retrieval.vector_store import load_index
+
+            with pytest.raises(FileNotFoundError):
+                load_index(tmp_path / "nonexistent.faiss")
+
 
 # ---------------------------------------------------------------------------
-# retriever
+# retriever (requires faiss-cpu)
 # ---------------------------------------------------------------------------
 
 
 class TestRetriever:
     def test_retrieve_returns_chunks(self, tmp_path):
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
         from lios.retrieval.retriever import retrieve
         from lios.retrieval.vector_store import build_flat_index, save_index
 
@@ -189,8 +209,7 @@ class TestRetriever:
         with chunks_path.open("wb") as fh:
             pickle.dump(chunks, fh)
 
-        # Mock embed_query to return a compatible random vector
-        def _fake_embed_query(query: str) -> np.ndarray:
+        def _fake_embed_query(query: str):
             return _make_random_vecs(1)[0]
 
         with patch("lios.retrieval.retriever.embed_query", side_effect=_fake_embed_query):
@@ -201,10 +220,48 @@ class TestRetriever:
         assert "text" in results[0]
 
     def test_retrieve_raises_if_index_missing(self, tmp_path):
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
         from lios.retrieval.retriever import retrieve
 
         with pytest.raises(FileNotFoundError):
             retrieve("question", index_path=tmp_path / "no.faiss", chunks_path=tmp_path / "no.pkl")
+
+    def test_retrieve_raises_for_zero_top_k(self, tmp_path):
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
+        from lios.retrieval.retriever import retrieve
+
+        # Create dummy index and chunks so we get past file checks
+        from lios.retrieval.vector_store import build_flat_index, save_index
+
+        vecs = _make_random_vecs(2)
+        index_path = tmp_path / "index.faiss"
+        chunks_path = tmp_path / "chunks.pkl"
+        save_index(build_flat_index(vecs), index_path)
+        with chunks_path.open("wb") as fh:
+            pickle.dump([{"text": "t"}] * 2, fh)
+
+        with pytest.raises(ValueError, match="top_k"):
+            with patch("lios.retrieval.retriever.embed_query", return_value=_make_random_vecs(1)[0]):
+                retrieve("q", index_path=index_path, chunks_path=chunks_path, top_k=0)
+
+    def test_retrieve_raises_for_negative_top_k(self, tmp_path):
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
+        from lios.retrieval.retriever import retrieve
+        from lios.retrieval.vector_store import build_flat_index, save_index
+
+        vecs = _make_random_vecs(2)
+        index_path = tmp_path / "index.faiss"
+        chunks_path = tmp_path / "chunks.pkl"
+        save_index(build_flat_index(vecs), index_path)
+        with chunks_path.open("wb") as fh:
+            pickle.dump([{"text": "t"}] * 2, fh)
+
+        with pytest.raises(ValueError, match="top_k"):
+            with patch("lios.retrieval.retriever.embed_query", return_value=_make_random_vecs(1)[0]):
+                retrieve("q", index_path=index_path, chunks_path=chunks_path, top_k=-1)
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +305,17 @@ class TestLegalReasoner:
         from lios.reasoning.legal_reasoner import build_prompt
 
         prompt = build_prompt("question?", "")
-        assert "No relevant context" in prompt or "not contain" in prompt
+        # Empty context should result in a placeholder message
+        assert "No legal context provided" in prompt or "No relevant context" in prompt
+
+    def test_build_prompt_accepts_list_context(self):
+        from lios.reasoning.legal_reasoner import build_prompt
+
+        chunks = [{"regulation": "BGB", "article": "280", "title": "Breach", "text": "Schuldner Pflicht"}]
+        prompt = build_prompt("question?", chunks)
+        assert "BGB" in prompt
+        assert "Schuldner" in prompt
+        assert "Issue" in prompt
 
     def test_format_context_from_chunks(self):
         from lios.reasoning.legal_reasoner import format_context_from_chunks
@@ -326,6 +393,39 @@ class TestValidator:
         vr2 = ValidationResult(status="INVALID", score=0.05, reason="low overlap")
         assert vr2.is_valid is False
 
+    def test_unknown_for_german_context_english_answer(self):
+        """Cross-language: German context + English answer => UNKNOWN not INVALID."""
+        from lios.validation.validator import validate
+
+        # Heavily German context (lots of umlauts / non-ASCII)
+        context = (
+            "Der Schuldner ist verpflichtet, die Leistung so zu erbringen, "
+            "wie Treu und Glauben mit Rücksicht auf die Verkehrssitte es erfordern. "
+            "Gemäß § 280 BGB kann der Gläubiger Schadensersatz verlangen, "
+            "wenn der Schuldner eine Pflicht aus dem Schuldverhältnis verletzt."
+        )
+        answer = "The debtor must perform their obligation in good faith under German law."
+        result = validate(answer, context)
+        # Cross-language: result should be UNKNOWN, not INVALID
+        assert result.status == "UNKNOWN"
+
+    def test_unicode_tokenizer_handles_umlauts(self):
+        """Unicode tokenizer should preserve umlaut-containing tokens."""
+        from lios.validation.validator import _tokenize
+
+        tokens = _tokenize("Schuldverhältnis Pflicht Rücksicht")
+        assert "schuldverhältnis" in tokens
+        assert "rücksicht" in tokens
+
+    def test_unicode_tokenizer_drops_short_tokens(self):
+        from lios.validation.validator import _tokenize
+
+        tokens = _tokenize("a ab abc abcd")
+        assert "a" not in tokens
+        assert "ab" not in tokens
+        assert "abc" in tokens
+        assert "abcd" in tokens
+
 
 # ---------------------------------------------------------------------------
 # run_pipeline (end-to-end, Ollama mocked)
@@ -334,6 +434,8 @@ class TestValidator:
 
 class TestRunPipeline:
     def test_pipeline_returns_required_keys(self, tmp_path):
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
         from lios.retrieval.vector_store import build_flat_index, save_index
 
         chunks = [
@@ -351,7 +453,7 @@ class TestRunPipeline:
         with chunks_path.open("wb") as fh:
             pickle.dump(chunks, fh)
 
-        def _fake_embed_query(query: str) -> np.ndarray:
+        def _fake_embed_query(query: str):
             return _make_random_vecs(1)[0]
 
         with (
@@ -371,9 +473,10 @@ class TestRunPipeline:
         assert "sources" in result
         assert "validation" in result
         assert isinstance(result["sources"], list)
-        assert result["validation"]["status"] in ("VALID", "INVALID")
+        assert result["validation"]["status"] in ("VALID", "INVALID", "UNKNOWN")
 
     def test_pipeline_handles_missing_index_gracefully(self, tmp_path):
+        """Missing FAISS index should be caught and pipeline should still return answer."""
         with patch("lios.llm.ollama_client.call_ollama_sync", return_value="No context answer."):
             from lios.main import run_pipeline
 
@@ -386,15 +489,34 @@ class TestRunPipeline:
         assert result["answer"] == "No context answer."
         assert result["sources"] == []
 
+    def test_pipeline_handles_missing_faiss_gracefully(self, tmp_path):
+        """ImportError from missing faiss-cpu should be caught gracefully."""
+        with (
+            patch("lios.retrieval.vector_store.load_index", side_effect=ImportError("faiss-cpu not installed")),
+            patch("lios.llm.ollama_client.call_ollama_sync", return_value="Graceful fallback."),
+        ):
+            from lios.main import run_pipeline
+
+            result = run_pipeline(
+                "What is GDPR?",
+                index_path=str(tmp_path / "index.faiss"),
+                chunks_path=str(tmp_path / "chunks.pkl"),
+            )
+
+        assert result["answer"] == "Graceful fallback."
+        assert result["sources"] == []
+
 
 # ---------------------------------------------------------------------------
-# Integration: ingest → retrieve → build_prompt → validate
+# Integration: ingest → retrieve → build_prompt → validate (requires faiss-cpu)
 # ---------------------------------------------------------------------------
 
 
 class TestEndToEndIngestionRetrieval:
     def test_ingest_then_retrieve(self, tmp_path):
         """Full pipeline: write JSON → ingest → retrieve → check results."""
+        pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
         from lios.ingestion.ingest import run_ingestion
         from lios.reasoning.legal_reasoner import build_prompt, format_context_from_chunks
         from lios.retrieval.retriever import retrieve
@@ -419,17 +541,13 @@ class TestEndToEndIngestionRetrieval:
         index_path = tmp_path / "index.faiss"
         chunks_path = tmp_path / "chunks.pkl"
 
-        # Track how many chunks are produced to create matching embeddings
-        produced: list[int] = []
-
         def _fake_embed_texts(texts):
-            produced.append(len(texts))
             return _make_random_vecs(len(texts))
 
-        def _fake_embed_query(query: str) -> np.ndarray:
+        def _fake_embed_query(query: str):
             return _make_random_vecs(1)[0]
 
-        with patch("lios.ingestion.ingest.embed_texts", side_effect=_fake_embed_texts):
+        with patch("lios.retrieval.embedder.embed_texts", side_effect=_fake_embed_texts):
             total = run_ingestion(input_file, index_path, chunks_path)
 
         assert total > 0
@@ -448,7 +566,6 @@ class TestEndToEndIngestionRetrieval:
         prompt = build_prompt("What rights does GDPR give?", context)
         assert "Issue" in prompt
 
-        # Simulate a grounded answer
         grounded_answer = "Under GDPR Article 17, data subjects have the right to erasure of personal data."
         result = validate(grounded_answer, context)
         assert result.status == "VALID"

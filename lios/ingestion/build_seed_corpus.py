@@ -16,6 +16,9 @@ _BASE_URLS: dict[str, str] = {
     "ESRS": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R2772",
     "EU_TAXONOMY": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32020R0852",
     "SFDR": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32019R2088",
+    "GDPR": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679",
+    "BGB": "https://www.gesetze-im-internet.de/bgb/",
+    "StGB": "https://www.gesetze-im-internet.de/stgb/",
 }
 
 _CELEX_IDS: dict[str, str] = {
@@ -23,6 +26,9 @@ _CELEX_IDS: dict[str, str] = {
     "ESRS": "32023R2772",
     "EU_TAXONOMY": "32020R0852",
     "SFDR": "32019R2088",
+    "GDPR": "32016R0679",
+    "BGB": "BGB",
+    "StGB": "StGB",
 }
 
 

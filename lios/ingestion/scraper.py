@@ -8,7 +8,6 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://www.gesetze-im-internet.de"
-_TOC_URL = f"{_BASE_URL}/Teilliste_GESAMT.xml"
 
 
 def scrape_law(abbr: str) -> list[dict[str, Any]]:

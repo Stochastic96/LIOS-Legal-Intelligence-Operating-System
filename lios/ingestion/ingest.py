@@ -1,86 +1,178 @@
-"""Ingest legal documents into FAISS + pickle for fast retrieval.
+"""Ingest raw legal documents into the LIOS corpus.
 
-Pipeline
---------
-1. Load documents from a JSON file (list of ``{title, text, source, language}``).
-2. Clean each text (strip HTML, normalise whitespace).
-3. Chunk each document into overlapping windows (400 words, 50-word overlap).
-4. Embed all chunks with sentence-transformers (all-MiniLM-L6-v2).
-5. Build a FAISS IndexFlatIP and persist it.
-6. Save the chunk metadata list to a pickle file.
+Two ingestion modes are provided:
 
-Usage::
+1. **JSONL corpus** (primary, no extra deps):
+   ``ingest_documents()`` appends provenance-aware chunks to
+   ``data/corpus/legal_chunks.jsonl`` for use with
+   :class:`~lios.retrieval.hybrid_retriever.HybridRetriever`.
 
-    python -m lios.ingestion.ingest
-    # or
-    from lios.ingestion.ingest import run_ingestion
-    run_ingestion("data/raw/legal_dataset.json")
+2. **FAISS + pickle** (optional, requires ``lios[data]``):
+   ``run_ingestion()`` embeds chunks with sentence-transformers and stores
+   them in a FAISS index + pickle file for dense retrieval via
+   :func:`~lios.retrieval.retriever.retrieve`.
+
+Document dict format::
+
+    {
+        "title":          "Breach of Contract",   # required
+        "text":           "A breach of ...",       # required
+        "source":         "BGB 280",               # optional -- used as article id
+        "regulation":     "BGB",                   # optional
+        "source_url":     "https://example.com",   # optional
+        "jurisdiction":   "DE",                    # optional (default "EU")
+        "published_date": "2002-01-01",            # optional
+    }
+
+Usage from the command line::
+
+    python -m lios.ingestion.ingest path/to/documents.json
+
+Usage from Python::
+
+    from lios.ingestion.ingest import ingest_documents
+    ingest_documents([{"title": "...", "text": "...", "source": "BGB 1"}])
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import pickle
+import sys
 from pathlib import Path
 from typing import Any
 
 from lios.ingestion.cleaner import clean_text
-from lios.retrieval.embedder import embed_texts
-from lios.retrieval.vector_store import build_flat_index, save_index
+from lios.ingestion.models import LegalChunk
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_INPUT = Path("data/raw/legal_dataset.json")
+_DEFAULT_OUTPUT = Path("data/corpus/legal_chunks.jsonl")
 _DEFAULT_INDEX = Path("data/index.faiss")
 _DEFAULT_CHUNKS = Path("data/chunks.pkl")
 
-CHUNK_SIZE = 400     # words per chunk
-CHUNK_OVERLAP = 50   # overlapping words between consecutive chunks
+CHUNK_SIZE = 400   # words per chunk
+CHUNK_OVERLAP = 50  # overlapping words between consecutive chunks
 
 
 # ---------------------------------------------------------------------------
-# Chunking
+# Shared chunking logic
 # ---------------------------------------------------------------------------
 
 
-def _chunk_words(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
-    """Split *text* into overlapping word windows.
+def _chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """Split *text* into overlapping word-based chunks.
 
     Args:
-        text:    Plain text to chunk.
-        size:    Window size in words.
-        overlap: Number of words shared between consecutive windows.
+        text:       Raw text to split.
+        chunk_size: Maximum number of words per chunk.
+        overlap:    Number of words shared between consecutive chunks.
 
     Returns:
-        List of chunk strings.
+        List of text chunk strings.
     """
     words = text.split()
     if not words:
         return []
-    step = max(1, size - overlap)
     chunks: list[str] = []
-    start = 0
-    while start < len(words):
-        chunk_words = words[start : start + size]
-        chunks.append(" ".join(chunk_words))
-        if start + size >= len(words):
-            break
-        start += step
+    step = max(1, chunk_size - overlap)
+    for start in range(0, len(words), step):
+        chunk = " ".join(words[start : start + chunk_size])
+        if chunk:
+            chunks.append(chunk)
     return chunks
 
 
+# Keep the original name as an alias for callers that use _chunk_words.
+# The wrapper maps the legacy ``size`` parameter name to ``chunk_size``.
+def _chunk_words(
+    text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP
+) -> list[str]:
+    """Backwards-compatible alias for :func:`_chunk_text` with ``size`` parameter."""
+    return _chunk_text(text, chunk_size=size, overlap=overlap)
+
+
 # ---------------------------------------------------------------------------
-# Main ingestion function
+# Mode 1 -- JSONL corpus pipeline (no extra dependencies)
+# ---------------------------------------------------------------------------
+
+
+def ingest_documents(
+    docs: list[dict[str, Any]],
+    output_path: str | Path = _DEFAULT_OUTPUT,
+    chunk_size: int = CHUNK_SIZE,
+    overlap: int = CHUNK_OVERLAP,
+) -> int:
+    """Ingest a list of document dicts, appending chunks to the JSONL corpus.
+
+    Existing entries in the output file are preserved.  New chunks are appended
+    so the file can be incrementally enriched.
+
+    Args:
+        docs:        List of document dicts (see module docstring for schema).
+        output_path: Destination JSONL file.  Defaults to
+                     ``data/corpus/legal_chunks.jsonl``.
+        chunk_size:  Words per chunk (default 400).
+        overlap:     Word overlap between consecutive chunks (default 50).
+
+    Returns:
+        Number of chunks written.
+    """
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    written = 0
+    with out.open("a", encoding="utf-8") as f:
+        for doc in docs:
+            title: str = doc.get("title", "Untitled")
+            text: str = clean_text(doc.get("text", ""))
+            regulation: str = doc.get("regulation", "CUSTOM")
+            source: str = doc.get("source", "")
+            source_url: str = doc.get("source_url", "")
+            jurisdiction: str = doc.get("jurisdiction", "EU")
+            published_date: str = doc.get("published_date", "")
+            effective_date: str = doc.get("effective_date", published_date)
+
+            if not text.strip():
+                continue
+
+            sub_chunks = _chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+            for idx, sub in enumerate(sub_chunks):
+                article_id = source if source else f"chunk-{idx + 1}"
+                if len(sub_chunks) > 1 and source:
+                    article_id = f"{source}-part{idx + 1}"
+
+                chunk = LegalChunk.create(
+                    source_url=source_url,
+                    celex_or_doc_id=source or regulation,
+                    jurisdiction=jurisdiction,
+                    regulation=regulation,
+                    article=article_id,
+                    published_date=published_date,
+                    effective_date=effective_date,
+                    title=title,
+                    text=sub,
+                )
+                f.write(json.dumps(chunk.to_dict(), ensure_ascii=False) + "\n")
+                written += 1
+
+    return written
+
+
+# ---------------------------------------------------------------------------
+# Mode 2 -- FAISS + pickle pipeline (requires lios[data])
 # ---------------------------------------------------------------------------
 
 
 def run_ingestion(
-    input_path: str | Path = _DEFAULT_INPUT,
+    input_path: str | Path = "data/raw/legal_dataset.json",
     index_path: str | Path = _DEFAULT_INDEX,
     chunks_path: str | Path = _DEFAULT_CHUNKS,
 ) -> int:
-    """Load, clean, chunk, embed, and index legal documents.
+    """Load, clean, chunk, embed, and index legal documents into FAISS.
+
+    Requires the ``lios[data]`` extras (``sentence-transformers``,
+    ``faiss-cpu``).
 
     Args:
         input_path:  Path to the JSON file with legal documents.
@@ -89,7 +181,17 @@ def run_ingestion(
 
     Returns:
         Total number of chunks ingested.
+
+    Raises:
+        FileNotFoundError: If *input_path* does not exist.
+        ImportError: If ``sentence-transformers`` or ``faiss-cpu`` are not
+                     installed (install with ``pip install lios[data]``).
     """
+    import pickle
+
+    from lios.retrieval.embedder import embed_texts
+    from lios.retrieval.vector_store import build_flat_index, save_index
+
     input_file = Path(input_path)
     if not input_file.exists():
         raise FileNotFoundError(f"Input file not found: {input_file}")
@@ -105,7 +207,7 @@ def run_ingestion(
     for doc in documents:
         raw_text = doc.get("text", "")
         cleaned = clean_text(raw_text)
-        word_chunks = _chunk_words(cleaned)
+        word_chunks = _chunk_text(cleaned)
 
         for chunk_text in word_chunks:
             chunk_meta: dict[str, Any] = {
@@ -118,13 +220,13 @@ def run_ingestion(
             all_texts.append(chunk_text)
 
     if not all_chunks:
-        logger.warning("No chunks produced – check input file.")
+        logger.warning("No chunks produced -- check input file.")
         return 0
 
-    logger.info("Generated %d chunks; computing embeddings…", len(all_chunks))
+    logger.info("Generated %d chunks; computing embeddings...", len(all_chunks))
     vectors = embed_texts(all_texts)
 
-    logger.info("Building FAISS index…")
+    logger.info("Building FAISS index...")
     index = build_flat_index(vectors)
 
     save_index(index, index_path)
@@ -139,7 +241,24 @@ def run_ingestion(
     return len(all_chunks)
 
 
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    total = run_ingestion()
-    print(f"Ingested {total} chunks.")
+    if len(sys.argv) < 2:
+        print("Usage: python -m lios.ingestion.ingest <documents.json> [output.jsonl]")
+        sys.exit(1)
+
+    _input_file = Path(sys.argv[1])
+    _output_file = Path(sys.argv[2]) if len(sys.argv) > 2 else _DEFAULT_OUTPUT
+
+    with _input_file.open("r", encoding="utf-8") as _fh:
+        _data = json.load(_fh)
+
+    if isinstance(_data, dict):
+        _data = [_data]
+
+    _count = ingest_documents(_data, output_path=_output_file)
+    print(f"Ingested {_count} chunks into {_output_file}")
