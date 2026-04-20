@@ -27,8 +27,8 @@ def engine(db):
 
 def test_consensus_engine_requires_three_agents(db):
     sus = SustainabilityAgent(db)
-    with pytest.raises(ValueError, match="exactly 3 agents"):
-        ConsensusEngine([sus, sus])
+    with pytest.raises(ValueError, match="at least 2 agents"):
+        ConsensusEngine([sus])
 
 
 def test_consensus_run_returns_result(engine):

@@ -20,13 +20,64 @@ class AgentResponse:
     conclusion_keywords: list[str] = field(default_factory=list)
 
 
+@dataclass
+class DomainRule:
+    """A keyword-triggered rule that emits a specific guidance text.
+
+    This dataclass is used by concrete agents to declare their domain
+    knowledge declaratively, eliminating repetitive ``if kw in query``
+    patterns (Template-Method / data-driven approach).
+
+    Attributes:
+        keywords: If *any* of these appear in the lower-cased query the rule
+            fires.  Use full sub-strings (e.g. ``"supply chain"``).
+        text: The guidance text appended to the answer when the rule fires.
+        require_all: When True *all* keywords must match (AND-semantics).
+            Defaults to False (OR-semantics).
+
+    Examples::
+
+        # OR-semantics: fires when 'climate' OR 'ghg' appears in the query
+        DomainRule(
+            keywords=["climate", "ghg"],
+            text="ESRS E1 requires GHG emission disclosure..."
+        )
+
+        # AND-semantics: fires only when BOTH 'double' AND 'materiality' appear
+        DomainRule(
+            keywords=["double", "materiality"],
+            text="CSRD Art.4 requires a double materiality assessment...",
+            require_all=True,
+        )
+    """
+
+    keywords: list[str]
+    text: str
+    require_all: bool = False
+
+    def matches(self, query_lower: str) -> bool:
+        """Return True if the rule matches *query_lower*."""
+        if self.require_all:
+            return all(kw in query_lower for kw in self.keywords)
+        return any(kw in query_lower for kw in self.keywords)
+
+
 class BaseAgent(ABC):
-    """Abstract base for all LIOS specialist agents."""
+    """Abstract base for all LIOS specialist agents.
+
+    Subclasses should declare a ``DOMAIN_RULES`` class attribute with a list
+    of :class:`DomainRule` instances.  The base ``_domain_analysis`` method
+    iterates over those rules automatically, so most subclasses no longer need
+    to override ``_domain_analysis`` – they only need to set ``DOMAIN_RULES``.
+    Subclasses that need more complex behaviour may still override the method.
+    """
 
     name: str = "base"
     domain: str = "general"
     # Subclasses declare which regulations they focus on
     primary_regulations: list[str] = []
+    # Subclasses populate this to drive _domain_analysis automatically
+    DOMAIN_RULES: list[DomainRule] = []
 
     def __init__(self, db: RegulatoryDatabase | None = None) -> None:
         self.db = db or RegulatoryDatabase()
@@ -110,12 +161,26 @@ class BaseAgent(ABC):
 
         return "\n".join(answer_lines), conclusion_kws
 
-    @abstractmethod
     def _domain_analysis(
         self, query_lower: str, articles: list[dict[str, Any]], context: dict[str, Any]
     ) -> list[str]:
-        """Domain-specific analysis lines appended to the answer."""
-        ...
+        """Domain-specific analysis lines appended to the answer.
+
+        Default implementation iterates over ``DOMAIN_RULES`` and appends the
+        text for every rule that fires.  Subclasses that declare
+        ``DOMAIN_RULES`` typically do *not* need to override this method.
+        Subclasses that need more complex logic may override it freely.
+        """
+        lines: list[str] = []
+        for rule in self.DOMAIN_RULES:
+            if rule.matches(query_lower):
+                lines.append(rule.text)
+        if not lines:
+            lines.append(
+                f"Consult {', '.join(self.primary_regulations) or 'the applicable regulation'} "
+                "provisions for comprehensive compliance obligations."
+            )
+        return lines
 
     def _extract_conclusion_keywords(
         self, query_lower: str, articles: list[dict[str, Any]]

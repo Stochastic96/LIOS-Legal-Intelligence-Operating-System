@@ -8,6 +8,9 @@ from typing import Any
 
 from lios.agents.base_agent import AgentResponse, BaseAgent
 from lios.agents.consensus import ConsensusEngine, ConsensusResult
+from lios.logging_setup import get_logger
+
+logger = get_logger(__name__)
 from lios.agents.finance_agent import FinanceAgent
 from lios.agents.sustainability_agent import SustainabilityAgent
 from lios.agents.supply_chain_agent import SupplyChainAgent
@@ -30,6 +33,7 @@ from lios.orchestration.query_parser import (
     QueryParser,
 )
 from lios.orchestration.response_aggregator import AggregatedResponse, ResponseAggregator
+from lios.retrieval.hybrid_retriever import HybridRetriever
 
 
 @dataclass
@@ -57,7 +61,9 @@ class OrchestrationEngine:
         self.aggregator = ResponseAggregator()
         self.decay_scorer = RegulatoryDecayScorer(self.db)
         self.conflict_detector = JurisdictionConflictDetector()
-        self.citation_engine = CitationEngine(self.db)
+        # Shared HybridRetriever instance – one model load, one doc-vector computation.
+        self.retriever = HybridRetriever()
+        self.citation_engine = CitationEngine(self.db, retriever=self.retriever)
         self.roadmap_generator = ComplianceRoadmapGenerator()
         self.applicability_checker = ApplicabilityChecker()
         self.conflict_mapper = ConflictMapper()
@@ -87,11 +93,19 @@ class OrchestrationEngine:
         lightweight: bool | None = None,
         concise: bool = True,
     ) -> FullResponse:
+        logger.info("route_query called | query=%r | intent_hint=%s", query[:80], preferred_intent)
+
         context: dict[str, Any] = {}
         if company_profile:
             context["company_profile"] = company_profile
 
-        parsed = self.parser.parse(query, context)
+        try:
+            parsed = self.parser.parse(query, context)
+        except Exception as exc:
+            logger.error("QueryParser failed: %s", exc, exc_info=True)
+            raise
+
+        logger.debug("Parsed intent=%s regulations=%s", parsed.intent, parsed.regulations)
 
         # If the conversation has stabilized, bias generic follow-ups toward recent direction.
         if preferred_intent and parsed.intent == "general_query":
@@ -112,43 +126,73 @@ class OrchestrationEngine:
         ))
         all_regulations = parsed.regulations or list(self.db.REGULATION_MODULES.keys())
 
-        primary_agent = self._select_primary_agent(parsed, query)
-        primary_response = primary_agent.analyze(query, context)
+        try:
+            primary_agent = self._select_primary_agent(parsed, query)
+            primary_response = primary_agent.analyze(query, context)
+            logger.debug("Primary agent %s responded (confidence=%.2f)", primary_agent.name, primary_response.confidence)
+        except Exception as exc:
+            logger.error("Primary agent analysis failed: %s", exc, exc_info=True)
+            primary_response = AgentResponse(
+                agent_name="fallback",
+                answer="Agent analysis temporarily unavailable. Please try again.",
+                citations=[],
+                confidence=0.1,
+                reasoning=str(exc),
+            )
 
         # Keep the first chat simple by default; consensus remains available when enabled.
         if self.consensus_engine is not None:
-            consensus_result = self.consensus_engine.run(query, context)
+            try:
+                consensus_result = self.consensus_engine.run(query, context)
+                logger.debug("Consensus reached=%s confidence=%.2f", consensus_result.consensus_reached, consensus_result.confidence)
+            except Exception as exc:
+                logger.warning("ConsensusEngine failed, falling back to single-agent: %s", exc)
+                consensus_result = self._build_single_agent_consensus(primary_response)
         else:
             consensus_result = self._build_single_agent_consensus(primary_response)
 
         # Run aggregator
-        aggregated = self.aggregator.aggregate(consensus_result.agent_responses)
+        try:
+            aggregated = self.aggregator.aggregate(consensus_result.agent_responses)
+        except Exception as exc:
+            logger.warning("ResponseAggregator failed, using empty aggregation: %s", exc)
+            from lios.orchestration.response_aggregator import AggregatedResponse
+            aggregated = AggregatedResponse(summary="", key_points=[], confidence=0.0)
 
         # Heavy analysis is skipped for lightweight/direct definition flows.
-        if use_lightweight:
-            decay_scores = []
-        else:
-            decay_scores = [
-                self.decay_scorer.decay_score(reg)
-                for reg in (parsed.regulations or list(self.db.REGULATION_MODULES.keys()))
-            ]
+        decay_scores = []
+        if not use_lightweight:
+            try:
+                decay_scores = [
+                    self.decay_scorer.decay_score(reg)
+                    for reg in (parsed.regulations or list(self.db.REGULATION_MODULES.keys()))
+                ]
+            except Exception as exc:
+                logger.warning("DecayScorer failed: %s", exc)
 
         # Jurisdiction conflicts
         jur_conflicts: list[Conflict] = []
         if not use_lightweight:
-            if all_jurisdictions:
-                for reg in all_regulations:
-                    jur_conflicts.extend(
-                        self.conflict_detector.detect_conflicts(reg, all_jurisdictions)
-                    )
-            else:
-                jur_conflicts = self.conflict_detector.get_all_known_conflicts()[:3]
+            try:
+                if all_jurisdictions:
+                    for reg in all_regulations:
+                        jur_conflicts.extend(
+                            self.conflict_detector.detect_conflicts(reg, all_jurisdictions)
+                        )
+                else:
+                    jur_conflicts = self.conflict_detector.get_all_known_conflicts()[:3]
+            except Exception as exc:
+                logger.warning("JurisdictionConflictDetector failed: %s", exc)
 
         # Citations
-        citations = self.citation_engine.get_citations(
-            query,
-            regulations=parsed.regulations if parsed.regulations else None,
-        )
+        try:
+            citations = self.citation_engine.get_citations(
+                query,
+                regulations=parsed.regulations if parsed.regulations else None,
+            )
+        except Exception as exc:
+            logger.warning("CitationEngine failed: %s", exc)
+            citations = []
 
         # Intent-specific extras
         roadmap: ComplianceRoadmap | None = None
@@ -157,17 +201,26 @@ class OrchestrationEngine:
         effective_company_profile = company_profile or parsed.company_profile
 
         if parsed.intent == INTENT_ROADMAP and effective_company_profile:
-            roadmap = self.roadmap_generator.generate_roadmap(effective_company_profile)
+            try:
+                roadmap = self.roadmap_generator.generate_roadmap(effective_company_profile)
+            except Exception as exc:
+                logger.warning("RoadmapGenerator failed: %s", exc)
 
         elif parsed.intent == INTENT_APPLICABILITY and effective_company_profile:
             reg = (parsed.regulations[0] if parsed.regulations else "CSRD")
-            applicability = self.applicability_checker.check_applicability(
-                reg, effective_company_profile
-            )
+            try:
+                applicability = self.applicability_checker.check_applicability(
+                    reg, effective_company_profile
+                )
+            except Exception as exc:
+                logger.warning("ApplicabilityChecker failed for %s: %s", reg, exc)
 
         elif parsed.intent == INTENT_BREAKDOWN and parsed.regulations:
             reg = parsed.regulations[0]
-            breakdown = self.breakdown_generator.generate_breakdown(query, reg)
+            try:
+                breakdown = self.breakdown_generator.generate_breakdown(query, reg)
+            except Exception as exc:
+                logger.warning("BreakdownGenerator failed for %s: %s", reg, exc)
 
         # Build final answer
         answer = self._build_final_answer(
@@ -185,15 +238,25 @@ class OrchestrationEngine:
                 citations=citations,
             )
 
-        answer = self.llm_refiner.refine(
-            query=query,
-            draft_answer=answer,
-            context={
-                "intent": parsed.intent,
-                "regulations": parsed.regulations,
-                "jurisdictions": all_jurisdictions,
-                "lightweight": use_lightweight,
-            },
+        try:
+            answer = self.llm_refiner.refine(
+                query=query,
+                draft_answer=answer,
+                context={
+                    "intent": parsed.intent,
+                    "regulations": parsed.regulations,
+                    "jurisdictions": all_jurisdictions,
+                    "lightweight": use_lightweight,
+                },
+            )
+        except Exception as exc:
+            logger.warning("LLMRefiner failed, using draft answer: %s", exc)
+
+        logger.info(
+            "route_query done | intent=%s | citations=%d | conflicts=%d",
+            parsed.intent,
+            len(citations),
+            len(jur_conflicts),
         )
 
         return FullResponse(

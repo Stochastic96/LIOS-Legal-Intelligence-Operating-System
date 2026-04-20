@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LIOS Chat Studio</title>
+    <style>
+        :root {
+            --bg: #f4f1e8;
+            --paper: #fffdf8;
+            --ink: #1c2322;
+            --muted: #61706c;
+            --brand: #126d67;
+            --accent: #cf642e;
+            --line: #d9d2c6;
+            --shadow: 0 18px 40px rgba(16, 24, 22, 0.12);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, #f8dcc2 0, transparent 34%),
+                radial-gradient(circle at top right, #d8efe7 0, transparent 28%),
+                linear-gradient(160deg, #faf7f0 0%, #f1eee7 100%);
+        }
+        .shell {
+            max-width: 1180px;
+            margin: 24px auto;
+            padding: 0 16px;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 16px;
+        }
+        .card {
+            background: var(--paper);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .sidebar { padding: 16px; }
+        .title h1 { margin: 0; font-size: 1.25rem; }
+        .title p { margin: 6px 0 0; color: var(--muted); font-size: 0.92rem; }
+        .field { margin-top: 14px; }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.78rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        input, textarea, button {
+            font: inherit;
+        }
+        input, textarea {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px 12px;
+            background: #fff;
+            color: var(--ink);
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        .help { margin-top: 10px; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+        button {
+            border: 0;
+            border-radius: 12px;
+            padding: 11px 14px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: transform 120ms ease, opacity 120ms ease;
+        }
+        button:hover { transform: translateY(-1px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .ghost { background: #ece7dc; color: #24302d; }
+        .primary { background: var(--brand); color: #fff; }
+        .workspace {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-height: 78vh;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(110deg, #fff 0%, #f8f5ef 100%);
+        }
+        .header strong { font-size: 1rem; }
+        .status {
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid #bcd9d2;
+            background: #dff2ed;
+            color: #255e57;
+            font-size: 0.76rem;
+            font-family: monospace;
+        }
+        .log {
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .bubble {
+            max-width: 88%;
+            padding: 12px 14px;
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            line-height: 1.45;
+            white-space: pre-wrap;
+            animation: rise 180ms ease;
+        }
+        .bubble.user { align-self: flex-end; background: #e9f3f0; border-color: #beddd7; }
+        .bubble.assistant { align-self: flex-start; background: #fff; }
+        .meta { margin-top: 8px; color: var(--muted); font-size: 0.74rem; font-family: monospace; }
+        .composer {
+            padding: 14px;
+            border-top: 1px solid var(--line);
+            background: #fbfaf6;
+            display: grid;
+            grid-template-columns: 1fr 128px;
+            gap: 12px;
+        }
+        .composer textarea { min-height: 56px; max-height: 160px; }
+        .send { background: var(--accent); color: #fff; }
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 900px) {
+            .shell { grid-template-columns: 1fr; }
+            .workspace { min-height: 70vh; }
+            .bubble { max-width: 100%; }
+            .composer { grid-template-columns: 1fr; }
+            .actions { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <aside class="card sidebar">
+            <div class="title">
+                <h1>LIOS Chat Studio</h1>
+                <p>Local-first training workspace</p>
+            </div>
+
+            <div class="field">
+                <label for="sessionId">Session ID</label>
+                <input id="sessionId" />
+            </div>
+
+            <div class="field">
+                <label for="jurisdictions">Jurisdictions</label>
+                <input id="jurisdictions" placeholder="EU, Germany" />
+            </div>
+
+            <div class="field">
+                <label for="profile">Company profile JSON</label>
+                <textarea id="profile" placeholder='{"employees":750,"turnover_eur":350000000,"listed":true}'></textarea>
+            </div>
+
+            <div class="actions">
+                <button class="ghost" id="loadBtn">Load Session</button>
+                <button class="ghost" id="exportBtn">Export JSONL</button>
+            </div>
+
+            <div class="help">Every exchange is stored locally in logs/chat_training.jsonl for iterative training and prompt tuning.</div>
+        </aside>
+
+        <section class="card workspace">
+            <header class="header">
+                <strong>Interactive Legal Chat</strong>
+                <span class="status" id="status">ready</span>
+            </header>
+            <main class="log" id="chatLog"></main>
+            <footer class="composer">
+                <textarea id="prompt" placeholder="Ask LIOS a compliance question..."></textarea>
+                <button class="send" id="sendBtn">Send</button>
+            </footer>
+        </section>
+    </div>
+
+    <script>
+        const chatLog = document.getElementById("chatLog");
+        const statusEl = document.getElementById("status");
+        const promptEl = document.getElementById("prompt");
+        const sendBtn = document.getElementById("sendBtn");
+        const loadBtn = document.getElementById("loadBtn");
+        const exportBtn = document.getElementById("exportBtn");
+        const sessionEl = document.getElementById("sessionId");
+        const jursEl = document.getElementById("jurisdictions");
+        const profileEl = document.getElementById("profile");
+
+        sessionEl.value = `session-${Date.now().toString(36)}`;
+
+        function addBubble(text, role, meta = "") {
+            const bubble = document.createElement("div");
+            bubble.className = `bubble ${role}`;
+            bubble.textContent = text;
+            if (meta) {
+                const metaEl = document.createElement("div");
+                metaEl.className = "meta";
+                metaEl.textContent = meta;
+                bubble.appendChild(metaEl);
+            }
+            chatLog.appendChild(bubble);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function parseProfile() {
+            const raw = profileEl.value.trim();
+            if (!raw) return null;
+            return JSON.parse(raw);
+        }
+
+        async function sendMessage() {
+            const query = promptEl.value.trim();
+            if (!query) return;
+
+            let companyProfile = null;
+            try {
+                companyProfile = parseProfile();
+            } catch {
+                addBubble("Invalid company profile JSON. Please fix it and try again.", "assistant");
+                return;
+            }
+
+            const jurisdictions = jursEl.value.split(",").map((value) => value.trim()).filter(Boolean);
+
+            addBubble(query, "user");
+            promptEl.value = "";
+            statusEl.textContent = "thinking";
+            sendBtn.disabled = true;
+
+            try {
+                const response = await fetch("/chat/api/message", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        query,
+                        session_id: sessionEl.value,
+                        jurisdictions,
+                        company_profile: companyProfile,
+                    }),
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    addBubble(`Error: ${data.error || "request failed"}`, "assistant");
+                    return;
+                }
+
+                const citations = (data.citations || [])
+                    .slice(0, 3)
+                    .map((citation) => `${citation.regulation} ${citation.article_id}`)
+                    .join(" | ");
+                addBubble(data.answer, "assistant", `intent=${data.intent}${citations ? " | " + citations : ""}`);
+            } catch (error) {
+                addBubble(`Request failed: ${error}`, "assistant");
+            } finally {
+                statusEl.textContent = "ready";
+                sendBtn.disabled = false;
+            }
+        }
+
+        async function loadSession() {
+            statusEl.textContent = "loading";
+            chatLog.innerHTML = "";
+            try {
+                const response = await fetch(`/chat/api/history?session_id=${encodeURIComponent(sessionEl.value)}`);
+                const data = await response.json();
+                if (!response.ok) {
+                    addBubble(`Error: ${data.error || "unable to load session"}`, "assistant");
+                    return;
+                }
+                for (const turn of data.turns || []) {
+                    addBubble(turn.user_query || "", "user");
+                    addBubble(turn.answer || "", "assistant", `intent=${turn.intent || "unknown"}`);
+                }
+            } finally {
+                statusEl.textContent = "ready";
+            }
+        }
+
+        async function exportSession() {
+            const response = await fetch(`/chat/api/export?session_id=${encodeURIComponent(sessionEl.value)}`);
+            if (!response.ok) {
+                addBubble("Could not export session.", "assistant");
+                return;
+            }
+            const text = await response.text();
+            const blob = new Blob([text], { type: "application/x-ndjson" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${sessionEl.value}.jsonl`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        loadBtn.addEventListener("click", loadSession);
+        exportBtn.addEventListener("click", exportSession);
+        promptEl.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        addBubble("Workspace ready. Send your first query to begin local training capture.", "assistant");
+    </script>
+</body>
+</html>

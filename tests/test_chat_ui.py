@@ -39,12 +39,22 @@ def test_chat_alias_redirects_to_chat() -> None:
 
 
 def test_debug_routes_lists_chat_path() -> None:
+    import os
+
+    os.environ["LIOS_DEV_MODE"] = "true"
+    # Recreate settings to pick up the env var
+    from lios.config import settings as _settings
+    _settings.DEV_MODE = True
+
     client = TestClient(routes.app)
     response = client.get("/debug/routes")
     assert response.status_code == 200
     payload = response.json()
     assert "/chat" in payload["routes"]
     assert "/chat-react" in payload["routes"]
+
+    _settings.DEV_MODE = False
+    os.environ.pop("LIOS_DEV_MODE", None)
 
 
 def test_favicon_returns_no_content() -> None:

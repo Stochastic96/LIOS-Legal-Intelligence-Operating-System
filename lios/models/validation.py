@@ -125,6 +125,71 @@ class QueryRequest(BaseModel):
         return unique_jurs
 
 
+class ChatMessageRequest(BaseModel):
+    """Validated request body for POST /chat/api/message."""
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "query": "Does CSRD apply to our company?",
+            "session_id": "session-abc123",
+            "jurisdictions": ["EU", "Germany"],
+            "company_profile": {
+                "employees": 600,
+                "turnover_eur": 50_000_000,
+                "balance_sheet_eur": 25_000_000,
+                "listed": False,
+            },
+        }
+    })
+
+    query: str = Field(
+        ...,
+        min_length=3,
+        max_length=5000,
+        description="The user's question (3-5000 characters)",
+    )
+    session_id: Optional[str] = Field(
+        default=None,
+        max_length=128,
+        description="Optional session identifier for conversation history",
+    )
+    jurisdictions: Optional[list[str]] = Field(
+        default=None,
+        max_length=10,
+        description="List of jurisdictions to consider (max 10)",
+    )
+    company_profile: Optional[CompanyProfile] = Field(
+        default=None,
+        description="Optional company profile for context-aware responses",
+    )
+
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Query cannot be empty or whitespace-only")
+        return v.strip()
+
+    @field_validator("session_id")
+    @classmethod
+    def validate_session_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+            # Prevent path-traversal characters in session IDs
+            if any(c in v for c in ("/", "\\", "..", "\x00")):
+                raise ValueError("session_id contains invalid characters")
+        return v
+
+    @field_validator("jurisdictions")
+    @classmethod
+    def validate_jurisdictions(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v is None:
+            return v
+        return list(dict.fromkeys(jur.upper() for jur in v))
+
+
 class ApplicabilityRequest(BaseModel):
     """Validated applicability check request."""
 

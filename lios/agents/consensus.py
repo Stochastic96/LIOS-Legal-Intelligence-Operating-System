@@ -22,15 +22,21 @@ class ConsensusResult:
 
 
 class ConsensusEngine:
-    """Run three agents in parallel; require ≥ CONSENSUS_THRESHOLD to agree."""
+    """Run N agents in parallel; require ≥ CONSENSUS_THRESHOLD to agree.
+
+    Args:
+        agents: Two or more :class:`BaseAgent` instances.
+        threshold: Minimum number of agents that must share a keyword to
+            declare consensus.  Defaults to ``settings.CONSENSUS_THRESHOLD``.
+    """
 
     def __init__(
         self,
         agents: list[BaseAgent],
         threshold: int | None = None,
     ) -> None:
-        if len(agents) != 3:
-            raise ValueError("ConsensusEngine requires exactly 3 agents.")
+        if len(agents) < 2:
+            raise ValueError("ConsensusEngine requires at least 2 agents.")
         self.agents = agents
         self.threshold = threshold if threshold is not None else settings.CONSENSUS_THRESHOLD
 
@@ -50,8 +56,9 @@ class ConsensusEngine:
     def _parallel_analyze(
         self, query: str, context: dict[str, Any]
     ) -> list[AgentResponse]:
-        results: list[AgentResponse | None] = [None, None, None]
-        errors: list[Exception | None] = [None, None, None]
+        n = len(self.agents)
+        results: list[AgentResponse | None] = [None] * n
+        errors: list[Exception | None] = [None] * n
 
         def run_agent(idx: int, agent: BaseAgent) -> None:
             try:
