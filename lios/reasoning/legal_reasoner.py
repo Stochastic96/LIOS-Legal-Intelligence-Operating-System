@@ -8,6 +8,8 @@ prompt that instructs the LLM to:
 * Accept context in German (EU / BGB / GDPR texts) while always responding in English.
 * Format the answer with the four IRAC sections.
 * Cite the source of every legal rule it references.
+* Adapt the response depth to the question type (definition, applicability,
+  requirement, timeline, penalty, etc.).
 """
 
 from __future__ import annotations
@@ -24,7 +26,8 @@ def build_prompt(
 
     The prompt enforces grounded answers: the model must reason only from the
     provided context and use the Issue / Rule / Analysis / Conclusion structure
-    common in legal practice.
+    common in legal practice.  A question-type hint is added to guide the model
+    toward the most useful response format.
 
     Args:
         question:          The user's legal question (English).
@@ -45,6 +48,8 @@ def build_prompt(
     else:
         context_text = _format_chunks(context, max_context_chars)
 
+    question_hint = _question_type_hint(question)
+
     return (
         "You are LIOS, a legal assistant specialising in EU and German law.\n\n"
         "STRICT RULES:\n"
@@ -55,6 +60,7 @@ def build_prompt(
         "\"I don't know based on the provided context.\"\n"
         "- Preserve legal precision; do not paraphrase in ways that change meaning.\n"
         "- Cite the source document or section whenever you state a legal rule.\n\n"
+        f"{question_hint}"
         "Use the following legal reasoning structure in your answer:\n\n"
         "1. Issue    -- What is the legal question being asked?\n"
         "2. Rule     -- Which legal provision(s) apply? Cite the source (e.g., GDPR Art. 6).\n"
@@ -65,6 +71,56 @@ def build_prompt(
         "---\n"
         f"Question:\n{question}\n"
     )
+
+
+def _question_type_hint(question: str) -> str:
+    """Return a short instruction paragraph tailored to the question type."""
+    q = question.lower()
+
+    if any(kw in q for kw in ("what is", "define", "what does", "meaning of")):
+        return (
+            "RESPONSE GUIDANCE: This is a definition question.  Provide a clear, "
+            "precise definition drawn directly from the context.\n\n"
+        )
+    if any(kw in q for kw in ("applies to", "who must", "which compan", "subject to",
+                               "applicable", "do we", "are we")):
+        return (
+            "RESPONSE GUIDANCE: This is an applicability question.  Identify the "
+            "specific criteria (employee thresholds, turnover, listing status, etc.) "
+            "from the context and state whether they apply.\n\n"
+        )
+    if any(kw in q for kw in ("penalty", "fine", "sanction", "non-compliance",
+                               "what happens if", "consequence")):
+        return (
+            "RESPONSE GUIDANCE: This is a penalty question.  Focus on enforcement "
+            "mechanisms, sanction levels, and the responsible enforcement authority "
+            "as described in the context.\n\n"
+        )
+    if any(kw in q for kw in ("when", "deadline", "timeline", "by when",
+                               "phased", "financial year")):
+        return (
+            "RESPONSE GUIDANCE: This is a timeline question.  Extract and clearly "
+            "list all relevant dates and deadlines from the context in chronological "
+            "order.\n\n"
+        )
+    if any(kw in q for kw in ("how to", "how do", "steps", "procedure", "process",
+                               "implement", "comply")):
+        return (
+            "RESPONSE GUIDANCE: This is a procedural question.  Structure your "
+            "answer as a numbered sequence of steps drawn from the context.\n\n"
+        )
+    if any(kw in q for kw in ("difference", "compare", "versus", " vs ", "distinguish")):
+        return (
+            "RESPONSE GUIDANCE: This is a comparison question.  Clearly contrast "
+            "the two subjects along key dimensions (scope, obligations, timeline, etc.).\n\n"
+        )
+    if any(kw in q for kw in ("requirement", "must", "shall", "obligat", "what must",
+                               "what are the", "disclosure")):
+        return (
+            "RESPONSE GUIDANCE: This is a requirements question.  List each "
+            "obligation as a separate bullet point with its source citation.\n\n"
+        )
+    return ""
 
 
 def _format_chunks(chunks: list[Any], max_chars: int) -> str:

@@ -68,13 +68,15 @@ def generate_answer(question: str) -> str:
 
         return call_ollama_sync(prompt)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Ollama unavailable (%s); falling back to rule-based engine.", exc)
+        logger.warning(
+            "Ollama unavailable (%s); falling back to AnswerSynthesizer.", exc
+        )
 
-    from lios.orchestration.engine import OrchestrationEngine
+    # Synthesize a dynamic IRAC answer from the retrieved chunks without Ollama.
+    from lios.intelligence.answer_synthesizer import AnswerSynthesizer
 
-    engine = OrchestrationEngine()
-    result = engine.route_query(question)
-    return result.answer
+    synthesizer = AnswerSynthesizer()
+    return synthesizer.synthesize(question, raw_chunks)
 
 
 # ---------------------------------------------------------------------------
