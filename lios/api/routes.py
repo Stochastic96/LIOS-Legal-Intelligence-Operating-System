@@ -198,6 +198,107 @@ async def rag_query(request: _RagQueryRequest) -> dict[str, Any]:
 
     return {"query": user_query, "answer": answer, "sources": sources}
 
+
+# ---------------------------------------------------------------------------
+# Synthesize endpoint – uses AnswerSynthesizer without requiring Ollama
+# ---------------------------------------------------------------------------
+
+
+class _SynthesizeRequest(BaseModel):
+    query: str
+
+
+@app.post("/api/synthesize")
+def synthesize_answer(request: _SynthesizeRequest) -> dict[str, Any]:
+    """Synthesize a dynamic IRAC answer using the retrieval corpus (no Ollama required).
+
+    Unlike ``/api/query`` this endpoint never calls Ollama.  It uses
+    :class:`~lios.intelligence.answer_synthesizer.AnswerSynthesizer` to build
+    a structured IRAC answer directly from retrieved legal chunks.  This
+    ensures an answer is always available even when Ollama is offline.
+
+    Returns JSON with ``query``, ``answer``, ``question_type``, and ``sources``.
+    """
+    from lios.intelligence.answer_synthesizer import AnswerSynthesizer
+    from lios.intelligence.question_classifier import QuestionClassifier
+
+    retriever = get_retriever()
+    user_query = request.query.strip()
+
+    retrieved = retriever.search(user_query, top_k=5)
+    chunks = [rc.chunk for rc in retrieved]
+
+    classifier = QuestionClassifier()
+    question_type = classifier.classify(user_query).value
+
+    synthesizer = AnswerSynthesizer()
+    answer = synthesizer.synthesize(user_query, chunks)
+
+    sources = [
+        {
+            "regulation": rc.chunk.get("regulation", ""),
+            "article": rc.chunk.get("article", ""),
+            "title": rc.chunk.get("title", ""),
+            "score": round(rc.total_score, 4),
+            "source_url": rc.chunk.get("source_url", ""),
+        }
+        for rc in retrieved
+    ]
+
+    return {
+        "query": user_query,
+        "answer": answer,
+        "question_type": question_type,
+        "sources": sources,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Evaluate endpoint – scores an answer against retrieved chunks
+# ---------------------------------------------------------------------------
+
+
+class _EvaluateRequest(BaseModel):
+    question: str
+    answer: str
+
+
+@app.post("/api/evaluate")
+def evaluate_answer(request: _EvaluateRequest) -> dict[str, Any]:
+    """Evaluate the quality of a generated answer against the knowledge corpus.
+
+    Retrieves relevant chunks for *question*, then scores *answer* on four
+    dimensions: grounding, citation coverage, completeness, and diversity.
+
+    Returns JSON with ``overall_score``, ``grade``, per-dimension scores,
+    and ``feedback`` suggestions.
+    """
+    from lios.evaluation.answer_evaluator import AnswerEvaluator
+
+    retriever = get_retriever()
+    user_query = request.question.strip()
+
+    retrieved = retriever.search(user_query, top_k=5)
+    chunks = [rc.chunk for rc in retrieved]
+
+    evaluator = AnswerEvaluator()
+    result = evaluator.evaluate(
+        question=user_query,
+        answer=request.answer,
+        chunks=chunks,
+    )
+
+    return {
+        "question": user_query,
+        "overall_score": result.overall_score,
+        "grade": result.grade,
+        "grounding_score": result.grounding_score,
+        "citation_score": result.citation_score,
+        "completeness_score": result.completeness_score,
+        "diversity_score": result.diversity_score,
+        "feedback": result.feedback,
+    }
+
 # ---------------------------------------------------------------------------
 # Backward-compat re-exports used by existing tests
 # ---------------------------------------------------------------------------
