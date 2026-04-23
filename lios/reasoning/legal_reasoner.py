@@ -73,6 +73,30 @@ def build_prompt(
     )
 
 
+def build_direct_prompt(question: str) -> str:
+    """Build a direct LLM prompt for easy questions that need no corpus context.
+
+    Unlike :func:`build_prompt`, this does not supply a retrieved context block.
+    Intended for DEFINITION and GENERAL questions where the LLM's training
+    knowledge is sufficient. The caller should verify the answer with
+    FactVerifier and fall back to the RAG path when the answer is not grounded.
+    """
+    question_hint = _question_type_hint(question)
+    return (
+        "You are LIOS, a legal assistant specialising in EU and German law.\n\n"
+        "INSTRUCTIONS:\n"
+        "- Answer using your training knowledge of EU regulations (CSRD, ESRS, SFDR, "
+        "EU Taxonomy, GDPR, and related directives).\n"
+        "- Respond ONLY in English.\n"
+        "- Do NOT invent specific article numbers or cite non-existent provisions.\n"
+        "- If you are uncertain, say so clearly rather than guessing.\n"
+        "- Keep the answer concise and factually accurate.\n"
+        "- Do NOT use an IRAC structure — give a clear, direct answer.\n\n"
+        f"{question_hint}"
+        f"Question:\n{question}\n"
+    )
+
+
 def _question_type_hint(question: str) -> str:
     """Return a short instruction paragraph tailored to the question type."""
     q = question.lower()

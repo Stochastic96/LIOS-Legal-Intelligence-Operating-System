@@ -13,10 +13,10 @@ class Settings:
     LOG_LEVEL: str = "INFO"
 
     # LLM backend (optional)
-    LLM_ENABLED: bool = False
+    LLM_ENABLED: bool = True
     LLM_PROVIDER: str = "openai_compatible"  # openai_compatible | azure
     LLM_BASE_URL: str = "http://localhost:11434/v1"
-    LLM_MODEL: str = "llama3"
+    LLM_MODEL: str = "mistral:7b-instruct-q4_K_M"
     LLM_API_KEY: str = "ollama"
     LLM_TIMEOUT_SECONDS: int = 30
 
@@ -50,7 +50,7 @@ class Settings:
 
     def __post_init__(self) -> None:
         # Allow environment variable overrides
-        self.LLM_ENABLED = os.environ.get("LIOS_LLM_ENABLED", "false").lower() == "true"
+        self.LLM_ENABLED = os.environ.get("LIOS_LLM_ENABLED", "true").lower() == "true"
         self.LLM_PROVIDER = os.environ.get("LIOS_LLM_PROVIDER", self.LLM_PROVIDER)
         self.LLM_BASE_URL = os.environ.get("LIOS_LLM_BASE_URL", self.LLM_BASE_URL)
         self.LLM_MODEL = os.environ.get("LIOS_LLM_MODEL", self.LLM_MODEL)

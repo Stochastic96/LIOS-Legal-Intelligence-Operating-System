@@ -145,3 +145,35 @@ class QuestionClassifier:
             if pattern.search(question):
                 matches.append(qtype)
         return matches or [QuestionType.GENERAL]
+
+
+# ---------------------------------------------------------------------------
+# Easy-question routing helper
+# ---------------------------------------------------------------------------
+
+_COMPANY_CONTEXT_RE = re.compile(
+    r"\b(\d[\d,\.]*\s*(employees?|staff|workers?|fte|turnover|revenue|sales)|"
+    r"our\s+company|we\s+have|we\s+are|our\s+business|my\s+company)\b",
+    re.IGNORECASE,
+)
+_ARTICLE_REF_RE = re.compile(
+    r"\b(art(?:icle)?\.?\s*\d+\w*|§\s*\d+\w*|paragraph\s+\d+\w*|recital\s+\d+\w*|annex\s+[ivxIVX]+\w*)",
+    re.IGNORECASE,
+)
+
+
+def is_easy_question(question: str, qtype: QuestionType) -> bool:
+    """Return True when the LLM can answer directly without corpus retrieval.
+
+    A question is considered easy when all of the following hold:
+    - The type is DEFINITION or GENERAL (not applicability, penalty, etc.)
+    - The question contains no company-specific metrics (employee counts, turnover)
+    - The question does not reference a specific article, paragraph, or annex number
+    """
+    if qtype not in (QuestionType.DEFINITION, QuestionType.GENERAL):
+        return False
+    if _COMPANY_CONTEXT_RE.search(question):
+        return False
+    if _ARTICLE_REF_RE.search(question):
+        return False
+    return True

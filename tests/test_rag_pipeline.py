@@ -340,6 +340,88 @@ class TestLegalReasoner:
 
 
 # ---------------------------------------------------------------------------
+# build_direct_prompt
+# ---------------------------------------------------------------------------
+
+
+class TestBuildDirectPrompt:
+    def test_contains_question(self):
+        from lios.reasoning.legal_reasoner import build_direct_prompt
+
+        prompt = build_direct_prompt("What is CSRD?")
+        assert "What is CSRD?" in prompt
+
+    def test_no_irac_structure(self):
+        from lios.reasoning.legal_reasoner import build_direct_prompt
+
+        prompt = build_direct_prompt("What is CSRD?")
+        assert "Legal Context:" not in prompt
+        assert "1. Issue" not in prompt
+
+    def test_instructs_no_fabricated_articles(self):
+        from lios.reasoning.legal_reasoner import build_direct_prompt
+
+        prompt = build_direct_prompt("What is CSRD?")
+        assert "invent" in prompt.lower() or "article" in prompt.lower()
+
+    def test_requires_english_response(self):
+        from lios.reasoning.legal_reasoner import build_direct_prompt
+
+        prompt = build_direct_prompt("What is CSRD?")
+        assert "English" in prompt or "english" in prompt.lower()
+
+
+# ---------------------------------------------------------------------------
+# generate_answer routing
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateAnswer:
+    def test_returns_string(self):
+        import httpx
+        from unittest.mock import patch
+        from lios.main import generate_answer
+
+        with patch(
+            "lios.llm.ollama_client.call_ollama_sync",
+            side_effect=httpx.ConnectError("refused"),
+        ):
+            result = generate_answer("What is CSRD?")
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_easy_question_tries_direct_prompt_first(self):
+        from unittest.mock import patch
+        from lios.main import generate_answer
+
+        calls = []
+
+        def mock_ollama(prompt, model=None):
+            calls.append(prompt)
+            return "CSRD is the Corporate Sustainability Reporting Directive."
+
+        with patch("lios.llm.ollama_client.call_ollama_sync", side_effect=mock_ollama):
+            generate_answer("What is CSRD?")
+
+        assert len(calls) >= 1
+        # First call should NOT include corpus context (easy/direct path)
+        assert "Legal Context:" not in calls[0]
+
+    def test_ollama_down_returns_synthesizer_answer(self):
+        import httpx
+        from unittest.mock import patch
+        from lios.main import generate_answer
+
+        with patch(
+            "lios.llm.ollama_client.call_ollama_sync",
+            side_effect=httpx.ConnectError("refused"),
+        ):
+            result = generate_answer("What are the penalties for CSRD non-compliance?")
+        assert isinstance(result, str)
+        assert len(result) > 10
+
+
+# ---------------------------------------------------------------------------
 # validator
 # ---------------------------------------------------------------------------
 

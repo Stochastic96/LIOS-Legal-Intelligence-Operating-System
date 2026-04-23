@@ -21,7 +21,6 @@ from typing import Any
 
 from lios.api.routes import app
 from lios.cli.interface import cli
-from lios.llm.ollama_client import OLLAMA_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -34,27 +33,72 @@ __all__ = ["app", "cli", "generate_answer", "run_pipeline"]
 
 
 def generate_answer(question: str) -> str:
-    """Answer a legal question using the full LIOS RAG pipeline.
+    """Answer a legal question using the LIOS routing pipeline.
 
-    The pipeline:
-    1. Retrieves relevant legal chunks via HybridRetriever
-       (BM25 + semantic + grounded rerank).
-    2. Builds a structured IRAC-style prompt via build_prompt.
-    3. Sends the prompt to Ollama/Mistral and returns the answer.
+    Routes the question through one of two paths:
 
-    When Ollama is unavailable the function falls back gracefully to the
-    rule-based OrchestrationEngine.
+    EASY PATH (DEFINITION / GENERAL, no company metrics, no article refs):
+      1. Call Ollama/Mistral directly without corpus context.
+      2. Retrieve top-5 chunks and verify grounding with FactVerifier.
+      3. If grounded: return the LLM answer.
+      4. If not grounded: re-ask with corpus context (RAG path).
+
+    COMPLEX PATH (all other question types, or when easy-path fails):
+      1. Retrieve top-5 chunks via HybridRetriever.
+      2. Build IRAC prompt with corpus context.
+      3. Call Ollama/Mistral and return the answer.
+
+    Falls back to rule-based AnswerSynthesizer when Ollama is unavailable.
 
     Args:
         question: The user's legal question in natural language.
 
     Returns:
-        A string answer, structured as Issue / Rule / Analysis / Conclusion.
+        A string answer.
     """
-    from lios.reasoning.legal_reasoner import build_prompt
+    from lios.intelligence.fact_verifier import FactVerifier
+    from lios.intelligence.question_classifier import QuestionClassifier, is_easy_question
+    from lios.llm.ollama_client import call_ollama_sync
+    from lios.reasoning.legal_reasoner import build_direct_prompt, build_prompt
     from lios.retrieval.hybrid_retriever import get_retriever
 
+    classifier = QuestionClassifier()
+    qtype = classifier.classify(question)
     retriever = get_retriever()
+
+    # --- EASY PATH: LLM-direct for definition/general questions ---
+    if is_easy_question(question, qtype):
+        try:
+            llm_answer = call_ollama_sync(build_direct_prompt(question))
+            top_chunks = retriever.search(question, top_k=5)
+            raw_chunks = [rc.chunk for rc in top_chunks]
+            if raw_chunks:
+                result = FactVerifier().verify(llm_answer, raw_chunks)
+                if result.is_grounded:
+                    logger.debug(
+                        "Easy-path LLM answer accepted (coverage=%.2f)",
+                        result.source_coverage,
+                    )
+                    return llm_answer
+                logger.debug(
+                    "Easy-path answer not grounded (%.2f); re-asking with context.",
+                    result.source_coverage,
+                )
+                # Re-ask with corpus context before giving up on Ollama
+                try:
+                    return call_ollama_sync(build_prompt(question, raw_chunks))
+                except Exception:  # noqa: BLE001
+                    pass
+                from lios.intelligence.answer_synthesizer import AnswerSynthesizer
+                return AnswerSynthesizer().synthesize(question, raw_chunks)
+            else:
+                # No corpus chunks — trust the LLM answer
+                logger.debug("No corpus chunks; returning easy-path LLM answer.")
+                return llm_answer
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Easy-path Ollama call failed (%s); falling back to RAG.", exc)
+
+    # --- COMPLEX PATH: RAG retrieval + context-grounded prompt ---
     top_chunks = retriever.search(question, top_k=5)
 
     if not top_chunks:
@@ -64,19 +108,14 @@ def generate_answer(question: str) -> str:
     prompt = build_prompt(question, raw_chunks)
 
     try:
-        from lios.llm.ollama_client import call_ollama_sync
-
         return call_ollama_sync(prompt)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "Ollama unavailable (%s); falling back to AnswerSynthesizer.", exc
         )
 
-    # Synthesize a dynamic IRAC answer from the retrieved chunks without Ollama.
     from lios.intelligence.answer_synthesizer import AnswerSynthesizer
-
-    synthesizer = AnswerSynthesizer()
-    return synthesizer.synthesize(question, raw_chunks)
+    return AnswerSynthesizer().synthesize(question, raw_chunks)
 
 
 # ---------------------------------------------------------------------------

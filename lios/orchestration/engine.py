@@ -34,6 +34,10 @@ from lios.orchestration.query_parser import (
 )
 from lios.orchestration.response_aggregator import AggregatedResponse, ResponseAggregator
 from lios.retrieval.hybrid_retriever import HybridRetriever
+from lios.intelligence.question_classifier import (
+    QuestionClassifier as _QuestionClassifier,
+    is_easy_question as _is_easy_question,
+)
 
 
 @dataclass
@@ -71,6 +75,7 @@ class OrchestrationEngine:
         self.llm_refiner = LLMRefiner()
         self.chat_mode = settings.CHAT_MODE
         self._agent_cache: dict[str, BaseAgent] = {}
+        self._question_classifier = _QuestionClassifier()
 
         self.consensus_engine: ConsensusEngine | None = None
         if self.chat_mode == "consensus":
@@ -112,6 +117,37 @@ class OrchestrationEngine:
             parsed.intent = preferred_intent
         if preferred_regulation and not parsed.regulations:
             parsed.regulations = [preferred_regulation]
+
+        # Fast path: easy definition/general questions answered by LLM directly.
+        # Only activates when the intent remained general after overrides.
+        if (
+            parsed.intent in {"general_query", "legal_breakdown"}
+            and _is_easy_question(query, self._question_classifier.classify(query))
+        ):
+            direct_answer = self._try_llm_direct(query)
+            if direct_answer is not None:
+                logger.debug("route_query: returning easy-path LLM-direct answer.")
+                return FullResponse(
+                    query=query,
+                    intent=parsed.intent,
+                    answer=direct_answer,
+                    citations=[],
+                    decay_scores=[],
+                    conflicts=[],
+                    consensus_result=self._build_empty_consensus(direct_answer),
+                    aggregated_response=AggregatedResponse(
+                        answer=direct_answer,
+                        citations=[],
+                        consensus_score=1.0,
+                        agent_count=1,
+                        agreeing_agents=["llm_direct"],
+                        diverging_agents=[],
+                    ),
+                    roadmap=None,
+                    breakdown=None,
+                    applicability=None,
+                    parsed_query=parsed,
+                )
 
         use_lightweight = self._should_use_lightweight(
             parsed=parsed,
@@ -379,6 +415,54 @@ class OrchestrationEngine:
             not has_company_context
             and not has_jurisdictions
             and parsed.intent in {"general_query", "legal_breakdown"}
+        )
+
+    def _try_llm_direct(self, query: str) -> str | None:
+        """Call Ollama directly (no corpus context), verify grounding, return answer or None."""
+        from lios.intelligence.fact_verifier import FactVerifier
+        from lios.llm.ollama_client import call_ollama_sync
+        from lios.reasoning.legal_reasoner import build_direct_prompt
+
+        try:
+            llm_answer = call_ollama_sync(build_direct_prompt(query))
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("LLM-direct call failed: %s", exc)
+            return None
+
+        try:
+            top_chunks = self.retriever.search(query, top_k=5)
+            raw_chunks = [rc.chunk for rc in top_chunks]
+            if raw_chunks:
+                result = FactVerifier().verify(llm_answer, raw_chunks)
+                if result.is_grounded:
+                    return llm_answer
+                logger.debug(
+                    "LLM-direct answer not grounded (%.2f); falling back to full pipeline.",
+                    result.source_coverage,
+                )
+                return None
+            return llm_answer  # no corpus — trust the LLM
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Corpus verification failed: %s", exc)
+            return None
+
+    def _build_empty_consensus(self, answer: str) -> ConsensusResult:
+        """Build a minimal ConsensusResult for the LLM-direct fast path."""
+        resp = AgentResponse(
+            agent_name="llm_direct",
+            answer=answer,
+            citations=[],
+            confidence=0.8,
+            reasoning="Answered directly by LLM without agent analysis.",
+        )
+        return ConsensusResult(
+            consensus_reached=True,
+            answer=answer,
+            citations=[],
+            conflict_report="",
+            agent_responses=[resp],
+            confidence=0.8,
+            agreeing_agents=["llm_direct"],
         )
 
     def _make_concise_answer(

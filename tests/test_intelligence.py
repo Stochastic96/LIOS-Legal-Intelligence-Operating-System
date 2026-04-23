@@ -304,3 +304,73 @@ class TestFactVerifier:
         )
         result = verifier.verify(answer, [_CSRD_ART7_CHUNK, _CSRD_ART1_CHUNK])
         assert 0.0 <= result.source_coverage <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# is_easy_question routing helper
+# ---------------------------------------------------------------------------
+
+
+class TestIsEasyQuestion:
+    def test_simple_definition_is_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert is_easy_question("What is CSRD?", QuestionType.DEFINITION) is True
+
+    def test_general_no_context_is_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert is_easy_question("Tell me about EU sustainability law.", QuestionType.GENERAL) is True
+
+    def test_applicability_not_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert is_easy_question("Does CSRD apply to us?", QuestionType.APPLICABILITY) is False
+
+    def test_requirement_not_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert is_easy_question("What must we disclose?", QuestionType.REQUIREMENT) is False
+
+    def test_penalty_not_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert is_easy_question("What are the fines for CSRD violations?", QuestionType.PENALTY) is False
+
+    def test_timeline_not_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert is_easy_question("When does CSRD apply?", QuestionType.TIMELINE) is False
+
+    def test_definition_with_employee_count_not_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert (
+            is_easy_question(
+                "What is CSRD and does it apply to us with 400 employees?",
+                QuestionType.DEFINITION,
+            )
+            is False
+        )
+
+    def test_definition_with_article_ref_not_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert (
+            is_easy_question(
+                "What is the meaning of Article 19a CSRD?",
+                QuestionType.DEFINITION,
+            )
+            is False
+        )
+
+    def test_general_with_turnover_not_easy(self):
+        from lios.intelligence.question_classifier import QuestionType, is_easy_question
+
+        assert (
+            is_easy_question(
+                "We have 80M revenue — explain sustainability law.",
+                QuestionType.GENERAL,
+            )
+            is False
+        )
