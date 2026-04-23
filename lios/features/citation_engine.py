@@ -44,6 +44,9 @@ class CitationEngine:
         regulations: list[str] | None = None,
     ) -> list[Citation]:
         """Return top citations for the given query, optionally filtered by regulation."""
+        if not query or not query.strip():
+            return []
+
         # Prefer retrieval from provenance-aware corpus when available.
         retrieved = self.retriever.search(query=query, regulations=regulations, top_k=10)
         if retrieved:
