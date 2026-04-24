@@ -18,7 +18,7 @@ class Settings:
     LLM_BASE_URL: str = "http://localhost:11434/v1"
     LLM_MODEL: str = "mistral:latest"
     LLM_API_KEY: str = "ollama"
-    LLM_TIMEOUT_SECONDS: int = 30
+    LLM_TIMEOUT_SECONDS: int = 120
 
     # Azure OpenAI settings (used when LLM_PROVIDER=azure)
     AZURE_OPENAI_ENDPOINT: str = ""
