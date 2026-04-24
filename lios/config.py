@@ -16,7 +16,7 @@ class Settings:
     LLM_ENABLED: bool = True
     LLM_PROVIDER: str = "openai_compatible"  # openai_compatible | azure
     LLM_BASE_URL: str = "http://localhost:11434/v1"
-    LLM_MODEL: str = "mistral:7b-instruct-q4_K_M"
+    LLM_MODEL: str = "mistral:latest"
     LLM_API_KEY: str = "ollama"
     LLM_TIMEOUT_SECONDS: int = 30
 

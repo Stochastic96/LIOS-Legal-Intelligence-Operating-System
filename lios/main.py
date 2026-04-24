@@ -91,12 +91,10 @@ def generate_answer(question: str) -> str:
                     pass
                 from lios.intelligence.answer_synthesizer import AnswerSynthesizer
                 return AnswerSynthesizer().synthesize(question, raw_chunks)
-            else:
-                # No corpus chunks — trust the LLM answer
-                logger.debug("No corpus chunks; returning easy-path LLM answer.")
-                return llm_answer
+            logger.debug("No corpus chunks; returning easy-path LLM answer.")
+            return llm_answer
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Easy-path Ollama call failed (%s); falling back to RAG.", exc)
+            logger.warning("Easy-path failed (%s); falling back to RAG.", exc)
 
     # --- COMPLEX PATH: RAG retrieval + context-grounded prompt ---
     top_chunks = retriever.search(question, top_k=5)

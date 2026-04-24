@@ -39,6 +39,9 @@ from lios.intelligence.question_classifier import (
     is_easy_question as _is_easy_question,
 )
 
+_LLM_DIRECT_AGENT = "llm_direct"
+_LLM_DIRECT_CONFIDENCE = 0.8
+
 
 @dataclass
 class FullResponse:
@@ -120,11 +123,12 @@ class OrchestrationEngine:
 
         # Fast path: easy definition/general questions answered by LLM directly.
         # Only activates when the intent remained general after overrides.
+        prefetched_chunks: list | None = None
         if (
             parsed.intent in {"general_query", "legal_breakdown"}
             and _is_easy_question(query, self._question_classifier.classify(query))
         ):
-            direct_answer = self._try_llm_direct(query)
+            direct_answer, prefetched_chunks = self._try_llm_direct(query)
             if direct_answer is not None:
                 logger.debug("route_query: returning easy-path LLM-direct answer.")
                 return FullResponse(
@@ -134,13 +138,21 @@ class OrchestrationEngine:
                     citations=[],
                     decay_scores=[],
                     conflicts=[],
-                    consensus_result=self._build_empty_consensus(direct_answer),
+                    consensus_result=self._build_single_agent_consensus(
+                        AgentResponse(
+                            agent_name=_LLM_DIRECT_AGENT,
+                            answer=direct_answer,
+                            citations=[],
+                            confidence=_LLM_DIRECT_CONFIDENCE,
+                            reasoning="Answered directly by LLM without agent analysis.",
+                        )
+                    ),
                     aggregated_response=AggregatedResponse(
                         answer=direct_answer,
                         citations=[],
                         consensus_score=1.0,
                         agent_count=1,
-                        agreeing_agents=["llm_direct"],
+                        agreeing_agents=[_LLM_DIRECT_AGENT],
                         diverging_agents=[],
                     ),
                     roadmap=None,
@@ -230,12 +242,12 @@ class OrchestrationEngine:
             logger.warning("CitationEngine failed: %s", exc)
             citations = []
 
-        # Retrieve BM25 context chunks for the LLM prompt
+        # Retrieve BM25 context chunks for the LLM prompt (reuse easy-path chunks when available)
         rag_context = ""
         try:
-            top_chunks = self.retriever.search(query, top_k=5)
-            if top_chunks:
-                rag_context = self.retriever.format_context(top_chunks)
+            chunks_for_context = prefetched_chunks or self.retriever.search(query, top_k=5)
+            if chunks_for_context:
+                rag_context = self.retriever.format_context(chunks_for_context)
         except Exception as exc:
             logger.warning("HybridRetriever.search failed: %s", exc)
 
@@ -417,8 +429,16 @@ class OrchestrationEngine:
             and parsed.intent in {"general_query", "legal_breakdown"}
         )
 
-    def _try_llm_direct(self, query: str) -> str | None:
-        """Call Ollama directly (no corpus context), verify grounding, return answer or None."""
+    def _try_llm_direct(self, query: str) -> tuple[str | None, list]:
+        """Call Ollama directly (no corpus context), verify grounding.
+
+        Returns (answer, top_chunks) on success or (None, top_chunks) on failure
+        so the caller can reuse the already-fetched RetrievedChunk list in the
+        full RAG pipeline instead of retrieving a second time.
+        """
+        if not settings.LLM_ENABLED:
+            return None, []
+
         from lios.intelligence.fact_verifier import FactVerifier
         from lios.llm.ollama_client import call_ollama_sync
         from lios.reasoning.legal_reasoner import build_direct_prompt
@@ -427,7 +447,7 @@ class OrchestrationEngine:
             llm_answer = call_ollama_sync(build_direct_prompt(query))
         except Exception as exc:  # noqa: BLE001
             logger.debug("LLM-direct call failed: %s", exc)
-            return None
+            return None, []
 
         try:
             top_chunks = self.retriever.search(query, top_k=5)
@@ -435,35 +455,16 @@ class OrchestrationEngine:
             if raw_chunks:
                 result = FactVerifier().verify(llm_answer, raw_chunks)
                 if result.is_grounded:
-                    return llm_answer
+                    return llm_answer, top_chunks
                 logger.debug(
                     "LLM-direct answer not grounded (%.2f); falling back to full pipeline.",
                     result.source_coverage,
                 )
-                return None
-            return llm_answer  # no corpus — trust the LLM
+                return None, top_chunks
+            return llm_answer, []  # no corpus — trust the LLM
         except Exception as exc:  # noqa: BLE001
             logger.debug("Corpus verification failed: %s", exc)
-            return None
-
-    def _build_empty_consensus(self, answer: str) -> ConsensusResult:
-        """Build a minimal ConsensusResult for the LLM-direct fast path."""
-        resp = AgentResponse(
-            agent_name="llm_direct",
-            answer=answer,
-            citations=[],
-            confidence=0.8,
-            reasoning="Answered directly by LLM without agent analysis.",
-        )
-        return ConsensusResult(
-            consensus_reached=True,
-            answer=answer,
-            citations=[],
-            conflict_report="",
-            agent_responses=[resp],
-            confidence=0.8,
-            agreeing_agents=["llm_direct"],
-        )
+            return None, []
 
     def _make_concise_answer(
         self,

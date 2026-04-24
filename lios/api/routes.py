@@ -115,6 +115,39 @@ app.include_router(supply_chain.router)
 app.include_router(impact.router)
 app.include_router(dashboard.router)
 
+
+# ---------------------------------------------------------------------------
+# Startup health check
+# ---------------------------------------------------------------------------
+
+
+@app.on_event("startup")
+async def _startup_ollama_health_check() -> None:
+    """Warn early if Ollama is unreachable or the configured model is missing."""
+    if not settings.LLM_ENABLED:
+        logger.info("LLM disabled (LIOS_LLM_ENABLED=false) – skipping Ollama health check.")
+        return
+
+    from lios.llm.ollama_client import OLLAMA_MODEL, check_ollama_health
+
+    health = check_ollama_health()
+    if not health["available"]:
+        logger.warning(
+            "Ollama is NOT reachable at %s. Start it with: ollama serve",
+            settings.LLM_BASE_URL,
+        )
+        return
+
+    available_models: list[str] = health.get("models", [])
+    if OLLAMA_MODEL not in available_models:
+        logger.warning(
+            "Ollama is running but model %r is not pulled. "
+            "Run: ollama pull %s   (available: %s)",
+            OLLAMA_MODEL,
+            OLLAMA_MODEL,
+            available_models or "none",
+        )
+
 # ---------------------------------------------------------------------------
 # Ollama status endpoint
 # ---------------------------------------------------------------------------

@@ -6,6 +6,8 @@ import logging
 import os
 from typing import Any
 
+from lios.config import settings
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -13,9 +15,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "mistral:7b-instruct-q4_K_M")
-OLLAMA_FALLBACK_MODEL: str = os.getenv("OLLAMA_FALLBACK_MODEL", "mistral:7b")
-OLLAMA_TIMEOUT: int = int(os.getenv("OLLAMA_TIMEOUT", "60"))
+OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", settings.LLM_MODEL)
+OLLAMA_FALLBACK_MODEL: str = os.getenv("OLLAMA_FALLBACK_MODEL", settings.LLM_MODEL)
+OLLAMA_TIMEOUT: int = int(os.getenv("OLLAMA_TIMEOUT", str(settings.LLM_TIMEOUT_SECONDS)))
 
 
 # ---------------------------------------------------------------------------
@@ -24,22 +26,7 @@ OLLAMA_TIMEOUT: int = int(os.getenv("OLLAMA_TIMEOUT", "60"))
 
 
 async def call_ollama(prompt: str, model: str | None = None) -> str:
-    """Call the Ollama generate API asynchronously.
-
-    If the primary model returns 404 (model not found), automatically retries
-    with ``OLLAMA_FALLBACK_MODEL`` and logs a warning.
-
-    Args:
-        prompt: The prompt text to send.
-        model:  Override the model name (defaults to ``OLLAMA_MODEL``).
-
-    Returns:
-        The generated text response from Ollama.
-
-    Raises:
-        httpx.ConnectError: When Ollama is unreachable.
-        httpx.HTTPStatusError: On non-recoverable HTTP errors.
-    """
+    """Call the Ollama generate API asynchronously."""
     import httpx
 
     target_model = model or OLLAMA_MODEL
@@ -50,21 +37,30 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
         "stream": False,
     }
 
-    async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-
-        if resp.status_code == 404 and target_model == OLLAMA_MODEL:
-            logger.warning(
-                "Primary model %r not found, falling back to %r",
-                OLLAMA_MODEL,
-                OLLAMA_FALLBACK_MODEL,
-            )
-            payload["model"] = OLLAMA_FALLBACK_MODEL
+    try:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
             resp = await client.post(url, json=payload)
 
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("response", "")
+            if resp.status_code == 404 and target_model == OLLAMA_MODEL:
+                logger.error(
+                    "Model %r not found in Ollama. Run: ollama pull %s",
+                    OLLAMA_MODEL,
+                    OLLAMA_MODEL,
+                )
+                if OLLAMA_FALLBACK_MODEL != OLLAMA_MODEL:
+                    logger.warning("Falling back to %r", OLLAMA_FALLBACK_MODEL)
+                    payload["model"] = OLLAMA_FALLBACK_MODEL
+                    resp = await client.post(url, json=payload)
+
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("response", "")
+    except httpx.ConnectError as exc:
+        logger.error("Cannot connect to Ollama at %s. Is it running? (ollama serve)", OLLAMA_BASE_URL)
+        raise RuntimeError(f"Failed to call Ollama: {exc}") from exc
+    except Exception as exc:
+        logger.error("Unexpected error in call_ollama: %s", exc)
+        raise RuntimeError(f"Failed to call Ollama: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -99,21 +95,30 @@ def call_ollama_sync(prompt: str, model: str | None = None) -> str:
         "stream": False,
     }
 
-    with httpx.Client(timeout=OLLAMA_TIMEOUT) as client:
-        resp = client.post(url, json=payload)
-
-        if resp.status_code == 404 and target_model == OLLAMA_MODEL:
-            logger.warning(
-                "Primary model %r not found, falling back to %r",
-                OLLAMA_MODEL,
-                OLLAMA_FALLBACK_MODEL,
-            )
-            payload["model"] = OLLAMA_FALLBACK_MODEL
+    try:
+        with httpx.Client(timeout=OLLAMA_TIMEOUT) as client:
             resp = client.post(url, json=payload)
 
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("response", "")
+            if resp.status_code == 404 and target_model == OLLAMA_MODEL:
+                logger.error(
+                    "Model %r not found in Ollama. Run: ollama pull %s",
+                    OLLAMA_MODEL,
+                    OLLAMA_MODEL,
+                )
+                if OLLAMA_FALLBACK_MODEL != OLLAMA_MODEL:
+                    logger.warning("Falling back to %r", OLLAMA_FALLBACK_MODEL)
+                    payload["model"] = OLLAMA_FALLBACK_MODEL
+                    resp = client.post(url, json=payload)
+
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("response", "")
+    except httpx.ConnectError as exc:
+        logger.error("Cannot connect to Ollama at %s. Is it running? (ollama serve)", OLLAMA_BASE_URL)
+        raise RuntimeError(f"Failed to call Ollama: {exc}") from exc
+    except Exception as exc:
+        logger.error("Unexpected error in call_ollama_sync: %s", exc)
+        raise RuntimeError(f"Failed to call Ollama: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------

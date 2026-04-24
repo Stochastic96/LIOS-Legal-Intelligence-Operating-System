@@ -111,6 +111,7 @@ class TestCallOllamaSync:
     def test_falls_back_to_fallback_model_on_404(self):
         import httpx
 
+        import lios.llm.ollama_client as ollama_mod
         from lios.llm.ollama_client import call_ollama_sync
 
         resp_404 = MagicMock(spec=httpx.Response)
@@ -122,7 +123,12 @@ class TestCallOllamaSync:
         resp_200.json.return_value = {"response": "Fallback answer."}
         resp_200.raise_for_status = MagicMock()
 
-        with patch("httpx.Client") as mock_client_cls:
+        # Patch the module-level constants so primary ≠ fallback, enabling the retry.
+        with (
+            patch.object(ollama_mod, "OLLAMA_MODEL", "mistral:latest"),
+            patch.object(ollama_mod, "OLLAMA_FALLBACK_MODEL", "mistral:7b"),
+            patch("httpx.Client") as mock_client_cls,
+        ):
             mock_client = MagicMock()
             mock_client.__enter__ = MagicMock(return_value=mock_client)
             mock_client.__exit__ = MagicMock(return_value=False)
@@ -134,9 +140,9 @@ class TestCallOllamaSync:
 
         assert result == "Fallback answer."
         assert mock_client.post.call_count == 2
-        # Second call should use fallback model
+        # Second call should use the fallback model
         second_call_kwargs = mock_client.post.call_args_list[1][1]
-        assert second_call_kwargs["json"]["model"] == OLLAMA_FALLBACK_MODEL
+        assert second_call_kwargs["json"]["model"] == "mistral:7b"
 
 
 class TestCallOllamaAsync:
