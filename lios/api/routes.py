@@ -200,10 +200,9 @@ async def rag_query(request: _RagQueryRequest) -> dict[str, Any]:
         context = ""
 
     # Stage 2 – build prompt
-    if context:
-        prompt = f"CONTEXT:\n{context}\n\nQUESTION:\n{user_query}\n\nANSWER:"
-    else:
-        prompt = f"QUESTION:\n{user_query}\n\nANSWER:"
+    from lios.reasoning.legal_reasoner import build_direct_prompt, build_prompt
+    raw_chunks = [rc.chunk for rc in chunks]
+    prompt = build_prompt(user_query, raw_chunks) if raw_chunks else build_direct_prompt(user_query)
 
     # Stage 3 – call Ollama asynchronously
     try:
