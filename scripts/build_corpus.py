@@ -11,6 +11,8 @@ Usage::
     python scripts/build_corpus.py --regulations csrd esrs taxonomy sfdr
     python scripts/build_corpus.py --regulations csrd
     python scripts/build_corpus.py --output /tmp/corpus.jsonl --regulations taxonomy
+    python scripts/build_corpus.py --source pdf
+    python scripts/build_corpus.py --source german --laws bgb lksg
 """
 
 from __future__ import annotations
@@ -124,15 +126,44 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         )
     )
     parser.add_argument(
+        "--source",
+        choices=["eurlex", "pdf", "german"],
+        default="eurlex",
+        metavar="SOURCE",
+        help=(
+            "Data source to ingest from. "
+            "'eurlex' (default): fetch from EUR-Lex HTML. "
+            "'pdf': process PDFs from data/pdfs/. "
+            "'german': fetch German federal laws from gesetze-im-internet.de."
+        ),
+    )
+    parser.add_argument(
         "--regulations",
         nargs="+",
         choices=_ALL_REGULATIONS,
         default=_ALL_REGULATIONS,
         metavar="REG",
         help=(
-            f"Regulations to fetch. One or more of: {', '.join(_ALL_REGULATIONS)}. "
+            f"Regulations to fetch (--source eurlex only). "
+            f"One or more of: {', '.join(_ALL_REGULATIONS)}. "
             "Default: all four."
         ),
+    )
+    parser.add_argument(
+        "--laws",
+        nargs="+",
+        default=None,
+        metavar="LAW",
+        help=(
+            "German law abbreviations to fetch (--source german only). "
+            "Default: all supported laws."
+        ),
+    )
+    parser.add_argument(
+        "--folder",
+        default=str(_ROOT / "data" / "pdfs"),
+        metavar="PATH",
+        help="PDF folder (--source pdf only). Default: data/pdfs/",
     )
     parser.add_argument(
         "--output",
@@ -147,6 +178,21 @@ def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
     output_path = Path(args.output)
 
+    if args.source == "pdf":
+        from lios.ingestion.pdf_ingester import ingest_pdfs
+        print(f"Source  : PDF files in {args.folder}")
+        print(f"Output  : {output_path}")
+        ingest_pdfs(folder=args.folder, corpus_path=output_path)
+        return
+
+    if args.source == "german":
+        from lios.ingestion.german_law_pipeline import ingest_german_laws
+        print(f"Source  : gesetze-im-internet.de")
+        print(f"Output  : {output_path}")
+        ingest_german_laws(laws=args.laws, corpus_path=output_path)
+        return
+
+    # Default: eurlex
     print(f"Fetching: {', '.join(r.upper() for r in args.regulations)}")
     print(f"Output  : {output_path}")
 
