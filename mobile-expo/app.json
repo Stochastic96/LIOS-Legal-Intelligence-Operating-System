@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "LIOS Mobile",
+    "slug": "lios-mobile",
+    "platforms": ["ios", "android", "web"],
+    "version": "1.0.0",
+    "sdkVersion": "48.0.0"
+  }
+}
