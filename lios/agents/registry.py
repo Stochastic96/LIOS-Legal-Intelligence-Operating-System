@@ -62,25 +62,11 @@ class AgentRegistry:
         """Load default agents into the registry."""
         default_agents = [
             AgentRegistration(
-                name="sustainability",
-                class_name="SustainabilityAgent",
-                module_path="lios.agents.sustainability_agent",
-                covers_regulations=["CSRD", "ESRS"],
-                description="Handles sustainability and ESG reporting requirements",
-            ),
-            AgentRegistration(
-                name="finance",
-                class_name="FinanceAgent",
-                module_path="lios.agents.finance_agent",
-                covers_regulations=["SFDR", "EU_TAXONOMY"],
-                description="Handles financial disclosure and taxonomy requirements",
-            ),
-            AgentRegistration(
-                name="supply_chain",
-                class_name="SupplyChainAgent",
-                module_path="lios.agents.supply_chain_agent",
-                covers_regulations=["CSRD"],
-                description="Handles supply chain and scope 3 emissions requirements",
+                name="unified_compliance",
+                class_name="UnifiedComplianceAgent",
+                module_path="lios.agents.unified_agent",
+                covers_regulations=["CSRD", "ESRS", "EU_TAXONOMY", "SFDR", "CS3D"],
+                description="Full EU sustainability compliance: CSRD, ESRS, EU Taxonomy, SFDR, CS3D",
             ),
         ]
 

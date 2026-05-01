@@ -141,10 +141,21 @@ class ConsensusEngine:
         )
 
     def _merge_answers(self, responses: list[AgentResponse]) -> str:
+        # Primary agent (highest confidence) leads; others add supplementary perspectives
+        sorted_responses = sorted(responses, key=lambda r: r.confidence, reverse=True)
+        primary = sorted_responses[0]
+        others = sorted_responses[1:]
+
         parts = [
-            f"[{r.agent_name}]: {r.answer}" for r in responses
+            f"Primary analysis ({primary.agent_name}, confidence {primary.confidence:.0%}):\n"
+            f"{primary.answer}"
         ]
-        return "\n\n---\n\n".join(parts)
+        for r in others:
+            parts.append(
+                f"Additional perspective ({r.agent_name}, confidence {r.confidence:.0%}):\n"
+                f"{r.answer}"
+            )
+        return "\n\n".join(parts)
 
     def _merge_citations(self, responses: list[AgentResponse]) -> list[dict[str, Any]]:
         seen: set[str] = set()

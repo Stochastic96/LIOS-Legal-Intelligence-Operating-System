@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -12,11 +12,12 @@ class Settings:
     VERSION: str = "0.1.0"
     LOG_LEVEL: str = "INFO"
 
-    # LLM backend (optional)
-    LLM_ENABLED: bool = False
-    LLM_PROVIDER: str = "openai_compatible"  # openai_compatible | azure
+    # LLM backend — defaults to local Ollama/Mistral (openai_compatible)
+    # Set LIOS_LLM_ENABLED=false to disable; defaults to enabled when Ollama is the provider
+    LLM_ENABLED: bool = True
+    LLM_PROVIDER: str = "openai_compatible"  # openai_compatible | azure | ollama
     LLM_BASE_URL: str = "http://localhost:11434/v1"
-    LLM_MODEL: str = "llama3"
+    LLM_MODEL: str = "mistral"
     LLM_API_KEY: str = "ollama"
     LLM_TIMEOUT_SECONDS: int = 30
 
@@ -29,13 +30,18 @@ class Settings:
     # Consensus settings
     CONSENSUS_THRESHOLD: int = 2  # out of 3 agents must agree
 
-    # Chat orchestration mode
+    # Chat orchestration mode — single unified agent handles all domains
     CHAT_MODE: str = "simple"  # simple | consensus
 
     def __post_init__(self) -> None:
         # Allow environment variable overrides
-        self.LLM_ENABLED = os.environ.get("LIOS_LLM_ENABLED", "false").lower() == "true"
+        llm_enabled_env = os.environ.get("LIOS_LLM_ENABLED")
+        if llm_enabled_env is not None:
+            self.LLM_ENABLED = llm_enabled_env.lower() == "true"
+
         self.LLM_PROVIDER = os.environ.get("LIOS_LLM_PROVIDER", self.LLM_PROVIDER)
+        if self.LLM_PROVIDER.lower() == "ollama":
+            self.LLM_PROVIDER = "openai_compatible"
         self.LLM_BASE_URL = os.environ.get("LIOS_LLM_BASE_URL", self.LLM_BASE_URL)
         self.LLM_MODEL = os.environ.get("LIOS_LLM_MODEL", self.LLM_MODEL)
         self.LLM_API_KEY = os.environ.get("LIOS_LLM_API_KEY", self.LLM_API_KEY)

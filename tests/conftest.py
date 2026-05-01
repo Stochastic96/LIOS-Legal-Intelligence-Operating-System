@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lios.agents.consensus import ConsensusEngine
-from lios.agents.finance_agent import FinanceAgent
-from lios.agents.sustainability_agent import SustainabilityAgent
-from lios.agents.supply_chain_agent import SupplyChainAgent
+from lios.agents.unified_agent import UnifiedComplianceAgent
 from lios.knowledge.regulatory_db import RegulatoryDatabase
 from lios.orchestration.engine import OrchestrationEngine
 
@@ -15,6 +12,11 @@ from lios.orchestration.engine import OrchestrationEngine
 @pytest.fixture(scope="session")
 def regulatory_db() -> RegulatoryDatabase:
     return RegulatoryDatabase()
+
+
+@pytest.fixture(scope="session")
+def unified_agent(regulatory_db: RegulatoryDatabase) -> UnifiedComplianceAgent:
+    return UnifiedComplianceAgent(regulatory_db)
 
 
 @pytest.fixture(scope="session")
@@ -51,14 +53,6 @@ def finance_company_profile() -> dict:
         "sector": "asset management",
         "jurisdiction": "Germany",
     }
-
-
-@pytest.fixture(scope="session")
-def consensus_engine(regulatory_db: RegulatoryDatabase) -> ConsensusEngine:
-    sus = SustainabilityAgent(regulatory_db)
-    sc = SupplyChainAgent(regulatory_db)
-    fin = FinanceAgent(regulatory_db)
-    return ConsensusEngine([sus, sc, fin])
 
 
 @pytest.fixture(scope="session")

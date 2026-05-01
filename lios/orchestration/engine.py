@@ -7,10 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lios.agents.base_agent import AgentResponse, BaseAgent
-from lios.agents.consensus import ConsensusEngine, ConsensusResult
-from lios.agents.finance_agent import FinanceAgent
-from lios.agents.sustainability_agent import SustainabilityAgent
-from lios.agents.supply_chain_agent import SupplyChainAgent
+from lios.agents.consensus import ConsensusResult
+from lios.agents.unified_agent import UnifiedComplianceAgent
 from lios.config import settings
 from lios.features.applicability_checker import ApplicabilityChecker, ApplicabilityResult
 from lios.features.citation_engine import Citation, CitationEngine
@@ -63,15 +61,7 @@ class OrchestrationEngine:
         self.conflict_mapper = ConflictMapper()
         self.breakdown_generator = LegalBreakdownGenerator(self.db)
         self.llm_refiner = LLMRefiner()
-        self.chat_mode = settings.CHAT_MODE
-        self._agent_cache: dict[str, BaseAgent] = {}
-
-        self.consensus_engine: ConsensusEngine | None = None
-        if self.chat_mode == "consensus":
-            sus_agent = self._get_agent("sustainability")
-            sc_agent = self._get_agent("supply_chain")
-            fin_agent = self._get_agent("finance")
-            self.consensus_engine = ConsensusEngine([sus_agent, sc_agent, fin_agent])
+        self._agent = UnifiedComplianceAgent(self.db)
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -112,14 +102,8 @@ class OrchestrationEngine:
         ))
         all_regulations = parsed.regulations or list(self.db.REGULATION_MODULES.keys())
 
-        primary_agent = self._select_primary_agent(parsed, query)
-        primary_response = primary_agent.analyze(query, context)
-
-        # Keep the first chat simple by default; consensus remains available when enabled.
-        if self.consensus_engine is not None:
-            consensus_result = self.consensus_engine.run(query, context)
-        else:
-            consensus_result = self._build_single_agent_consensus(primary_response)
+        primary_response = self._agent.analyze(query, context)
+        consensus_result = self._build_single_agent_consensus(primary_response)
 
         # Run aggregator
         aggregated = self.aggregator.aggregate(consensus_result.agent_responses)
@@ -178,7 +162,10 @@ class OrchestrationEngine:
             breakdown,
             primary_response,
         )
-        if concise:
+
+        # LLM handles formatting and conciseness when enabled.
+        # Fall back to rule-based concision only when LLM is off.
+        if concise and not self.llm_refiner.enabled:
             answer = self._make_concise_answer(
                 draft=answer,
                 intent=parsed.intent,
@@ -192,7 +179,7 @@ class OrchestrationEngine:
                 "intent": parsed.intent,
                 "regulations": parsed.regulations,
                 "jurisdictions": all_jurisdictions,
-                "lightweight": use_lightweight,
+                "company_profile": company_profile,
             },
         )
 
@@ -252,33 +239,6 @@ class OrchestrationEngine:
 
         return "\n\n".join(parts)
 
-    def _get_agent(self, name: str) -> BaseAgent:
-        if name in self._agent_cache:
-            return self._agent_cache[name]
-
-        if name == "sustainability":
-            agent: BaseAgent = SustainabilityAgent(self.db)
-        elif name == "supply_chain":
-            agent = SupplyChainAgent(self.db)
-        elif name == "finance":
-            agent = FinanceAgent(self.db)
-        else:
-            raise KeyError(f"Unknown agent: {name}")
-
-        self._agent_cache[name] = agent
-        return agent
-
-    def _select_primary_agent(self, parsed: ParsedQuery, query: str) -> BaseAgent:
-        query_lower = query.lower()
-
-        if any(keyword in query_lower for keyword in ["supply chain", "supplier", "due diligence", "value chain"]):
-            return self._get_agent("supply_chain")
-
-        if any(reg in {"SFDR", "EU_TAXONOMY"} for reg in parsed.regulations):
-            return self._get_agent("finance")
-
-        return self._get_agent("sustainability")
-
     def _build_single_agent_consensus(self, response: AgentResponse) -> ConsensusResult:
         return ConsensusResult(
             consensus_reached=True,
@@ -334,10 +294,10 @@ class OrchestrationEngine:
                 continue
             selected.append(sentence)
             total += len(sentence)
-            if len(selected) >= 2 or total >= 380:
+            if len(selected) >= 5 or total >= 800:
                 break
 
-        concise = " ".join(selected) if selected else text[:380]
+        concise = " ".join(selected) if selected else text[:800]
 
         if citations:
             top = citations[:2]

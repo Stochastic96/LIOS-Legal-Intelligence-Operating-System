@@ -12,6 +12,21 @@ pip install -r requirements.txt
 uvicorn lios.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+To make LIOS answer with local Ollama Mistral, set:
+
+```bash
+export LIOS_LLM_ENABLED=true
+export LIOS_LLM_PROVIDER=ollama
+export LIOS_LLM_BASE_URL=http://localhost:11434/v1
+export LIOS_LLM_MODEL=mistral
+```
+
+Then run:
+
+```bash
+lios query "What is CSRD?"
+```
+
 Open:
 
 - `http://localhost:8000/chat` (same machine)

@@ -709,8 +709,7 @@ def chat_message(payload: dict[str, Any]) -> dict[str, Any]:
         jurisdictions=jurisdictions,
         preferred_intent=(direction_hint or {}).get("intent"),
         preferred_regulation=(direction_hint or {}).get("regulation"),
-        # Keep user questions lightweight unless a company context is explicitly provided.
-        lightweight=None if company_profile else True,
+        lightweight=None,
         concise=True,
     )
 
@@ -752,7 +751,7 @@ def chat_message(payload: dict[str, Any]) -> dict[str, Any]:
             "confidence": result.consensus_result.confidence,
         },
         "mode": {
-            "lightweight": (None if company_profile else True),
+            "lightweight": False,
             "agent_count": len(result.consensus_result.agent_responses),
             "direction_hint": direction_hint,
         },

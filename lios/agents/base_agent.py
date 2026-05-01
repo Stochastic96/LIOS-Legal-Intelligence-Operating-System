@@ -1,4 +1,4 @@
-"""Base agent definition with rule-based fallback."""
+"""Base agent definition with rule-based analysis and structured legal output."""
 
 from __future__ import annotations
 
@@ -21,11 +21,10 @@ class AgentResponse:
 
 
 class BaseAgent(ABC):
-    """Abstract base for all LIOS specialist agents."""
+    """Abstract base for all LIOS agents."""
 
     name: str = "base"
     domain: str = "general"
-    # Subclasses declare which regulations they focus on
     primary_regulations: list[str] = []
 
     def __init__(self, db: RegulatoryDatabase | None = None) -> None:
@@ -36,12 +35,11 @@ class BaseAgent(ABC):
     # ------------------------------------------------------------------
 
     def analyze(self, query: str, context: dict[str, Any] | None = None) -> AgentResponse:
-        """Main entry point.  Uses rule-based analysis; LLM optional."""
         context = context or {}
         return self._rule_based_analyze(query, context)
 
     # ------------------------------------------------------------------
-    # Rule-based engine (subclasses may extend _domain_keywords / _score_relevance)
+    # Core pipeline
     # ------------------------------------------------------------------
 
     def _rule_based_analyze(self, query: str, context: dict[str, Any]) -> AgentResponse:
@@ -67,60 +65,60 @@ class BaseAgent(ABC):
         for reg in self.primary_regulations:
             hits = self.db.search_articles(query_lower, regulation=reg)
             results.extend(hits)
-        # Also do a global search if no primary regulation results
         if not results:
             results = self.db.search_articles(query_lower)
-        # Keep top 5
         results.sort(key=lambda x: x["relevance_score"], reverse=True)
         return results[:5]
 
     def _compose_answer(
         self, query_lower: str, articles: list[dict[str, Any]], context: dict[str, Any]
     ) -> tuple[str, list[str]]:
-        """Produce a human-readable answer + key conclusion keywords."""
-        if not articles:
+        """Build a structured legal draft with retrieved articles + expert domain analysis."""
+        conclusion_kws = self._extract_conclusion_keywords(query_lower, articles)
+
+        parts: list[str] = []
+
+        # ── Legal sources retrieved from the regulatory database ──────────────
+        if articles:
+            source_blocks: list[str] = []
+            for a in articles[:3]:
+                reg = a["regulation"]
+                art = a["article_id"]
+                title = a.get("title", "")
+                text = a.get("text", "")
+                snippet = text[:700] + ("…" if len(text) > 700 else "")
+                header = f"**{reg} {art}**" + (f" — {title}" if title else "")
+                source_blocks.append(f"{header}\n{snippet}")
+            parts.append("## Retrieved Legal Provisions\n\n" + "\n\n".join(source_blocks))
+
+        # ── Expert domain analysis (keyword-triggered rule blocks) ────────────
+        domain_lines = self._domain_analysis(query_lower, articles, context)
+        if domain_lines:
+            parts.append("## Compliance Analysis\n\n" + "\n\n".join(domain_lines))
+
+        if not parts:
             return (
-                f"[{self.name}] Insufficient regulatory data found for this query "
-                f"within the {self.domain} domain. Please consult the full regulatory text.",
+                "No specific regulatory provisions found for this query. "
+                "Please consult the official CSRD, ESRS, EU Taxonomy, SFDR, or CS3D texts directly.",
                 ["insufficient_data"],
             )
 
-        top = articles[0]
-        regulation = top["regulation"]
-        article_id = top["article_id"]
-        title = top.get("title", "")
-        text = top.get("text", "")
-
-        # Domain-specific preamble
-        conclusion_kws = self._extract_conclusion_keywords(query_lower, articles)
-
-        answer_lines = [
-            f"[{self.name}] Based on {regulation} {article_id} ({title}):",
-            "",
-            text[:400] + ("..." if len(text) > 400 else ""),
-            "",
-        ]
-        if len(articles) > 1:
-            others = ", ".join(
-                f"{a['regulation']} {a['article_id']}" for a in articles[1:3]
-            )
-            answer_lines.append(f"Additional relevant provisions: {others}.")
-
-        answer_lines.extend(self._domain_analysis(query_lower, articles, context))
-
-        return "\n".join(answer_lines), conclusion_kws
+        return "\n\n---\n\n".join(parts), conclusion_kws
 
     @abstractmethod
     def _domain_analysis(
         self, query_lower: str, articles: list[dict[str, Any]], context: dict[str, Any]
     ) -> list[str]:
-        """Domain-specific analysis lines appended to the answer."""
+        """Domain-specific expert analysis blocks appended to the answer."""
         ...
+
+    # ------------------------------------------------------------------
+    # Supporting helpers
+    # ------------------------------------------------------------------
 
     def _extract_conclusion_keywords(
         self, query_lower: str, articles: list[dict[str, Any]]
     ) -> list[str]:
-        """Extract short conclusion keywords for consensus comparison."""
         keywords: list[str] = []
         applies_pattern = re.compile(
             r"\b(appl|mandator|requir|oblig|must|shall|compli|report)\w*\b"
@@ -151,15 +149,13 @@ class BaseAgent(ABC):
         if not articles:
             return 0.2
         top_score = articles[0]["relevance_score"]
-        # Clamp to [0.3, 0.95]
-        return min(0.95, max(0.3, top_score * 0.15))
+        return min(0.95, max(0.3, top_score))
 
     def _build_reasoning(self, query_lower: str, articles: list[dict[str, Any]]) -> str:
         if not articles:
             return f"No relevant articles found in {self.primary_regulations} for this query."
         return (
-            f"Agent '{self.name}' searched {self.primary_regulations} and found "
-            f"{len(articles)} relevant article(s). "
+            f"Searched {self.primary_regulations}, found {len(articles)} relevant article(s). "
             f"Top match: {articles[0]['regulation']} {articles[0]['article_id']} "
             f"(score={articles[0]['relevance_score']})."
         )
