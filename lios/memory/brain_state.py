@@ -63,6 +63,13 @@ def check_llm_reachable() -> bool:
 
 
 def get_knowledge_chunk_count() -> int:
+    try:
+        from lios.retrieval.chroma_retriever import total_chunks
+        count = total_chunks()
+        if count > 0:
+            return count
+    except Exception:
+        pass
     corpus = Path("data/corpus/legal_chunks.jsonl")
     if not corpus.exists():
         return 0

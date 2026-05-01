@@ -21,3 +21,4 @@ ENV/
 .coverage
 htmlcov/
 logs/
+data/vectordb/

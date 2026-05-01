@@ -94,38 +94,40 @@ def _load_corpus() -> list[dict]:
     return chunks
 
 
-def _retrieve_context(query: str, top_k: int = 3) -> str:
-    chunks = _load_corpus()
+def _retrieve_context(query: str, top_k: int = 5) -> str:
+    try:
+        from lios.retrieval.chroma_retriever import query as chroma_query
+        chunks = chroma_query(query, top_k=top_k)
+    except Exception:
+        chunks = _keyword_fallback(query, top_k)
+
     if not chunks:
-        return ""
-    query_lower = query.lower()
-    keywords = [w for w in query_lower.split() if len(w) > 3]
-    if not keywords:
-        return ""
-
-    scored: list[tuple[int, dict]] = []
-    for chunk in chunks:
-        text = (
-            chunk.get("text", "") + " " +
-            chunk.get("regulation", "") + " " +
-            chunk.get("article", "")
-        ).lower()
-        score = sum(1 for kw in keywords if kw in text)
-        if score > 0:
-            scored.append((score, chunk))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    top = scored[:top_k]
-    if not top:
         return ""
 
     lines = ["## Relevant legal provisions"]
-    for _, chunk in top:
+    for chunk in chunks:
         reg = chunk.get("regulation", "")
         art = chunk.get("article", "")
         text = chunk.get("text", "")
         lines.append(f"[{reg} {art}]: {text}")
     return "\n".join(lines)
+
+
+def _keyword_fallback(query: str, top_k: int) -> list[dict]:
+    chunks = _load_corpus()
+    if not chunks:
+        return []
+    keywords = [w for w in query.lower().split() if len(w) > 3]
+    if not keywords:
+        return []
+    scored = []
+    for c in chunks:
+        text = (c.get("text", "") + " " + c.get("regulation", "") + " " + c.get("article", "")).lower()
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scored.append((score, c))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [c for _, c in scored[:top_k]]
 
 
 def _call_llm(system: str, messages: list[dict], query: str) -> str | None:
