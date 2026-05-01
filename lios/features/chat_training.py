@@ -1,8 +1,17 @@
-"""Local chat session storage for iterative training and app development."""
+"""Local chat session storage for iterative training and app development.
+
+Supports two backends:
+* ``jsonl`` (default) – append-only JSONL file, zero extra dependencies.
+* ``sqlite``          – SQLite database, survives concurrent writers and
+  large session counts much better than the flat-file approach.
+
+The backend is selected via ``settings.CHAT_STORE_BACKEND``.
+"""
 
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,10 +32,14 @@ class ChatTurn:
     metadata: dict[str, Any]
 
 
-class LocalTrainingStore:
+# ---------------------------------------------------------------------------
+# JSONL backend (original, kept for backwards compatibility)
+# ---------------------------------------------------------------------------
+
+class _JsonlStore:
     """Append-only JSONL store for chat exchanges."""
 
-    def __init__(self, file_path: str | Path = "logs/chat_training.jsonl") -> None:
+    def __init__(self, file_path: str | Path) -> None:
         self.file_path = Path(file_path)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = Lock()
@@ -39,7 +52,6 @@ class LocalTrainingStore:
     def list_session(self, session_id: str, limit: int = 100) -> list[dict[str, Any]]:
         if not self.file_path.exists():
             return []
-
         rows: list[dict[str, Any]] = []
         with self.file_path.open("r", encoding="utf-8") as f:
             for line in f:
@@ -52,18 +64,147 @@ class LocalTrainingStore:
                     continue
                 if row.get("session_id") == session_id:
                     rows.append(row)
-
         return rows[-limit:]
 
     def export_session_jsonl(self, session_id: str) -> str:
-        session_rows = self.list_session(session_id=session_id, limit=10_000)
-        return "\n".join(json.dumps(r, ensure_ascii=False) for r in session_rows)
+        rows = self.list_session(session_id=session_id, limit=10_000)
+        return "\n".join(json.dumps(r, ensure_ascii=False) for r in rows)
+
+
+# ---------------------------------------------------------------------------
+# SQLite backend
+# ---------------------------------------------------------------------------
+
+_CREATE_TABLE = """
+CREATE TABLE IF NOT EXISTS chat_turns (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp   TEXT    NOT NULL,
+    session_id  TEXT    NOT NULL,
+    user_query  TEXT    NOT NULL,
+    answer      TEXT    NOT NULL,
+    intent      TEXT    NOT NULL,
+    citations   TEXT    NOT NULL,
+    metadata    TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_session_id ON chat_turns (session_id);
+"""
+
+
+class _SqliteStore:
+    """SQLite-backed chat turn store."""
+
+    def __init__(self, db_path: str | Path) -> None:
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = Lock()
+        self._init_db()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self) -> None:
+        with self._lock:
+            conn = self._connect()
+            try:
+                conn.executescript(_CREATE_TABLE)
+                conn.commit()
+            finally:
+                conn.close()
+
+    def append_turn(self, turn: ChatTurn) -> None:
+        with self._lock:
+            conn = self._connect()
+            try:
+                conn.execute(
+                    "INSERT INTO chat_turns "
+                    "(timestamp, session_id, user_query, answer, intent, citations, metadata) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        turn.timestamp,
+                        turn.session_id,
+                        turn.user_query,
+                        turn.answer,
+                        turn.intent,
+                        json.dumps(turn.citations, ensure_ascii=False),
+                        json.dumps(turn.metadata, ensure_ascii=False),
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def list_session(self, session_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        conn = self._connect()
+        try:
+            cur = conn.execute(
+                "SELECT * FROM chat_turns WHERE session_id = ? ORDER BY id DESC LIMIT ?",
+                (session_id, limit),
+            )
+            rows = [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
+        # Deserialise JSON fields and reverse to chronological order
+        for row in rows:
+            try:
+                row["citations"] = json.loads(row["citations"])
+            except Exception:
+                row["citations"] = []
+            try:
+                row["metadata"] = json.loads(row["metadata"])
+            except Exception:
+                row["metadata"] = {}
+        rows.reverse()
+        return rows
+
+    def export_session_jsonl(self, session_id: str) -> str:
+        rows = self.list_session(session_id=session_id, limit=10_000)
+        return "\n".join(json.dumps(r, ensure_ascii=False) for r in rows)
+
+
+# ---------------------------------------------------------------------------
+# Public façade – delegates to the configured backend
+# ---------------------------------------------------------------------------
+
+class LocalTrainingStore:
+    """Chat turn store that delegates to JSONL or SQLite based on settings."""
+
+    def __init__(
+        self,
+        file_path: str | Path | None = None,
+        db_path: str | Path | None = None,
+        backend: str | None = None,
+    ) -> None:
+        from lios.config import settings as _settings
+
+        _backend = (backend or _settings.CHAT_STORE_BACKEND).lower()
+        if _backend == "sqlite":
+            _db_path = db_path or _settings.CHAT_STORE_DB_PATH
+            self._store: _JsonlStore | _SqliteStore = _SqliteStore(_db_path)
+        else:
+            _file = file_path or _settings.CHAT_STORE_PATH
+            self._store = _JsonlStore(_file)
+
+    # ------------------------------------------------------------------
+    # Delegate to backend
+    # ------------------------------------------------------------------
+
+    def append_turn(self, turn: ChatTurn) -> None:
+        self._store.append_turn(turn)
+
+    def list_session(self, session_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        return self._store.list_session(session_id, limit)
+
+    def export_session_jsonl(self, session_id: str) -> str:
+        return self._store.export_session_jsonl(session_id)
+
+    # ------------------------------------------------------------------
+    # Session direction inference (unchanged from original)
+    # ------------------------------------------------------------------
 
     def infer_session_direction(self, session_id: str, window: int = 3) -> dict[str, Any] | None:
-        """Infer stable session direction from the latest turns.
-
-        Returns a directional hint when recent turns show a clear intent and/or regulation trend.
-        """
+        """Infer stable session direction from the latest turns."""
         if window < 2:
             window = 2
 
@@ -112,3 +253,4 @@ class LocalTrainingStore:
     @staticmethod
     def now_iso() -> str:
         return datetime.now(timezone.utc).isoformat()
+

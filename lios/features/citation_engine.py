@@ -29,9 +29,14 @@ class Citation:
 class CitationEngine:
     """Find and rank regulatory citations relevant to a query."""
 
-    def __init__(self, db: RegulatoryDatabase | None = None) -> None:
+    def __init__(
+        self,
+        db: RegulatoryDatabase | None = None,
+        retriever: HybridRetriever | None = None,
+    ) -> None:
         self.db = db or RegulatoryDatabase()
-        self.retriever = HybridRetriever()
+        # Reuse a shared HybridRetriever when provided to avoid duplicate model loads.
+        self.retriever = retriever if retriever is not None else HybridRetriever()
 
     def get_citations(
         self,
@@ -39,6 +44,9 @@ class CitationEngine:
         regulations: list[str] | None = None,
     ) -> list[Citation]:
         """Return top citations for the given query, optionally filtered by regulation."""
+        if not query or not query.strip():
+            return []
+
         # Prefer retrieval from provenance-aware corpus when available.
         retrieved = self.retriever.search(query=query, regulations=regulations, top_k=10)
         if retrieved:

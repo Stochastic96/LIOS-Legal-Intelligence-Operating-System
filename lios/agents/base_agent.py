@@ -20,12 +20,63 @@ class AgentResponse:
     conclusion_keywords: list[str] = field(default_factory=list)
 
 
+@dataclass
+class DomainRule:
+    """A keyword-triggered rule that emits a specific guidance text.
+
+    This dataclass is used by concrete agents to declare their domain
+    knowledge declaratively, eliminating repetitive ``if kw in query``
+    patterns (Template-Method / data-driven approach).
+
+    Attributes:
+        keywords: If *any* of these appear in the lower-cased query the rule
+            fires.  Use full sub-strings (e.g. ``"supply chain"``).
+        text: The guidance text appended to the answer when the rule fires.
+        require_all: When True *all* keywords must match (AND-semantics).
+            Defaults to False (OR-semantics).
+
+    Examples::
+
+        # OR-semantics: fires when 'climate' OR 'ghg' appears in the query
+        DomainRule(
+            keywords=["climate", "ghg"],
+            text="ESRS E1 requires GHG emission disclosure..."
+        )
+
+        # AND-semantics: fires only when BOTH 'double' AND 'materiality' appear
+        DomainRule(
+            keywords=["double", "materiality"],
+            text="CSRD Art.4 requires a double materiality assessment...",
+            require_all=True,
+        )
+    """
+
+    keywords: list[str]
+    text: str
+    require_all: bool = False
+
+    def matches(self, query_lower: str) -> bool:
+        """Return True if the rule matches *query_lower*."""
+        if self.require_all:
+            return all(kw in query_lower for kw in self.keywords)
+        return any(kw in query_lower for kw in self.keywords)
+
+
 class BaseAgent(ABC):
-    """Abstract base for all LIOS agents."""
+    """Abstract base for all LIOS specialist agents.
+
+    Subclasses should declare a ``DOMAIN_RULES`` class attribute with a list
+    of :class:`DomainRule` instances.  The base ``_domain_analysis`` method
+    iterates over those rules automatically, so most subclasses no longer need
+    to override ``_domain_analysis`` – they only need to set ``DOMAIN_RULES``.
+    Subclasses that need more complex behaviour may still override the method.
+    """
 
     name: str = "base"
     domain: str = "general"
     primary_regulations: list[str] = []
+    # Subclasses populate this to drive _domain_analysis automatically
+    DOMAIN_RULES: list[DomainRule] = []
 
     def __init__(self, db: RegulatoryDatabase | None = None) -> None:
         self.db = db or RegulatoryDatabase()
@@ -73,44 +124,88 @@ class BaseAgent(ABC):
     def _compose_answer(
         self, query_lower: str, articles: list[dict[str, Any]], context: dict[str, Any]
     ) -> tuple[str, list[str]]:
-        """Build a structured legal draft with retrieved articles + expert domain analysis."""
-        conclusion_kws = self._extract_conclusion_keywords(query_lower, articles)
+        """Produce a human-readable answer + key conclusion keywords.
 
-        parts: list[str] = []
-
-        # ── Legal sources retrieved from the regulatory database ──────────────
-        if articles:
-            source_blocks: list[str] = []
-            for a in articles[:3]:
-                reg = a["regulation"]
-                art = a["article_id"]
-                title = a.get("title", "")
-                text = a.get("text", "")
-                snippet = text[:700] + ("…" if len(text) > 700 else "")
-                header = f"**{reg} {art}**" + (f" — {title}" if title else "")
-                source_blocks.append(f"{header}\n{snippet}")
-            parts.append("## Retrieved Legal Provisions\n\n" + "\n\n".join(source_blocks))
-
-        # ── Expert domain analysis (keyword-triggered rule blocks) ────────────
-        domain_lines = self._domain_analysis(query_lower, articles, context)
-        if domain_lines:
-            parts.append("## Compliance Analysis\n\n" + "\n\n".join(domain_lines))
-
-        if not parts:
+        Uses :class:`~lios.intelligence.answer_synthesizer.AnswerSynthesizer`
+        to build a dynamic IRAC answer from the retrieved articles so that
+        each answer varies with the actual retrieved content rather than
+        returning static template strings.
+        """
+        if not articles:
             return (
                 "No specific regulatory provisions found for this query. "
                 "Please consult the official CSRD, ESRS, EU Taxonomy, SFDR, or CS3D texts directly.",
                 ["insufficient_data"],
             )
 
-        return "\n\n---\n\n".join(parts), conclusion_kws
+        conclusion_kws = self._extract_conclusion_keywords(query_lower, articles)
 
-    @abstractmethod
+        # Convert regulatory DB article dicts to the chunk-dict format expected
+        # by AnswerSynthesizer (keys: regulation, article, title, text).
+        chunks = [
+            {
+                "regulation": a.get("regulation", ""),
+                "article": a.get("article_id", ""),
+                "title": a.get("title", ""),
+                "text": a.get("text", ""),
+                "source_url": a.get("source_url", ""),
+            }
+            for a in articles
+        ]
+
+        try:
+            from lios.intelligence.answer_synthesizer import AnswerSynthesizer
+
+            synthesizer = AnswerSynthesizer()
+            answer = synthesizer.synthesize(query_lower, chunks)
+        except Exception:  # pragma: no cover – synthesizer is best-effort
+            # Graceful fallback to original template-based logic
+            top = articles[0]
+            regulation = top["regulation"]
+            article_id = top["article_id"]
+            title = top.get("title", "")
+            text = top.get("text", "")
+            answer_lines = [
+                f"[{self.name}] Based on {regulation} {article_id} ({title}):",
+                "",
+                text[:400] + ("..." if len(text) > 400 else ""),
+                "",
+            ]
+            if len(articles) > 1:
+                others = ", ".join(
+                    f"{a['regulation']} {a['article_id']}" for a in articles[1:3]
+                )
+                answer_lines.append(f"Additional relevant provisions: {others}.")
+            answer_lines.extend(self._domain_analysis(query_lower, articles, context))
+            answer = "\n".join(answer_lines)
+
+        # Append domain-specific analysis notes when they add new information.
+        domain_lines = self._domain_analysis(query_lower, articles, context)
+        if domain_lines:
+            answer = answer + "\n\n" + "\n".join(domain_lines)
+
+        return answer, conclusion_kws
+
     def _domain_analysis(
         self, query_lower: str, articles: list[dict[str, Any]], context: dict[str, Any]
     ) -> list[str]:
-        """Domain-specific expert analysis blocks appended to the answer."""
-        ...
+        """Domain-specific analysis lines appended to the answer.
+
+        Default implementation iterates over ``DOMAIN_RULES`` and appends the
+        text for every rule that fires.  Subclasses that declare
+        ``DOMAIN_RULES`` typically do *not* need to override this method.
+        Subclasses that need more complex logic may override it freely.
+        """
+        lines: list[str] = []
+        for rule in self.DOMAIN_RULES:
+            if rule.matches(query_lower):
+                lines.append(rule.text)
+        if not lines:
+            lines.append(
+                f"Consult {', '.join(self.primary_regulations) or 'the applicable regulation'} "
+                "provisions for comprehensive compliance obligations."
+            )
+        return lines
 
     # ------------------------------------------------------------------
     # Supporting helpers

@@ -1,89 +1,76 @@
-# LIOS — Claude Code Rules
+# CLAUDE.md
 
-## AI Tracking (MANDATORY — Read This First)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Before making any change to this codebase, every AI session must:**
+## Commands
 
-1. **Check** `logs/ai_tracking.jsonl` — read the last entry to understand what was done previously and what is unfinished
-2. **Append a `session_start` entry** to `logs/ai_tracking.jsonl` with:
-   - `session_id` (format: `lios-<descriptor>-<YYYYMMDD>`)
-   - `ai_model` (which model you are)
-   - `timestamp` (ISO 8601 UTC)
-   - `task` (what you are about to do)
-   - `goal` (what completing this achieves for the user)
-   - `completed_steps` (carry forward from previous session if resuming)
-   - `remaining_steps` (full list of what is left)
-   - `current_step` (the first thing you will do)
-3. **Append a `step_complete` entry** each time a step finishes
-4. **Append a `session_end` entry** when finishing normally, with `stop_reason: "completed"` or `stop_reason: "user_request"`
-5. **If context limit is approaching** (you notice you are running out of context), immediately append a `session_interrupted` entry with:
-   - `stop_reason: "context_limit"`
-   - `current_step`: exactly what you were doing mid-task
-   - `completed_steps`: everything finished so far
-   - `remaining_steps`: everything still left
-   - `resume_instructions`: precise instructions for the next AI session to pick up exactly where you left off — file paths, function names, what was partially written
-
-**The tracking log must never be deleted. It is the institutional memory of all AI work on this codebase.**
-
-### Entry format (append-only JSONL)
-```json
-{"event":"session_start"|"step_complete"|"session_end"|"session_interrupted", "session_id":"...", "ai_model":"...", "timestamp":"...", "task":"...", "goal":"...", "current_step":"...", "completed_steps":[...], "remaining_steps":[...], "stop_reason":null|"completed"|"user_request"|"context_limit"|"error", "resume_instructions":"..."}
-```
-
----
-
-## Project Overview
-
-**LIOS (Legal Intelligence Operating System)** — a self-learning EU sustainability law assistant.
-
-- Backend: FastAPI + Python, runs on `uvicorn lios.main:app --port 8000`
-- LLM: Ollama (local, Mistral) wired via `lios/llm/refiner.py`
-- Knowledge: 33 EU law chunks in `data/corpus/legal_chunks.jsonl` (CSRD, ESRS, EU Taxonomy, SFDR)
-- Mobile: React Native + Expo Go app in `lios-mobile/` (connects over WiFi to backend)
-- Storage: JSON/JSONL files only — no external database
-
-## Key Directories
-
-```
-lios/api/routes.py          — all FastAPI endpoints
-lios/orchestration/engine.py — query routing + LLM refinement
-lios/llm/refiner.py         — Ollama/Azure LLM integration
-lios/features/chat_training.py — chat session storage
-data/corpus/legal_chunks.jsonl — EU law knowledge base
-data/memory/                — corrections.json, rules.json, knowledge_map.json (created at runtime)
-logs/ai_tracking.jsonl      — AI session tracking (this file)
-lios-mobile/                — Expo React Native app
-```
-
-## Architecture Decisions
-
-- No database — everything is JSON/JSONL files
-- Brain toggle is runtime (no restart needed), stored in `data/memory/brain_state.json`
-- Memory rules are injected into the LLM system prompt on every query when brain is ON
-- Expo app connects to `http://<MAC_IP>:8000` over LAN — user sets IP in app settings
-- Knowledge map pre-seeded with EU law topics; topics graduate: `unknown → learning → connected → functional → mastered`
-
-## Coding Style
-
-- Python: dataclasses, type hints, no external DB dependencies
-- Keep new endpoints in `lios/api/routes.py` following existing patterns
-- New feature modules go in `lios/features/`
-- New memory/state modules go in `lios/memory/` (create if needed)
-- React Native: functional components, hooks only, no class components
-- No comments unless the WHY is non-obvious
-
-## Running the Stack
-
+**Install (development):**
 ```bash
-# Backend
-cd LIOS-Legal-Intelligence-Operating-System
-source .venv/bin/activate
-uvicorn lios.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Ollama (separate terminal)
-ollama run mistral
-
-# Expo app
-cd lios-mobile
-npx expo start
+pip install -e ".[dev]"
+# or with data pipeline tools:
+pip install -e ".[dev,data]"
 ```
+
+**Run the API server:**
+```bash
+uvicorn lios.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Run all tests:**
+```bash
+pytest tests/ -v --tb=short
+```
+
+**Run a single test:**
+```bash
+pytest tests/test_agents.py::TestSustainabilityAgent::test_name -v
+```
+
+**Lint:**
+```bash
+ruff check lios/ tests/
+```
+
+**CLI:**
+```bash
+lios query "What is CSRD?" --employees 500 --turnover 50000000
+```
+
+## Architecture
+
+LIOS is a RAG-based legal intelligence system for EU sustainability compliance (CSRD, ESRS, EU Taxonomy, SFDR, GDPR, BGB, StGB). Queries enter through either the FastAPI API (`lios/api/`) or Click CLI (`lios/cli/`) and are routed through four layers:
+
+**1. Orchestration** (`lios/orchestration/`) — `OrchestrationEngine` is the central coordinator. It uses `QueryParser` to classify intent and routes to either single-agent or consensus mode, then passes results through `ResponseAggregator`.
+
+**2. Analysis** — Two modes:
+- *Single-agent* (default): lightweight, fast responses via `lios/intelligence/` (answer synthesis, question classification, fact verification)
+- *Consensus mode* (`LIOS_CHAT_MODE=consensus`): three specialist agents (`lios/agents/` — Sustainability, Finance, Supply Chain) run in parallel threads; `ConsensusEngine` requires 2/3 agreement on key entities before returning
+
+**3. Features** (`lios/features/`) — 12 analytical tools (applicability checker, citation engine, compliance roadmap, carbon accounting, materiality, supply chain analysis, etc.) called by agents or directly by the orchestrator.
+
+**4. Knowledge & Retrieval** (`lios/knowledge/`, `lios/retrieval/`) — `RegulatoryDatabase` indexes 7 regulation modules with cached article lookup. `HybridRetriever` is a singleton running 3-stage weighted retrieval: BM25 (0.55) + semantic sentence-transformers (0.30) + provenance rerank (0.15). The corpus lives in `data/corpus/legal_chunks.jsonl` with per-chunk metadata (regulation, article, celex_id, jurisdiction, source_url, version_hash).
+
+**Reasoning** (`lios/reasoning/`) wraps retrieval output in IRAC-structured prompts before synthesis. LLM calls go through `lios/llm/` (Ollama client; falls back to deterministic synthesis if LLM is unavailable).
+
+**Chat sessions** log to `logs/chat_training.jsonl` (JSONL, append-only) and optionally to a PostgreSQL/pgvector backend controlled by `LIOS_CHAT_STORE`.
+
+## Key Configuration
+
+Environment variables (set in shell or `.env`):
+
+| Variable | Effect |
+|---|---|
+| `LIOS_LLM_ENABLED` | Enable Ollama LLM backend (default: false) |
+| `LIOS_LLM_PROVIDER` | `ollama` or `azure` |
+| `LIOS_CHAT_MODE` | `simple` (default) or `consensus` |
+| `LIOS_DEV_MODE` | Relaxed validation, verbose logging |
+| `LIOS_CHAT_STORE` | `jsonl` (default) or `postgres` |
+
+`lios/config.py` → `Settings` class is the single source of truth; all env vars are read there.
+
+## Testing Notes
+
+- pytest-asyncio is configured with `asyncio_mode = auto` (in `pyproject.toml`); no `@pytest.mark.asyncio` decorator needed.
+- `tests/conftest.py` provides shared fixtures: `RegulatoryDatabase`, company profiles, pre-built agents.
+- Tests are fully offline — no real HTTP calls or LLM calls; `HybridRetriever` and LLM client are mocked/stubbed in fixtures.
+- The CI matrix runs Python 3.10, 3.11, and 3.12.

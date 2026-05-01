@@ -2,6 +2,7 @@
 
 from lios.models.validation import (
     ApplicabilityRequest,
+    ChatMessageRequest,
     CitationResponse,
     CompanyProfile,
     ConflictResponse,
@@ -17,6 +18,7 @@ from lios.models.validation import (
 __all__ = [
     "CompanyProfile",
     "QueryRequest",
+    "ChatMessageRequest",
     "ApplicabilityRequest",
     "RoadmapRequest",
     "DecayScoreResponse",

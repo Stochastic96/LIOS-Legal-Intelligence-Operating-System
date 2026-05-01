@@ -21,9 +21,10 @@ def agent(db):
     return UnifiedComplianceAgent(db)
 
 
-@pytest.fixture
-def engine():
-    return OrchestrationEngine()
+def test_consensus_engine_requires_three_agents(db):
+    sus = SustainabilityAgent(db)
+    with pytest.raises(ValueError, match="at least 2 agents"):
+        ConsensusEngine([sus])
 
 
 def test_single_agent_consensus_result(agent):

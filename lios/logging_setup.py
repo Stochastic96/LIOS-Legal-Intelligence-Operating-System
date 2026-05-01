@@ -13,6 +13,16 @@ from typing import Any, Optional
 from lios.config import settings
 
 
+class SafeStreamHandler(logging.StreamHandler):
+    """StreamHandler that ignores writes attempted after the stream is closed."""
+
+    def handleError(self, record: logging.LogRecord) -> None:  # noqa: N802
+        exc = sys.exc_info()[1]
+        if isinstance(exc, ValueError) and "closed file" in str(exc).lower():
+            return
+        super().handleError(record)
+
+
 class StructuredFormatter(logging.Formatter):
     """Format logs as JSON for better parsing and analysis."""
 
@@ -94,11 +104,15 @@ def setup_logging(
         root_logger.removeHandler(handler)
 
     # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler = SafeStreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
     formatter = StructuredFormatter() if json_format else PlainFormatter()
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
+
+    # Prevent debug noise from third-party HTTP libraries at interpreter shutdown.
+    logging.getLogger("httpcore").setLevel(logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.INFO)
 
     # File handler (if specified)
     if log_file:
