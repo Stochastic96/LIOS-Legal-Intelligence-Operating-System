@@ -1,0 +1,12 @@
+[
+  {
+    "id": "corr-0001",
+    "created_at": "2026-05-01T17:44:44.364094+00:00",
+    "session_id": "lios-1777657413893",
+    "user_query": "What is csrd ?",
+    "original_answer": "Based on my knowledge base:\n\n[EU_TAXONOMY Art.8]: Financial market participants, large public interest entities, and non-financial undertakings subject to NFRD/CSRD shall disclose how and to what extent their activities are associated with environmentally sustainable economic activities. Key performance indicators include: taxonomy-eligible activities as proportion of turnover, capex, and opex.\n[CSRD Art.1]: This Directive amends Directive 2013/34/EU as regards the disclosure of non-financial and diversity information by certain large undertakings and groups. It introduces mandatory sustainability reporting requirements for large companies and listed SMEs operating in the EU.\n[CSRD Art.2]: For the purposes of this Directive: 'sustainability reporting' means reporting on sustainability matters including environmental, social and governance (ESG) factors. 'Large undertaking' means an undertaking which exceeds the limits of at least two of three size criteria: net turnover > 40 million EUR, balance sheet > 20 million EUR, employees > 250 on average during the financial year.\n\n_(Brain is off — turn it on for LLM-powered answers)_",
+    "feedback_type": "partial",
+    "correction_text": "Information is nit structured",
+    "made_rule": false
+  }
+]

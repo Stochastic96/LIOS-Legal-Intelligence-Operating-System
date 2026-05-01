@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "model": "mistral",
+  "base_url": "http://localhost:11434",
+  "toggled_at": "2026-05-01T22:55:40.516554+00:00"
+}

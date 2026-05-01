@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -1931,4 +1931,229 @@ def _build_dashboard_html() -> str:
     </script>
 </body>
 </html>"""
+
+
+# ── Mobile app endpoints ───────────────────────────────────────────────────────
+# In-memory stores for brain state, rules, corrections and learn progress.
+# These reset on server restart; good enough for local dev use.
+
+import httpx
+from pydantic import BaseModel as _BM
+
+_brain_on: bool = False
+_brain_toggled_at: Optional[str] = None
+
+_rules: dict[str, dict] = {}
+_corrections: list[dict] = []
+
+_LEARN_TOPICS: list[dict] = [
+    {"id": "csrd-basics", "name": "CSRD Basics", "category": "CSRD", "description": "Corporate Sustainability Reporting Directive scope and thresholds"},
+    {"id": "esrs-e1", "name": "ESRS E1 Climate", "category": "ESRS", "description": "Climate change mitigation and adaptation disclosures"},
+    {"id": "esrs-s1", "name": "ESRS S1 Workforce", "category": "ESRS", "description": "Own workforce social standards and disclosures"},
+    {"id": "eu-taxonomy", "name": "EU Taxonomy", "category": "EU Taxonomy", "description": "Sustainable activity classification criteria"},
+    {"id": "sfdr-basics", "name": "SFDR PAI", "category": "SFDR", "description": "Principal Adverse Impact indicators for financial products"},
+    {"id": "gdpr-data", "name": "GDPR Data Subject Rights", "category": "GDPR", "description": "Individual rights and controller obligations"},
+    {"id": "supply-chain-lksg", "name": "LkSG Due Diligence", "category": "Supply Chain", "description": "German Supply Chain Act obligations"},
+]
+_learn_progress: dict[str, dict] = {
+    t["id"]: {"status": "unknown", "pct": 0, "last_updated": None} for t in _LEARN_TOPICS
+}
+
+
+async def _ollama_reachable() -> bool:
+    try:
+        base = settings.LLM_BASE_URL.rstrip("/").removesuffix("/v1")
+        async with httpx.AsyncClient(timeout=2.0) as c:
+            r = await c.get(f"{base}/api/tags")
+            return r.status_code == 200
+    except Exception:
+        return False
+
+
+class _BrainToggleReq(_BM):
+    enabled: bool
+
+class _AddRuleReq(_BM):
+    rule_text: str
+    topic: str = "general"
+
+class _FeedbackReq(_BM):
+    session_id: str
+    message_id: str
+    query: str
+    original_answer: str
+    feedback_type: str  # good | wrong | partial
+    correction_text: Optional[str] = None
+    make_rule: bool = False
+
+class _LearnAnswerReq(_BM):
+    topic_id: str
+    answer_text: str
+    reference: str = ""
+
+
+@app.get("/brain/status")
+async def brain_status():
+    reachable = await _ollama_reachable()
+    chunk_count = 0
+    try:
+        from lios.retrieval.hybrid_retriever import HybridRetriever
+        hr = HybridRetriever.get_instance()
+        chunk_count = len(hr._chunks) if hasattr(hr, "_chunks") else 0
+    except Exception:
+        pass
+    active_rules = sum(1 for r in _rules.values() if r.get("active", True))
+    return {
+        "brain_on": _brain_on,
+        "model": settings.LLM_MODEL,
+        "base_url": settings.LLM_BASE_URL,
+        "llm_reachable": reachable,
+        "knowledge_chunks": chunk_count,
+        "active_rules": active_rules,
+        "total_corrections": len(_corrections),
+        "toggled_at": _brain_toggled_at,
+    }
+
+
+@app.post("/brain/toggle")
+async def brain_toggle(body: _BrainToggleReq):
+    global _brain_on, _brain_toggled_at
+    _brain_on = body.enabled
+    _brain_toggled_at = datetime.now(timezone.utc).isoformat()
+    reachable = await _ollama_reachable()
+    active_rules = sum(1 for r in _rules.values() if r.get("active", True))
+    return {
+        "brain_on": _brain_on,
+        "model": settings.LLM_MODEL,
+        "base_url": settings.LLM_BASE_URL,
+        "llm_reachable": reachable,
+        "knowledge_chunks": 0,
+        "active_rules": active_rules,
+        "total_corrections": len(_corrections),
+        "toggled_at": _brain_toggled_at,
+    }
+
+
+@app.get("/memory/rules")
+async def memory_rules():
+    active = [r for r in _rules.values() if r.get("active", True)]
+    return {"rules": active, "total": len(active)}
+
+
+@app.post("/memory/rules")
+async def memory_add_rule(body: _AddRuleReq):
+    rule_id = str(uuid.uuid4())[:8]
+    rule = {
+        "id": rule_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": "user",
+        "topic": body.topic,
+        "rule_text": body.rule_text,
+        "active": True,
+    }
+    _rules[rule_id] = rule
+    return {"created": True, "rule": rule}
+
+
+@app.delete("/memory/rules/{rule_id}")
+async def memory_delete_rule(rule_id: str):
+    if rule_id not in _rules:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    _rules[rule_id]["active"] = False
+    return {"deactivated": True}
+
+
+@app.get("/memory/corrections")
+async def memory_corrections(limit: int = 50):
+    recent = _corrections[-limit:][::-1]
+    return {"corrections": recent, "total": len(_corrections)}
+
+
+@app.post("/feedback")
+async def submit_feedback(body: _FeedbackReq):
+    record = {
+        "id": str(uuid.uuid4())[:8],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "session_id": body.session_id,
+        "user_query": body.query,
+        "feedback_type": body.feedback_type,
+        "correction_text": body.correction_text or "",
+        "made_rule": False,
+    }
+    _corrections.append(record)
+    rule_created = False
+    if body.make_rule and body.correction_text:
+        rule_id = str(uuid.uuid4())[:8]
+        _rules[rule_id] = {
+            "id": rule_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "source": "feedback",
+            "topic": "general",
+            "rule_text": body.correction_text,
+            "active": True,
+        }
+        record["made_rule"] = True
+        rule_created = True
+    return {"stored": True, "rule_created": rule_created, "message": "Feedback recorded"}
+
+
+@app.get("/learn/next")
+async def learn_next():
+    for t in _LEARN_TOPICS:
+        prog = _learn_progress[t["id"]]
+        if prog["status"] != "mastered":
+            return {
+                "all_mastered": False,
+                "topic": {**t, "status": prog["status"], "pct": prog["pct"]},
+                "question": f"Explain the key obligations under {t['name']} in one sentence.",
+            }
+    return {"all_mastered": True, "topic": None, "question": None}
+
+
+@app.post("/learn/answer")
+async def learn_answer(body: _LearnAnswerReq):
+    if body.topic_id not in _learn_progress:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    prog = _learn_progress[body.topic_id]
+    new_pct = min(prog["pct"] + 25, 100)
+    status = "mastered" if new_pct >= 100 else ("functional" if new_pct >= 50 else "learning")
+    prog.update({"pct": new_pct, "status": status, "last_updated": datetime.now(timezone.utc).isoformat()})
+    topic_meta = next(t for t in _LEARN_TOPICS if t["id"] == body.topic_id)
+    overall = int(sum(p["pct"] for p in _learn_progress.values()) / len(_learn_progress))
+    next_topic = next(
+        (t["id"] for t in _LEARN_TOPICS if _learn_progress[t["id"]]["status"] != "mastered" and t["id"] != body.topic_id),
+        None,
+    )
+    return {
+        "topic_updated": {**topic_meta, **prog},
+        "overall_pct": overall,
+        "next_topic": next_topic,
+    }
+
+
+@app.get("/learn/map")
+async def learn_map():
+    from collections import defaultdict
+    cats: dict[str, list] = defaultdict(list)
+    for t in _LEARN_TOPICS:
+        prog = _learn_progress[t["id"]]
+        cats[t["category"]].append({
+            "id": t["id"], "name": t["name"],
+            "status": prog["status"], "pct": prog["pct"],
+            "last_updated": prog["last_updated"],
+        })
+    mastered = sum(1 for p in _learn_progress.values() if p["status"] == "mastered")
+    functional = sum(1 for p in _learn_progress.values() if p["status"] == "functional")
+    learning = sum(1 for p in _learn_progress.values() if p["status"] == "learning")
+    unknown = sum(1 for p in _learn_progress.values() if p["status"] == "unknown")
+    overall = int(sum(p["pct"] for p in _learn_progress.values()) / len(_learn_progress))
+    return {
+        "overall_pct": overall,
+        "total_topics": len(_LEARN_TOPICS),
+        "mastered": mastered,
+        "functional": functional,
+        "learning": learning,
+        "unknown": unknown,
+        "categories": dict(cats),
+    }
 
