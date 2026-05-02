@@ -72,6 +72,7 @@ def _chunk_article(article: dict[str, Any]) -> list[LegalChunk]:
     effective_date = article.get("effective_date", "")
     source_url = _SOURCE_URLS.get(regulation, "https://eur-lex.europa.eu")
 
+    jurisdiction = article.get("jurisdiction", "EU")
     words = text.split()
 
     # Short or medium article — keep as a single chunk.
@@ -86,6 +87,7 @@ def _chunk_article(article: dict[str, Any]) -> list[LegalChunk]:
                 source_url=source_url,
                 published_date=published_date,
                 effective_date=effective_date,
+                jurisdiction=jurisdiction,
             )
         ]
 
@@ -102,6 +104,7 @@ def _chunk_article(article: dict[str, Any]) -> list[LegalChunk]:
             source_url=source_url,
             published_date=published_date,
             effective_date=effective_date,
+            jurisdiction=jurisdiction,
         )
         for i, seg in enumerate(segments, start=1)
     ]
@@ -167,11 +170,12 @@ def _make_chunk(
     source_url: str,
     published_date: str,
     effective_date: str,
+    jurisdiction: str = "EU",
 ) -> LegalChunk:
     return LegalChunk.create(
         source_url=source_url,
         celex_or_doc_id=celex_id,
-        jurisdiction="EU",
+        jurisdiction=jurisdiction,
         regulation=regulation,
         article=article,
         published_date=published_date,

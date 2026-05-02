@@ -78,6 +78,86 @@ regulations:
         assets_under_management_min: 100000000
         employees_min: 500
 
+  HGB:
+    name: HGB
+    full_name: Handelsgesetzbuch (German Commercial Code)
+    description: German commercial law governing merchants, partnerships, and accounting obligations
+    jurisdictions:
+      - Germany
+    effective_date: "1900-01-01"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - finance
+    secondary_agents:
+      - supply_chain
+    enabled: true
+
+  GmbHG:
+    name: GmbHG
+    full_name: GmbH-Gesetz (Limited Liability Company Act)
+    description: German law governing GmbH formation, governance, and obligations
+    jurisdictions:
+      - Germany
+    effective_date: "1892-04-20"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - finance
+    secondary_agents: []
+    enabled: true
+
+  AktG:
+    name: AktG
+    full_name: Aktiengesetz (Stock Corporation Act)
+    description: German law governing Aktiengesellschaft formation and corporate governance
+    jurisdictions:
+      - Germany
+    effective_date: "1966-01-01"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - finance
+    secondary_agents:
+      - sustainability
+    enabled: true
+
+  KrWG:
+    name: KrWG
+    full_name: Kreislaufwirtschaftsgesetz (Circular Economy Act)
+    description: German circular economy and waste management requirements
+    jurisdictions:
+      - Germany
+    effective_date: "2012-06-01"
+    last_updated: "2023-07-01"
+    primary_agents:
+      - sustainability
+    secondary_agents: []
+    enabled: true
+
+  BSIG:
+    name: BSIG
+    full_name: BSI-Gesetz (IT Security Act)
+    description: German IT security requirements for critical infrastructure operators
+    jurisdictions:
+      - Germany
+    effective_date: "2009-08-14"
+    last_updated: "2021-05-28"
+    primary_agents:
+      - supply_chain
+    secondary_agents: []
+    enabled: true
+
+  UmwG:
+    name: UmwG
+    full_name: Umwandlungsgesetz (Transformation Act)
+    description: German law governing mergers, demergers, and corporate transformations
+    jurisdictions:
+      - Germany
+    effective_date: "1995-01-01"
+    last_updated: "2023-01-01"
+    primary_agents:
+      - finance
+    secondary_agents: []
+    enabled: true
+
   # Template for adding new regulations:
   # CGD:
   #   name: CGD

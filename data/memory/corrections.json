@@ -8,5 +8,25 @@
     "feedback_type": "partial",
     "correction_text": "Information is nit structured",
     "made_rule": false
+  },
+  {
+    "id": "corr-0002",
+    "created_at": "2026-05-01T23:49:40.741269+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] TCFD",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "So the full set of the 4 TCFD pillars is:\n\n1. Governance – how the organization oversees climate-related risks and opportunities\n2. Strategy – how climate issues affect the business model and long-term planning\n3. Risk Management – how climate risks are identified, assessed, and managed\n4. Metrics and Targets – the data and goals used to measure and manage climate-related performance\n\nOfficial reference (TCFD):\nThe TCFD recommendations clearly define these four pillars in their core guidance documents (e.g., Recommendations of the TCFD, 2017, updated status reports thereafter). (Reference: https://www.fsb-tcfd.org/recommendations/)",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0003",
+    "created_at": "2026-05-01T23:52:59.926694+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] ISSB / IFRS S1 S2",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "Both are issued by the International Sustainability Standards Board under the IFRS Foundation.\n\nHere’s the clear difference:\n\n⸻\n\n🔹 IFRS S1 — General sustainability disclosures\n\n* Full name: General Requirements for Disclosure of Sustainability-related Financial Information\n* Scope: Covers all sustainability risks and opportunities (environmental, social, governance – ESG)\n* Purpose:\n    * Provides the overall framework for sustainability reporting\n    * Requires companies to disclose material sustainability-related risks/opportunities that could affect financial performance\n* Acts as: the baseline / umbrella standard\n\n👉 Think of IFRS S1 as: “Report all relevant sustainability issues affecting the business.”\n\n⸻\n\n🔹 IFRS S2 — Climate-related disclosures\n\n* Full name: Climate-related Disclosures\n* Scope: Focused only on climate\n* Built on: the Task Force on Climate-related Financial Disclosures structure\n* Requires disclosure of:\n    * Climate risks (physical & transition)\n    * Scenario analysis\n    * Greenhouse gas emissions (Scope 1, 2, and 3)\n    * Climate targets and transition plans\n\n👉 Think of IFRS S2 as: “Go deep specifically on climate.”\n\n⸻\n\n🧠 Key difference in one line\n\n* IFRS S1 = broad (all sustainability topics)\n* IFRS S2 = specific (climate only)\n\n⸻\n\n🔗 How they work together\n\n* IFRS S2 is not standalone — it must be used with IFRS S1\n* Both use the same structure:\n    Governance, Strategy, Risk Management, Metrics & Targets (aligned with TCFD) ja (Reference: Here are the official reference URLs for IFRS S1 and IFRS S2 under the International Sustainability Standards Board:  ⸻  📘 IFRS S1 (General sustainability disclosures)  * IFRS S1 official page * IFRS S1 full PDF (official standard)  ⸻  🌍 IFRS S2 (Climate-related disclosures)  * IFRS S2 full PDF (official standard)  ⸻  🔎 Supporting overview (official IFRS site)  * Introduction to ISSB and IFRS S1/S2  ⸻  ✅ What these confirm  * IFRS S1 covers all sustainability-related risks and opportunities * IFRS S2 covers climate-related disclosures only * Both standards must be used together and follow the same structure (governance, strategy, risk management, metrics & targets))",
+    "made_rule": false
   }
 ]
