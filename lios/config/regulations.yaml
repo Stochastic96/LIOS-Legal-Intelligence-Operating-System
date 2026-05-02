@@ -158,6 +158,103 @@ regulations:
     secondary_agents: []
     enabled: true
 
+  GDPR:
+    name: GDPR
+    full_name: General Data Protection Regulation
+    description: EU regulation on personal data protection and privacy for all individuals
+    jurisdictions:
+      - EU
+    effective_date: "2018-05-25"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - supply_chain
+    secondary_agents:
+      - finance
+    enabled: true
+
+  DORA:
+    name: DORA
+    full_name: Digital Operational Resilience Act
+    description: EU regulation on digital operational resilience for financial entities
+    jurisdictions:
+      - EU
+    effective_date: "2025-01-17"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - finance
+    secondary_agents:
+      - supply_chain
+    enabled: true
+
+  AI_ACT:
+    name: AI_ACT
+    full_name: EU Artificial Intelligence Act
+    description: EU regulation establishing a legal framework for artificial intelligence
+    jurisdictions:
+      - EU
+    effective_date: "2024-08-01"
+    last_updated: "2024-07-12"
+    primary_agents:
+      - supply_chain
+    secondary_agents:
+      - finance
+    enabled: true
+
+  NIS2:
+    name: NIS2
+    full_name: Network and Information Security Directive 2
+    description: EU directive on cybersecurity measures for essential and important entities
+    jurisdictions:
+      - EU
+    effective_date: "2024-10-18"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - supply_chain
+    secondary_agents: []
+    enabled: true
+
+  CSDDD:
+    name: CSDDD
+    full_name: Corporate Sustainability Due Diligence Directive
+    description: EU directive on corporate sustainability due diligence and supply chains
+    jurisdictions:
+      - EU
+    effective_date: "2024-07-25"
+    last_updated: "2024-07-05"
+    primary_agents:
+      - supply_chain
+      - sustainability
+    secondary_agents:
+      - finance
+    enabled: true
+
+  WHISTLEBLOWER:
+    name: WHISTLEBLOWER
+    full_name: EU Whistleblower Protection Directive
+    description: EU directive protecting persons who report breaches of EU law
+    jurisdictions:
+      - EU
+    effective_date: "2021-12-17"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - supply_chain
+    secondary_agents: []
+    enabled: true
+
+  CBAM:
+    name: CBAM
+    full_name: Carbon Border Adjustment Mechanism
+    description: EU mechanism putting a carbon price on imports from outside the EU
+    jurisdictions:
+      - EU
+    effective_date: "2023-10-01"
+    last_updated: "2024-01-01"
+    primary_agents:
+      - sustainability
+      - finance
+    secondary_agents: []
+    enabled: true
+
   # Template for adding new regulations:
   # CGD:
   #   name: CGD

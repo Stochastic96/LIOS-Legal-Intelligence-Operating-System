@@ -50,6 +50,48 @@ REGULATIONS: dict[str, dict[str, str]] = {
         "published_date": "2019-12-09",
         "effective_date": "2021-03-10",
     },
+    "gdpr": {
+        "celex_id": "32016R0679",
+        "regulation": "GDPR",
+        "published_date": "2016-05-04",
+        "effective_date": "2018-05-25",
+    },
+    "dora": {
+        "celex_id": "32022R2554",
+        "regulation": "DORA",
+        "published_date": "2022-12-27",
+        "effective_date": "2025-01-17",
+    },
+    "ai_act": {
+        "celex_id": "32024R1689",
+        "regulation": "AI_ACT",
+        "published_date": "2024-07-12",
+        "effective_date": "2024-08-01",
+    },
+    "nis2": {
+        "celex_id": "32022L2555",
+        "regulation": "NIS2",
+        "published_date": "2022-12-27",
+        "effective_date": "2024-10-18",
+    },
+    "csddd": {
+        "celex_id": "32024L1760",
+        "regulation": "CSDDD",
+        "published_date": "2024-07-05",
+        "effective_date": "2024-07-25",
+    },
+    "whistleblower": {
+        "celex_id": "32019L1937",
+        "regulation": "WHISTLEBLOWER",
+        "published_date": "2019-11-26",
+        "effective_date": "2021-12-17",
+    },
+    "cbam": {
+        "celex_id": "32023R0956",
+        "regulation": "CBAM",
+        "published_date": "2023-05-16",
+        "effective_date": "2023-10-01",
+    },
 }
 
 _HTML_URL = "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:{celex_id}"

@@ -31,7 +31,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from lios.ingestion.eurlex_fetcher import fetch_regulation  # noqa: E402
+from lios.ingestion.eurlex_fetcher import fetch_regulation, REGULATIONS as _EUR_REGS  # noqa: E402
 from lios.ingestion.legal_chunker import chunk_articles  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ from lios.ingestion.legal_chunker import chunk_articles  # noqa: E402
 # ---------------------------------------------------------------------------
 
 _DEFAULT_OUTPUT = _ROOT / "data" / "corpus" / "legal_chunks.jsonl"
-_ALL_REGULATIONS = ["csrd", "esrs", "taxonomy", "sfdr"]
+_ALL_REGULATIONS = list(_EUR_REGS.keys())   # auto-synced with eurlex_fetcher.py
 _ALL_SOURCES = ["cjeu", "echr", "german"]
 
 
