@@ -122,6 +122,25 @@
         .bubble.user { align-self: flex-end; background: #e9f3f0; border-color: #beddd7; }
         .bubble.assistant { align-self: flex-start; background: #fff; }
         .meta { margin-top: 8px; color: var(--muted); font-size: 0.74rem; font-family: monospace; }
+        .feedback-buttons {
+            margin-top: 8px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .feedback-btn {
+            padding: 6px 10px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #f0f0f0;
+            color: var(--ink);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 120ms ease;
+        }
+        .feedback-btn:hover { background: var(--line); }
+        .feedback-btn.success { background: #90ee90; border-color: #228b22; }
+        .feedback-btn.error { background: #ffb6c6; border-color: #c41e3a; }
         .composer {
             padding: 14px;
             border-top: 1px solid var(--line);
@@ -136,6 +155,70 @@
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .mode-toggle {
+            padding: 8px 12px;
+            margin-top: 10px;
+            border-radius: 8px;
+            background: #e8f4f1;
+            border: 1px solid var(--brand);
+            display: flex;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+        .mode-toggle button {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+        }
+        .mode-toggle button.active {
+            background: var(--brand);
+            color: #fff;
+            border-color: var(--brand);
+        }
+        .learn-panel {
+            margin-top: 14px;
+            padding: 10px;
+            background: #f0f8f5;
+            border: 1px solid #b8e2d9;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+        .learn-status { margin-top: 6px; color: var(--muted); }
+        .learn-stat { display: flex; justify-content: space-between; margin: 4px 0; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--paper);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid var(--line);
+        }
+        .modal-close {
+            float: right;
+            border: 0;
+            background: transparent;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+        }
+        .modal-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 12px; }
         @media (max-width: 900px) {
             .shell { grid-template-columns: 1fr; }
             .workspace { min-height: 70vh; }
@@ -151,6 +234,11 @@
             <div class="title">
                 <h1>LIOS Chat Studio</h1>
                 <p>Local-first training workspace</p>
+            </div>
+
+            <div class="mode-toggle">
+                <button class="active" id="serveModeBtn">Serve</button>
+                <button id="learnModeBtn">Learn</button>
             </div>
 
             <div class="field">
@@ -173,6 +261,17 @@
                 <button class="ghost" id="exportBtn">Export JSONL</button>
             </div>
 
+            <div id="learnPanel" class="learn-panel" style="display:none;">
+                <strong>Learn Mode</strong>
+                <div class="learn-status" id="learnStatus">
+                    <div class="learn-stat"><span>Accuracy:</span> <span id="accuracy">--</span></div>
+                    <div class="learn-stat"><span>Questions:</span> <span id="qCount">0</span></div>
+                    <div class="learn-stat"><span>Topics:</span> <span id="tCount">0</span></div>
+                </div>
+                <button class="ghost" id="nextQBtn" style="width:100%;margin-top:8px;">Next Question</button>
+                <button class="ghost" id="summaryBtn" style="width:100%;margin-top:6px;">Session Summary</button>
+            </div>
+
             <div class="help">Every exchange is stored locally in logs/chat_training.jsonl for iterative training and prompt tuning.</div>
         </aside>
 
@@ -189,6 +288,14 @@
         </section>
     </div>
 
+    <div id="summaryModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="document.getElementById('summaryModal').classList.remove('active')">×</button>
+            <div class="modal-title">Session Summary</div>
+            <div id="summaryContent"></div>
+        </div>
+    </div>
+
     <script>
         const chatLog = document.getElementById("chatLog");
         const statusEl = document.getElementById("status");
@@ -199,6 +306,14 @@
         const sessionEl = document.getElementById("sessionId");
         const jursEl = document.getElementById("jurisdictions");
         const profileEl = document.getElementById("profile");
+        const serveModeBtn = document.getElementById("serveModeBtn");
+        const learnModeBtn = document.getElementById("learnModeBtn");
+        const learnPanel = document.getElementById("learnPanel");
+        const nextQBtn = document.getElementById("nextQBtn");
+        const summaryBtn = document.getElementById("summaryBtn");
+
+        let learnMode = false;
+        let assistantMessages = [];  // Track assistant messages for feedback
 
         sessionEl.value = `session-${Date.now().toString(36)}`;
 
@@ -212,15 +327,154 @@
                 metaEl.textContent = meta;
                 bubble.appendChild(metaEl);
             }
+            
+            // Add feedback buttons for assistant messages in learn mode
+            if (role === "assistant" && learnMode) {
+                const feedbackDiv = document.createElement("div");
+                feedbackDiv.className = "feedback-buttons";
+                const msgIndex = assistantMessages.length;
+                assistantMessages.push(text);  // Store message
+
+                const buttons = [
+                    { label: "✓ Correct", value: "correct", class: "success" },
+                    { label: "✗ Incorrect", value: "incorrect", class: "error" },
+                    { label: "~ Partial", value: "partially_correct", class: "" },
+                    { label: "? Unclear", value: "unclear", class: "" },
+                ];
+
+                buttons.forEach(btn => {
+                    const fbBtn = document.createElement("button");
+                    fbBtn.className = `feedback-btn ${btn.class}`;
+                    fbBtn.textContent = btn.label;
+                    fbBtn.onclick = () => submitFeedback(btn.value, msgIndex, fbBtn);
+                    feedbackDiv.appendChild(fbBtn);
+                });
+
+                bubble.appendChild(feedbackDiv);
+            }
+
             chatLog.appendChild(bubble);
             chatLog.scrollTop = chatLog.scrollHeight;
         }
+
+        function setLearnMode(enabled) {
+            learnMode = enabled;
+            learnPanel.style.display = enabled ? "block" : "none";
+            serveModeBtn.classList.toggle("active", !enabled);
+            learnModeBtn.classList.toggle("active", enabled);
+            if (enabled) {
+                updateLearnStatus();
+            }
+        }
+
+        serveModeBtn.addEventListener("click", () => setLearnMode(false));
+        learnModeBtn.addEventListener("click", () => setLearnMode(true));
 
         function parseProfile() {
             const raw = profileEl.value.trim();
             if (!raw) return null;
             return JSON.parse(raw);
         }
+
+        async function submitFeedback(feedbackType, msgIndex, button) {
+            try {
+                button.disabled = true;
+                button.textContent = "Submitting...";
+
+                const response = await fetch("/chat/api/feedback", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: sessionEl.value,
+                        turn_id: msgIndex,
+                        response: feedbackType,
+                        feedback_text: null,
+                        confidence_level: 0.5,
+                    }),
+                });
+
+                if (!response.ok) {
+                    button.textContent = "Error";
+                    return;
+                }
+
+                button.disabled = true;
+                button.style.opacity = "0.5";
+                button.textContent = "✓ Sent";
+                updateLearnStatus();
+            } catch (error) {
+                button.textContent = "Error";
+                console.error("Feedback submission error:", error);
+            }
+        }
+
+        async function updateLearnStatus() {
+            if (!learnMode) return;
+            try {
+                const response = await fetch(`/chat/api/learn-status?session_id=${encodeURIComponent(sessionEl.value)}`);
+                const data = await response.json();
+                document.getElementById("accuracy").textContent = `${(data.accuracy * 100).toFixed(0)}%`;
+                document.getElementById("qCount").textContent = data.total_questions_answered;
+                document.getElementById("tCount").textContent = data.topics_covered.length;
+            } catch (error) {
+                console.error("Error updating learn status:", error);
+            }
+        }
+
+        async function getNextQuestion() {
+            try {
+                statusEl.textContent = "generating";
+                const response = await fetch(`/chat/api/next-question?session_id=${encodeURIComponent(sessionEl.value)}`);
+                const data = await response.json();
+                if (!response.ok) {
+                    alert("Could not generate next question");
+                    return;
+                }
+                promptEl.value = data.question;
+                promptEl.focus();
+            } catch (error) {
+                alert("Error getting next question: " + error);
+            } finally {
+                statusEl.textContent = "ready";
+            }
+        }
+
+        async function showSessionSummary() {
+            try {
+                statusEl.textContent = "summarizing";
+                const response = await fetch(`/chat/api/session-summary?session_id=${encodeURIComponent(sessionEl.value)}`);
+                const data = await response.json();
+                if (!response.ok) {
+                    alert("Could not generate summary");
+                    return;
+                }
+
+                let html = `
+                    <p><strong>Total Turns:</strong> ${data.total_turns}</p>
+                    <p><strong>Duration:</strong> ${Math.round(data.duration_seconds / 60)} minutes</p>
+                    <p><strong>Feedback Collected:</strong> ${JSON.stringify(data.feedback_collected)}</p>
+                    <p><strong>Confidence Improvement:</strong> ${(data.confidence_metrics.confidence_improvement * 100).toFixed(1)}%</p>
+                    <p><strong>Topics Covered:</strong></p>
+                    <ul>
+                        ${(data.key_learning_events || []).slice(0, 5).map(e => `<li>${e.topic} - ${e.event_type}</li>`).join('')}
+                    </ul>
+                    <p><strong>Recommended Next Steps:</strong></p>
+                    <ul>
+                        ${(data.recommended_next_steps || []).map(s => `<li>${s}</li>`).join('')}
+                    </ul>
+                `;
+
+                document.getElementById("summaryContent").innerHTML = html;
+                document.getElementById("summaryModal").classList.add("active");
+            } catch (error) {
+                alert("Error generating summary: " + error);
+            } finally {
+                statusEl.textContent = "ready";
+            }
+        }
+
+        nextQBtn.addEventListener("click", getNextQuestion);
+        summaryBtn.addEventListener("click", showSessionSummary);
 
         async function sendMessage() {
             const query = promptEl.value.trim();
@@ -275,6 +529,7 @@
         async function loadSession() {
             statusEl.textContent = "loading";
             chatLog.innerHTML = "";
+            assistantMessages = [];
             try {
                 const response = await fetch(`/chat/api/history?session_id=${encodeURIComponent(sessionEl.value)}`);
                 const data = await response.json();
@@ -286,6 +541,7 @@
                     addBubble(turn.user_query || "", "user");
                     addBubble(turn.answer || "", "assistant", `intent=${turn.intent || "unknown"}`);
                 }
+                updateLearnStatus();
             } finally {
                 statusEl.textContent = "ready";
             }
@@ -317,7 +573,7 @@
             }
         });
 
-        addBubble("Workspace ready. Send your first query to begin local training capture.", "assistant");
+        addBubble("Workspace ready. Send your first query to begin local training capture. Toggle Learn Mode to provide feedback.", "assistant");
     </script>
 </body>
 </html>

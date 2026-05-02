@@ -30,6 +30,11 @@ class ChatTurn:
     intent: str
     citations: list[dict[str, Any]]
     metadata: dict[str, Any]
+    # New fields for learning integration
+    feedback: dict[str, Any] | None = None  # e.g. {"type":"verified","text":...}
+    learning_event_id: str | None = None
+    confidence_before: float | None = None
+    confidence_after: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +89,11 @@ CREATE TABLE IF NOT EXISTS chat_turns (
     answer      TEXT    NOT NULL,
     intent      TEXT    NOT NULL,
     citations   TEXT    NOT NULL,
-    metadata    TEXT    NOT NULL
+    metadata    TEXT    NOT NULL,
+    feedback    TEXT,
+    learning_event_id TEXT,
+    confidence_before REAL,
+    confidence_after REAL
 );
 CREATE INDEX IF NOT EXISTS idx_session_id ON chat_turns (session_id);
 """

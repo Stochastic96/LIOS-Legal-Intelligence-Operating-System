@@ -17,6 +17,10 @@ from lios.features.materiality import DoubleMaterialityEngine
 from lios.features.supply_chain import SupplyChainDueDiligenceEngine
 from lios.knowledge.regulatory_db import RegulatoryDatabase
 from lios.orchestration.engine import OrchestrationEngine
+from lios.learning.feedback_handler import FeedbackHandler
+from lios.learning.gap_detector import GapDetector
+from lios.learning.learning_event_store import LearningEventStore
+from lios.ai_tracking import AIActivityLogger
 
 # ---------------------------------------------------------------------------
 # Shared service singletons – initialised once at import time.
@@ -30,6 +34,12 @@ training_store = LocalTrainingStore()
 carbon_engine = CarbonAccountingEngine()
 supply_chain_engine = SupplyChainDueDiligenceEngine()
 materiality_engine = DoubleMaterialityEngine()
+
+# Learning and tracking singletons
+learning_event_store = LearningEventStore()
+feedback_handler = FeedbackHandler(learning_event_store)
+gap_detector = GapDetector.create_default()
+ai_activity_logger = AIActivityLogger()
 
 # ---------------------------------------------------------------------------
 # API key authentication

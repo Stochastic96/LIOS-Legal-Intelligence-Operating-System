@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
-from lios.api.routers import carbon, chat, core, dashboard, impact, supply_chain
+from lios.api.routers import carbon, chat, core, dashboard, impact, learn, supply_chain
 from lios.config import settings
 from lios.logging_setup import get_logger
 from lios.models.validation import ErrorResponse
@@ -110,6 +110,7 @@ def debug_routes() -> dict[str, list[str]]:
 
 app.include_router(core.router)
 app.include_router(chat.router)
+app.include_router(learn.router)
 app.include_router(carbon.router)
 app.include_router(supply_chain.router)
 app.include_router(impact.router)

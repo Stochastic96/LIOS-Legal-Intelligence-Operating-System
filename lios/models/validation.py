@@ -520,3 +520,165 @@ class MaterialityAssessmentRequest(BaseModel):
     topics: list[TopicAssessmentInput] = Field(
         ..., min_length=1, description="List of ESRS topics to assess"
     )
+
+
+# ---------------------------------------------------------------------------
+# Learning & Feedback Models
+# ---------------------------------------------------------------------------
+
+
+class FeedbackRequest(BaseModel):
+    """Request model for submitting feedback on an answer."""
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "session_id": "session-abc123",
+            "turn_id": 5,
+            "response": "correct",
+            "feedback_text": "This answer was very helpful for understanding CSRD requirements.",
+            "confidence_level": 0.9,
+        }
+    })
+
+    session_id: str = Field(
+        ...,
+        max_length=128,
+        description="Session identifier",
+    )
+    turn_id: Optional[int] = Field(
+        default=None,
+        description="Chat turn index to provide feedback on",
+    )
+    response: str = Field(
+        ...,
+        pattern="^(correct|incorrect|partially_correct|unclear)$",
+        description="Feedback type: correct, incorrect, partially_correct, or unclear",
+    )
+    feedback_text: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        description="Optional detailed feedback text",
+    )
+    confidence_level: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="User's confidence in the answer (0-1)",
+    )
+    correction: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        description="Corrected answer if feedback response is incorrect",
+    )
+
+
+class NextQuestionResponse(BaseModel):
+    """Response model for next learning question."""
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "session_id": "session-abc123",
+            "question": "What are the materiality thresholds for CSRD reporting?",
+            "topic": "CSRD",
+            "difficulty_level": "intermediate",
+            "explanation": "Based on your recent queries, you show a gap in understanding materiality assessment."
+        }
+    })
+
+    session_id: str = Field(..., description="Session identifier")
+    question: str = Field(..., description="The next recommended learning question")
+    topic: str = Field(..., description="The ESRS/regulation topic")
+    difficulty_level: str = Field(
+        ...,
+        pattern="^(beginner|intermediate|advanced)$",
+        description="Difficulty level of the question",
+    )
+    explanation: Optional[str] = Field(
+        default=None,
+        description="Explanation of why this question was selected",
+    )
+
+
+class LearnStatusResponse(BaseModel):
+    """Response model for learning status."""
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "session_id": "session-abc123",
+            "total_questions_answered": 15,
+            "correct_answers": 12,
+            "accuracy": 0.8,
+            "topics_covered": ["CSRD", "ESRS", "Materiality"],
+            "knowledge_gaps": [
+                {"topic": "Carbon Accounting", "priority": "high"},
+                {"topic": "Scope 3 Emissions", "priority": "medium"}
+            ]
+        }
+    })
+
+    session_id: str = Field(..., description="Session identifier")
+    total_questions_answered: int = Field(
+        default=0, description="Total number of questions answered"
+    )
+    correct_answers: int = Field(
+        default=0, description="Number of correct answers"
+    )
+    accuracy: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Accuracy percentage (0-1)"
+    )
+    topics_covered: list[str] = Field(
+        default_factory=list, description="List of topics covered"
+    )
+    knowledge_gaps: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="List of identified knowledge gaps with priority levels",
+    )
+
+
+class SessionSummaryResponse(BaseModel):
+    """Response model for session summary."""
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "session_id": "session-abc123",
+            "total_turns": 8,
+            "duration_seconds": 3600,
+            "feedback_collected": {
+                "correct": 5,
+                "incorrect": 1,
+                "partially_correct": 2
+            },
+            "confidence_metrics": {
+                "avg_confidence_before": 0.65,
+                "avg_confidence_after": 0.82,
+                "confidence_improvement": 0.17
+            },
+            "key_learning_events": [
+                {
+                    "event_type": "instruction_record",
+                    "topic": "CSRD",
+                    "timestamp": "2026-05-01T10:30:00Z"
+                }
+            ],
+            "recommended_next_steps": [
+                "Review Scope 3 emissions calculation methodology",
+                "Practice materiality assessment questions"
+            ]
+        }
+    })
+
+    session_id: str = Field(..., description="Session identifier")
+    total_turns: int = Field(default=0, description="Total number of chat turns")
+    duration_seconds: int = Field(default=0, description="Session duration in seconds")
+    feedback_collected: dict[str, int] = Field(
+        default_factory=dict, description="Count of feedback by type"
+    )
+    confidence_metrics: dict[str, float] = Field(
+        default_factory=dict, description="Confidence metrics before/after learning"
+    )
+    key_learning_events: list[dict[str, Any]] = Field(
+        default_factory=list, description="Key learning events recorded"
+    )
+    recommended_next_steps: list[str] = Field(
+        default_factory=list, description="Recommended topics to review"
+    )
