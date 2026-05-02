@@ -253,6 +253,8 @@ def main(argv: list[str] | None = None) -> None:
     if srcs:
         print(f"Sources    : {', '.join(srcs)}")
     print(f"Output     : {output_path}")
+
+    added, skipped = build_corpus(regs, output_path, sources=srcs)
     print(f"{added} chunks added, {skipped} skipped")
 
 
