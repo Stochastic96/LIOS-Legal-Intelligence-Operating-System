@@ -1,0 +1,155 @@
+name: LIOS Learn Copilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - auto     # fully autonomous — generates + submits answers
+          - review   # read-only — just prints questions (no submissions)
+      rounds:
+        description: "Number of learn rounds (1–50)"
+        required: true
+        default: "10"
+        type: string
+      commit_progress:
+        description: "Commit updated brain state back to main after session"
+        required: true
+        default: true
+        type: boolean
+
+# Write permission needed to push the updated brain state back
+permissions:
+  contents: write
+
+jobs:
+  learn:
+    name: "Learn Copilot · ${{ inputs.mode }} · ${{ inputs.rounds }} rounds"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so we can push back cleanly
+          fetch-depth: 0
+
+      # ── 2. Python environment ──────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install LIOS + copilot deps
+        run: pip install -e "." requests
+
+      # ── 3. Start LIOS server ───────────────────────────────────────────────
+      - name: Start LIOS server
+        env:
+          LIOS_LLM_ENABLED: "false"   # no Ollama on CI — uses deterministic fallback
+        run: |
+          uvicorn lios_server:app --host 127.0.0.1 --port 8000 \
+            > /tmp/lios_server.log 2>&1 &
+          echo "Server PID: $!"
+
+          # Poll until healthy (max 60s)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
+              echo "✓ LIOS server is ready."
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "✗ Server failed to start. Log:"
+              cat /tmp/lios_server.log
+              exit 1
+            fi
+            echo "  waiting… ($i/30)"
+            sleep 2
+          done
+
+      # ── 4. Show initial knowledge map ─────────────────────────────────────
+      - name: Initial knowledge map
+        run: |
+          echo "=== LIOS Knowledge Map (before session) ==="
+          curl -s http://127.0.0.1:8000/learn/map \
+            | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'Overall: {d[\"overall_pct\"]}%')
+          print(f'Mastered: {d[\"mastered\"]}  Functional: {d[\"functional\"]}  Learning: {d[\"learning\"]}  Unknown: {d[\"unknown\"]}')
+          print()
+          for cat, topics in d.get('categories', {}).items():
+              avg = round(sum(t['pct'] for t in topics) / len(topics)) if topics else 0
+              print(f'  {cat}: {avg}%')
+              for t in topics:
+                  bar = '█' * (t['pct'] // 5) + '░' * (20 - t['pct'] // 5)
+                  print(f'    [{bar}] {t[\"pct\"]:3d}%  {t[\"name\"]}  ({t[\"status\"]})')
+          "
+
+      # ── 5. Run the copilot ─────────────────────────────────────────────────
+      - name: Run Learn Copilot
+        run: |
+          python3 scripts/learn_copilot.py \
+            --server http://127.0.0.1:8000 \
+            --mode "${{ inputs.mode }}" \
+            --rounds "${{ inputs.rounds }}" \
+            --delay 2
+
+      # ── 6. Show final knowledge map ────────────────────────────────────────
+      - name: Final knowledge map
+        if: always()
+        run: |
+          echo "=== LIOS Knowledge Map (after session) ==="
+          curl -s http://127.0.0.1:8000/learn/map \
+            | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'Overall: {d[\"overall_pct\"]}%  (+progress from session)')
+          print(f'Mastered: {d[\"mastered\"]}  Functional: {d[\"functional\"]}  Learning: {d[\"learning\"]}  Unknown: {d[\"unknown\"]}')
+          print()
+          for cat, topics in d.get('categories', {}).items():
+              avg = round(sum(t['pct'] for t in topics) / len(topics)) if topics else 0
+              print(f'  {cat}: {avg}%')
+              for t in topics:
+                  bar = '█' * (t['pct'] // 5) + '░' * (20 - t['pct'] // 5)
+                  print(f'    [{bar}] {t[\"pct\"]:3d}%  {t[\"name\"]}  ({t[\"status\"]})')
+          "
+
+      # ── 7. Commit updated brain state back to main ─────────────────────────
+      - name: Commit brain state
+        if: ${{ inputs.commit_progress == 'true' && inputs.mode == 'auto' }}
+        run: |
+          git config user.name  "LIOS Copilot"
+          git config user.email "copilot@lios.ai"
+
+          # Stage only the memory files the server writes
+          git add data/memory/knowledge_map.json \
+                  data/memory/brain_state.json \
+                  data/memory/corrections.json \
+                  data/memory/rules.json \
+                  logs/ 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No brain-state changes to commit."
+          else
+            ROUNDS="${{ inputs.rounds }}"
+            git commit -m "chore: copilot learn session — ${ROUNDS} rounds [skip ci]"
+            git push origin HEAD:main
+            echo "✓ Brain state committed and pushed."
+          fi
+
+      # ── 8. Upload server log as artifact (always) ──────────────────────────
+      - name: Upload server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lios-server-log
+          path: /tmp/lios_server.log
+          retention-days: 7
