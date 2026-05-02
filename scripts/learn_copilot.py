@@ -75,7 +75,7 @@ def _wrap(text: str, indent: int = 4) -> str:
 # ── HTTP helpers ───────────────────────────────────────────────────────────────
 
 class LIOSClient:
-    def __init__(self, base_url: str, timeout: int = 30):
+    def __init__(self, base_url: str, timeout: int = 90):
         self.base   = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
@@ -104,8 +104,8 @@ class LIOSClient:
     def learn_map(self) -> dict:
         return self._get("/learn/map")
 
-    def synthesize(self, question: str) -> dict:
-        return self._post("/synthesize", {"query": question})
+    def chat(self, question: str, session_id: str = "copilot") -> dict:
+        return self._post("/chat", {"query": question, "session_id": session_id})
 
     def ping(self) -> bool:
         try:
@@ -117,22 +117,11 @@ class LIOSClient:
 # ── Answer generation ──────────────────────────────────────────────────────────
 
 def _generate_answer(client: LIOSClient, question: str, topic_name: str, min_len: int) -> str | None:
-    """Ask LIOS to synthesize an answer for the given question using its own corpus."""
-    # We frame it as a legal question to get a knowledge-grounded response
-    query = f"{question} (context: {topic_name} in EU legal compliance)"
+    """Ask LIOS to answer the question via /chat using its own knowledge corpus."""
+    query = f"{question} (topic: {topic_name}, EU legal compliance)"
     try:
-        result = client.synthesize(query)
+        result = client.chat(query, session_id="copilot-learn")
         answer = result.get("answer", "").strip()
-    except requests.exceptions.HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
-            # /synthesize not available, fall back to /query
-            try:
-                result = client._post("/query", {"query": query})
-                answer = result.get("answer", "").strip()
-            except Exception:
-                return None
-        else:
-            return None
     except Exception:
         return None
 
@@ -283,14 +272,10 @@ def run(args: argparse.Namespace):
             continue
 
         # 2. Generate answer
-        if mode == "interactive":
-            print(_c(DIM, "  Generating answer from corpus…"), end="", flush=True)
-
+        print(_c(DIM, "  Generating answer from corpus…"), end="", flush=True)
         answer = _generate_answer(client, question, topic.get("name", ""), min_len)
-
-        if mode == "interactive":
-            print(_c(GREEN, " done") if answer else _c(RED, " failed"))
-            print()
+        print(_c(GREEN, " done") if answer else _c(RED, " failed"))
+        print()
 
         if not answer:
             print(_c(YELLOW, "  Could not generate a sufficient answer — skipping.\n"))
