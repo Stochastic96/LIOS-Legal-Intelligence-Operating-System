@@ -54,6 +54,7 @@ export default function LearnScreen() {
 
   const mountAnim  = useRef(new Animated.Value(0)).current;
   const streakAnim = useRef(new Animated.Value(1)).current;
+  const resultAnim = useRef(new Animated.Value(0)).current;
   const prevStreak = useRef(streak);
 
   useEffect(() => {
@@ -102,12 +103,16 @@ export default function LearnScreen() {
     try {
       const res = await api.learn.answer(learnData.topic.id, answer.trim(), reference.trim());
       setStreak((s) => s + 1);
+      resultAnim.setValue(0);
       setResult({
         name:      res.topic_updated.name,
         pct:       res.topic_updated.pct,
         status:    res.topic_updated.status,
         nextTopic: res.next_topic,
       });
+      Animated.spring(resultAnim, {
+        toValue: 1, speed: 14, bounciness: 10, useNativeDriver: true,
+      }).start();
       setOverallPct(res.overall_pct);
     } catch {
       // ignore
@@ -212,33 +217,51 @@ export default function LearnScreen() {
           </Card>
 
           {result ? (
-            /* Result card */
-            <View style={styles.resultCard}>
-              <View style={styles.resultHeader}>
-                <Feather name="check-circle" size={22} color={C.green} />
-                <Text style={styles.resultTitle}>Stored</Text>
-              </View>
-              <Text style={styles.resultLine}>
-                {result.name}: {result.pct}% ({result.status})
-              </Text>
-
-              {result.nextTopic && (
-                <View style={styles.nextTopicRow}>
-                  <View style={styles.nextTopicLabelRow}>
-                    <Feather name="arrow-right" size={11} color={C.accent} />
-                    <Text style={styles.nextTopicLabel}>UP NEXT</Text>
+            /* Result card — spring entrance */
+            <Animated.View
+              style={{
+                opacity: resultAnim,
+                transform: [
+                  { scale: resultAnim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
+                  { translateY: resultAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
+                ],
+              }}
+            >
+              <View style={styles.resultCard}>
+                <View style={styles.resultHeader}>
+                  <Feather name="check-circle" size={22} color={C.green} />
+                  <Text style={styles.resultTitle}>Stored</Text>
+                  <View style={styles.resultXp}>
+                    <Text style={styles.resultXpText}>+XP</Text>
                   </View>
-                  <Text style={styles.resultNext}>{result.nextTopic}</Text>
                 </View>
-              )}
 
-              <ScalePressable onPress={() => loadNext(false)}>
-                <View style={styles.nextBtn}>
-                  <Text style={styles.nextBtnText}>Next Question</Text>
-                  <Feather name="chevron-right" size={16} color={C.accent} />
+                <View style={styles.resultStat}>
+                  <Text style={styles.resultStatNum}>{result.pct}%</Text>
+                  <View>
+                    <Text style={styles.resultLine}>{result.name}</Text>
+                    <Text style={styles.resultStatus}>{result.status}</Text>
+                  </View>
                 </View>
-              </ScalePressable>
-            </View>
+
+                {result.nextTopic && (
+                  <View style={styles.nextTopicRow}>
+                    <View style={styles.nextTopicLabelRow}>
+                      <Feather name="arrow-right" size={11} color={C.accent} />
+                      <Text style={styles.nextTopicLabel}>UP NEXT</Text>
+                    </View>
+                    <Text style={styles.resultNext}>{result.nextTopic}</Text>
+                  </View>
+                )}
+
+                <ScalePressable onPress={() => loadNext(false)}>
+                  <View style={styles.nextBtn}>
+                    <Text style={styles.nextBtnText}>Next Question</Text>
+                    <Feather name="chevron-right" size={16} color={C.accent} />
+                  </View>
+                </ScalePressable>
+              </View>
+            </Animated.View>
           ) : (
             /* Answer form */
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -424,9 +447,14 @@ const styles = StyleSheet.create({
     padding: S.md,
     gap: S.sm,
   },
-  resultHeader:   { flexDirection: "row", alignItems: "center", gap: S.sm, marginBottom: S.xs },
+  resultHeader:   { flexDirection: "row", alignItems: "center", gap: S.sm, marginBottom: S.sm },
   resultTitle:    { fontSize: F.lg, fontWeight: W.bold, color: C.green },
-  resultLine:     { fontSize: F.sm, color: C.text },
+  resultXp:       { marginLeft: "auto" as any, backgroundColor: C.accent, borderRadius: R.full, paddingHorizontal: 8, paddingVertical: 2 },
+  resultXpText:   { fontSize: F.xs, fontWeight: W.bold, color: C.bg },
+  resultStat:     { flexDirection: "row", alignItems: "center", gap: S.md, marginBottom: S.sm },
+  resultStatNum:  { fontSize: 40, fontWeight: W.heavy, color: C.green, lineHeight: 44 },
+  resultLine:     { fontSize: F.md, color: C.text, fontWeight: W.semi },
+  resultStatus:   { fontSize: F.xs, color: C.mid, marginTop: 2 },
 
   nextTopicRow:   {
     backgroundColor: C.accentDim,

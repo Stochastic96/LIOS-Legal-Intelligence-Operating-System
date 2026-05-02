@@ -43,16 +43,38 @@ function PillToggle({ value, onToggle, disabled }: { value: boolean; onToggle: (
 }
 
 // ── Info badge ────────────────────────────────────────────────────────────────
-function InfoBadge({ label, value, icon, valueColor }: {
+function InfoBadge({ label, value, icon, valueColor, pulse }: {
   label: string; value: string;
   icon: React.ComponentProps<typeof Feather>["name"];
   valueColor?: string;
+  pulse?: boolean;
 }) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!pulse) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,   duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
   return (
     <View style={styles.infoBadge}>
-      <Feather name={icon} size={13} color={C.dim} style={{ marginBottom: 4 }} />
+      <View style={styles.infoBadgeTop}>
+        {pulse ? (
+          <Animated.View style={{ opacity: pulseAnim }}>
+            <Feather name={icon} size={14} color={valueColor ?? C.dim} />
+          </Animated.View>
+        ) : (
+          <Feather name={icon} size={14} color={valueColor ?? C.dim} />
+        )}
+        <Text style={[styles.infoBadgeValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
+      </View>
       <Text style={styles.infoBadgeLabel}>{label}</Text>
-      <Text style={[styles.infoBadgeValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
     </View>
   );
 }
@@ -182,12 +204,15 @@ export default function BrainScreen() {
             <View style={styles.divider} />
 
             <View style={styles.badgeGrid}>
-              <InfoBadge label="Model"  icon="box"       value={status?.model ?? "—"} />
-              <InfoBadge label="LLM"    icon="wifi"      value={status?.llm_reachable ? "Online" : "Offline"}
-                valueColor={status?.llm_reachable ? C.green : C.red} />
-              <InfoBadge label="Chunks" icon="database"  value={String(status?.knowledge_chunks ?? 0)} />
-              <InfoBadge label="Rules"  icon="list"      value={String(status?.active_rules ?? 0)} />
-              <InfoBadge label="Correx" icon="edit-2"    value={String(status?.total_corrections ?? 0)} />
+              <InfoBadge label="Model"       icon="box"      value={status?.model ?? "—"} />
+              <InfoBadge label="LLM"         icon="wifi"     value={status?.llm_reachable ? "Online" : "Offline"}
+                valueColor={status?.llm_reachable ? C.green : C.red}
+                pulse={status?.llm_reachable} />
+              <InfoBadge label="Knowledge"   icon="database" value={String(status?.knowledge_chunks ?? 0)} />
+              <InfoBadge label="Rules"       icon="list"     value={String(status?.active_rules ?? 0)} />
+              <InfoBadge label="Corrections" icon="edit-2"   value={String(status?.total_corrections ?? 0)} />
+              <InfoBadge label="Status"      icon="activity" value={status?.brain_on ? "Active" : "Standby"}
+                valueColor={status?.brain_on ? C.accent : C.dim} />
             </View>
           </Card>
 
@@ -329,9 +354,15 @@ const styles = StyleSheet.create({
   pillThumb:  { width: 22, height: 22, borderRadius: R.full, backgroundColor: C.text, elevation: 2 },
 
   // Badge grid
-  badgeGrid:    { flexDirection: "row", flexWrap: "wrap", gap: S.sm },
-  infoBadge:    { backgroundColor: C.bg, borderRadius: R.sm, paddingHorizontal: S.sm + 2, paddingVertical: S.sm, minWidth: 72, alignItems: "center", borderWidth: 1, borderColor: C.border },
-  infoBadgeLabel: { fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 },
+  badgeGrid:      { flexDirection: "row", flexWrap: "wrap", gap: S.sm },
+  infoBadge:      {
+    backgroundColor: C.bg, borderRadius: R.sm,
+    paddingHorizontal: S.sm + 2, paddingVertical: S.sm,
+    flex: 1, minWidth: 90, alignItems: "flex-start",
+    borderWidth: 1, borderColor: C.border,
+  },
+  infoBadgeTop:   { flexDirection: "row", alignItems: "center", gap: S.xs, marginBottom: 4 },
+  infoBadgeLabel: { fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.8 },
   infoBadgeValue: { fontSize: F.md, fontWeight: W.bold, color: C.text },
 
   // Rules

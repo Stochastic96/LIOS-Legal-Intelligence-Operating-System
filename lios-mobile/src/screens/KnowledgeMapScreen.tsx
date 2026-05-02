@@ -148,6 +148,26 @@ function TopicRow({
   );
 }
 
+function StaggeredSection({ children, index }: { children: React.ReactNode; index: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 280,
+      delay: 80 + index * 60,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+  return (
+    <Animated.View style={{
+      opacity: anim,
+      transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+    }}>
+      {children}
+    </Animated.View>
+  );
+}
+
 function CategorySection({
   name,
   topics,
@@ -281,57 +301,67 @@ export default function KnowledgeMapScreen() {
         }
       >
         <Animated.View style={fadeStyle}>
-          {/* Overall card */}
+          {/* Overall hero card — ring + stats */}
           <Card surface="s2" style={styles.overallCard}>
-            <View style={styles.overallLeft}>
-              <Text style={[styles.overallPct, { color: pctColor(mapData.overall_pct) }]}>
+            {/* Circular ring */}
+            <View style={[styles.ring, { borderColor: pctColor(mapData.overall_pct) }]}>
+              <Text style={[styles.ringPct, { color: pctColor(mapData.overall_pct) }]}>
                 {mapData.overall_pct}%
               </Text>
-              <Text style={styles.overallLabel}>field mapped</Text>
+              <Text style={styles.ringLabel}>mapped</Text>
             </View>
+
+            {/* Stats column */}
             <View style={styles.overallStats}>
               <View style={styles.stat}>
-                <Feather name="users" size={14} color={C.green} style={{ marginBottom: 4 }} />
                 <Text style={[styles.statNum, { color: C.green }]}>
                   {mapData.mastered + mapData.functional}
                 </Text>
-                <Text style={styles.statLabel}>Known</Text>
+                <View style={styles.statRow}>
+                  <Feather name="check" size={10} color={C.green} />
+                  <Text style={styles.statLabel}>Known</Text>
+                </View>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.stat}>
-                <Feather name="book-open" size={14} color={C.amber} style={{ marginBottom: 4 }} />
                 <Text style={[styles.statNum, { color: C.amber }]}>{mapData.learning}</Text>
-                <Text style={styles.statLabel}>Learning</Text>
+                <View style={styles.statRow}>
+                  <Feather name="book-open" size={10} color={C.amber} />
+                  <Text style={styles.statLabel}>Learning</Text>
+                </View>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.stat}>
-                <Feather name="help-circle" size={14} color={C.dim} style={{ marginBottom: 4 }} />
                 <Text style={[styles.statNum, { color: C.mid }]}>{mapData.unknown}</Text>
-                <Text style={styles.statLabel}>Unknown</Text>
+                <View style={styles.statRow}>
+                  <Feather name="circle" size={10} color={C.dim} />
+                  <Text style={styles.statLabel}>Unknown</Text>
+                </View>
               </View>
             </View>
           </Card>
 
-          {/* Big progress bar */}
+          {/* Thin progress bar */}
           <View style={styles.bigBarWrap}>
             <AnimatedProgressBar
               value={mapData.overall_pct}
               color={pctColor(mapData.overall_pct)}
-              height={8}
+              height={3}
               bgColor={C.s2}
               duration={700}
             />
           </View>
 
-          {/* Category sections */}
-          {Object.entries(mapData.categories).map(([cat, topics]) => (
-            <CategorySection
-              key={cat}
-              name={cat}
-              topics={topics}
-              expandedIds={expandedIds}
-              onToggle={toggleTopic}
-            />
+          {/* Category sections — staggered entrance */}
+          {Object.entries(mapData.categories).map(([cat, topics], i) => (
+            <StaggeredSection key={cat} index={i}>
+              <CategorySection
+                name={cat}
+                topics={topics}
+                expandedIds={expandedIds}
+                onToggle={toggleTopic}
+              />
+            </StaggeredSection>
           ))}
         </Animated.View>
       </ScrollView>
@@ -363,15 +393,19 @@ const styles = StyleSheet.create({
 
   scroll:       { padding: S.md, paddingBottom: S.xxl },
 
-  overallCard:  { flexDirection: "row", alignItems: "center", marginBottom: S.sm },
-  overallLeft:  { marginRight: S.lg },
-  overallPct:   { fontSize: 44, fontWeight: W.heavy, lineHeight: 50 },
-  overallLabel: { fontSize: F.xs, color: C.dim, marginTop: -4 },
+  overallCard:  { flexDirection: "row", alignItems: "center", marginBottom: S.sm, gap: S.lg },
+  ring:         {
+    width: 90, height: 90, borderRadius: 45,
+    borderWidth: 5, alignItems: "center", justifyContent: "center",
+  },
+  ringPct:      { fontSize: 22, fontWeight: W.heavy, lineHeight: 26 },
+  ringLabel:    { fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.8 },
   overallStats: { flex: 1, flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
-  stat:         { alignItems: "center" },
+  stat:         { alignItems: "center", gap: 4 },
   statNum:      { fontSize: F.xl, fontWeight: W.bold },
-  statLabel:    { fontSize: F.xs, color: C.dim, marginTop: 2 },
-  statDivider:  { width: 1, height: 36, backgroundColor: C.border },
+  statRow:      { flexDirection: "row", alignItems: "center", gap: 3 },
+  statLabel:    { fontSize: F.xs, color: C.dim },
+  statDivider:  { width: 1, height: 32, backgroundColor: C.border },
 
   bigBarWrap:   { marginBottom: S.lg, marginTop: S.xs },
 
