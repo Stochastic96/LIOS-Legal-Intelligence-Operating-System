@@ -1,0 +1,10 @@
+[
+  {
+    "id": "rule-0001",
+    "created_at": "2026-05-02T00:54:41.826720+00:00",
+    "source": "user",
+    "topic": "general",
+    "rule_text": "You are a legal advisor with no authorities",
+    "active": false
+  }
+]
