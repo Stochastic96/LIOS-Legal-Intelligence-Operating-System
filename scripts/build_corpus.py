@@ -11,6 +11,8 @@ Usage::
     python scripts/build_corpus.py --regulations csrd esrs taxonomy sfdr
     python scripts/build_corpus.py --regulations csrd
     python scripts/build_corpus.py --output /tmp/corpus.jsonl --regulations taxonomy
+    python scripts/build_corpus.py --source cjeu echr
+    python scripts/build_corpus.py --source cjeu echr german
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ from lios.ingestion.legal_chunker import chunk_articles  # noqa: E402
 
 _DEFAULT_OUTPUT = _ROOT / "data" / "corpus" / "legal_chunks.jsonl"
 _ALL_REGULATIONS = ["csrd", "esrs", "taxonomy", "sfdr"]
+_ALL_SOURCES = ["cjeu", "echr", "german"]
 
 
 # ---------------------------------------------------------------------------
@@ -46,12 +49,14 @@ _ALL_REGULATIONS = ["csrd", "esrs", "taxonomy", "sfdr"]
 def build_corpus(
     regulations: list[str],
     output_path: Path = _DEFAULT_OUTPUT,
+    sources: list[str] | None = None,
 ) -> tuple[int, int]:
-    """Fetch, chunk, and write regulations to *output_path*.
+    """Fetch, chunk, and write regulations and case law to *output_path*.
 
     Args:
         regulations: Short keys such as ``["csrd", "esrs"]``.
         output_path: Destination JSONL file.
+        sources: Optional list of additional sources: ``"cjeu"``, ``"echr"``, ``"german"``.
 
     Returns:
         ``(added, skipped)`` — counts of newly written and already-present chunks.
@@ -68,23 +73,60 @@ def build_corpus(
         if not articles:
             print(f"  WARNING: no articles fetched for {reg_key.upper()}", file=sys.stderr)
             continue
+        added, skipped = _ingest_articles(
+            articles, existing, new_chunk_dicts, added, skipped
+        )
 
-        chunks = chunk_articles(articles)
-        for chunk in chunks:
-            key = f"{chunk.celex_or_doc_id}|{chunk.article}"
-            if key in existing:
-                skipped += 1
-            else:
-                d = chunk.to_dict()
-                new_chunk_dicts.append(d)
-                existing.add(key)
-                added += 1
+    for source in sources or []:
+        articles = _fetch_source(source)
+        if not articles:
+            print(f"  WARNING: no articles fetched for source={source}", file=sys.stderr)
+            continue
+        added, skipped = _ingest_articles(
+            articles, existing, new_chunk_dicts, added, skipped
+        )
 
     if new_chunk_dicts:
         with output_path.open("a", encoding="utf-8") as fh:
             for chunk_dict in new_chunk_dicts:
                 fh.write(json.dumps(chunk_dict, ensure_ascii=False) + "\n")
 
+    return added, skipped
+
+
+def _fetch_source(source: str) -> list[dict]:
+    """Dispatch to the appropriate fetcher for *source*."""
+    if source == "cjeu":
+        from lios.ingestion.caselaw_fetcher import fetch_cjeu_cases
+
+        return fetch_cjeu_cases()
+    if source == "echr":
+        from lios.ingestion.caselaw_fetcher import fetch_echr_cases
+
+        return fetch_echr_cases()
+    if source == "german":
+        from lios.ingestion.german_law_fetcher import fetch_german_laws
+
+        return fetch_german_laws()
+    raise ValueError(f"Unknown source: {source!r}. Must be one of {_ALL_SOURCES}")
+
+
+def _ingest_articles(
+    articles: list[dict],
+    existing: set[str],
+    new_chunk_dicts: list[dict],
+    added: int,
+    skipped: int,
+) -> tuple[int, int]:
+    chunks = chunk_articles(articles)
+    for chunk in chunks:
+        key = f"{chunk.celex_or_doc_id}|{chunk.article}"
+        if key in existing:
+            skipped += 1
+        else:
+            new_chunk_dicts.append(chunk.to_dict())
+            existing.add(key)
+            added += 1
     return added, skipped
 
 
@@ -119,7 +161,7 @@ def _load_existing_keys(path: Path) -> set[str]:
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Fetch EU regulations from EUR-Lex and append new chunks to "
+            "Fetch EU regulations and case law and append new chunks to "
             "data/corpus/legal_chunks.jsonl."
         )
     )
@@ -135,6 +177,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--source",
+        nargs="+",
+        choices=_ALL_SOURCES,
+        default=[],
+        metavar="SRC",
+        help=(
+            f"Additional sources. One or more of: {', '.join(_ALL_SOURCES)}. "
+            "Default: none."
+        ),
+    )
+    parser.add_argument(
         "--output",
         default=str(_DEFAULT_OUTPUT),
         metavar="PATH",
@@ -147,10 +200,14 @@ def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
     output_path = Path(args.output)
 
-    print(f"Fetching: {', '.join(r.upper() for r in args.regulations)}")
-    print(f"Output  : {output_path}")
+    regs = args.regulations
+    srcs = args.source or []
+    print(f"Regulations: {', '.join(r.upper() for r in regs) if regs else 'none'}")
+    if srcs:
+        print(f"Sources    : {', '.join(srcs)}")
+    print(f"Output     : {output_path}")
 
-    added, skipped = build_corpus(args.regulations, output_path)
+    added, skipped = build_corpus(regs, output_path, sources=srcs)
     print(f"{added} chunks added, {skipped} skipped")
 
 
