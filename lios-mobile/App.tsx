@@ -1,25 +1,23 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 import ChatScreen from "./src/screens/ChatScreen";
 import LearnScreen from "./src/screens/LearnScreen";
 import KnowledgeMapScreen from "./src/screens/KnowledgeMapScreen";
 import BrainScreen from "./src/screens/BrainScreen";
-import { C } from "./src/theme";
+import { C, S } from "./src/theme";
 
 const Tab = createBottomTabNavigator();
 
-const TABS = [
-  { name: "Chat",  icon: "chat",  label: "Chat"  },
-  { name: "Learn", icon: "learn", label: "Learn" },
-  { name: "Map",   icon: "map",   label: "Map"   },
-  { name: "Brain", icon: "brain", label: "Brain" },
-];
+type FeatherName = React.ComponentProps<typeof Feather>["name"];
 
-const ICONS: Record<string, string> = {
-  Chat: "◎", Learn: "△", Map: "□", Brain: "◈",
+const TAB_ICONS: Record<string, FeatherName> = {
+  Chat:  "message-circle",
+  Learn: "book-open",
+  Map:   "map",
+  Brain: "cpu",
 };
 
 export default function App() {
@@ -35,22 +33,25 @@ export default function App() {
               backgroundColor: C.s1,
               borderTopWidth: 1,
               borderTopColor: C.border,
-              height: 56,
-              paddingBottom: 6,
-              paddingTop: 4,
+              height: 60,
+              paddingBottom: S.sm,
+              paddingTop: S.xs,
             },
             tabBarActiveTintColor: C.accent,
             tabBarInactiveTintColor: C.dim,
             tabBarLabelStyle: {
               fontSize: 10,
               fontWeight: "600",
-              letterSpacing: 0.5,
+              letterSpacing: 0.8,
               marginTop: 2,
             },
             tabBarIcon: ({ focused, color }) => (
-              <Text style={{ fontSize: 18, color, opacity: focused ? 1 : 0.5 }}>
-                {ICONS[route.name]}
-              </Text>
+              <Feather
+                name={TAB_ICONS[route.name]}
+                size={22}
+                color={color}
+                style={{ opacity: focused ? 1 : 0.55 }}
+              />
             ),
           })}
         >

@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -9,14 +10,54 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 import { api, BrainStatus, Rule, getServerUrl, setServerUrl } from "../api/client";
+import { C, F, R, S, W } from "../theme";
+import ScalePressable from "../components/ScalePressable";
+import Card from "../components/Card";
+import SectionHeader from "../components/SectionHeader";
 
+// ── Custom animated pill toggle ───────────────────────────────────────────────
+function PillToggle({ value, onToggle, disabled }: { value: boolean; onToggle: (v: boolean) => void; disabled?: boolean }) {
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, { toValue: value ? 1 : 0, useNativeDriver: false, speed: 20, bounciness: 6 }).start();
+  }, [value]);
+
+  const bgColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.s2, C.accent] });
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] });
+
+  return (
+    <Pressable onPress={() => !disabled && onToggle(!value)} style={{ opacity: disabled ? 0.5 : 1 }}>
+      <Animated.View style={[styles.pillTrack, { backgroundColor: bgColor }]}>
+        <Animated.View style={[styles.pillThumb, { transform: [{ translateX }] }]} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// ── Info badge ────────────────────────────────────────────────────────────────
+function InfoBadge({ label, value, icon, valueColor }: {
+  label: string; value: string;
+  icon: React.ComponentProps<typeof Feather>["name"];
+  valueColor?: string;
+}) {
+  return (
+    <View style={styles.infoBadge}>
+      <Feather name={icon} size={13} color={C.dim} style={{ marginBottom: 4 }} />
+      <Text style={styles.infoBadgeLabel}>{label}</Text>
+      <Text style={[styles.infoBadgeValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function BrainScreen() {
   const [status, setStatus] = useState<BrainStatus | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
@@ -28,6 +69,14 @@ export default function BrainScreen() {
   const [ruleTopic, setRuleTopic] = useState("general");
   const [serverUrlModal, setServerUrlModal] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+
+  const mountAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(mountAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
+  }, []);
+
+  const translateY = mountAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
 
   const loadAll = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
@@ -60,9 +109,7 @@ export default function BrainScreen() {
     try {
       const res = await api.memory.addRule(ruleText.trim(), ruleTopic.trim() || "general");
       setRules((prev) => [...prev, res.rule]);
-      setRuleText("");
-      setRuleTopic("general");
-      setAddRuleModal(false);
+      setRuleText(""); setRuleTopic("general"); setAddRuleModal(false);
     } catch {
       Alert.alert("Error", "Could not add rule.");
     }
@@ -71,36 +118,30 @@ export default function BrainScreen() {
   const removeRule = useCallback(async (id: string) => {
     Alert.alert("Remove Rule", "Deactivate this rule?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.memory.deleteRule(id);
-            setRules((prev) => prev.filter((r) => r.id !== id));
-          } catch {}
-        },
-      },
+      { text: "Remove", style: "destructive", onPress: async () => {
+        try {
+          await api.memory.deleteRule(id);
+          setRules((prev) => prev.filter((r) => r.id !== id));
+        } catch {}
+      }},
     ]);
   }, []);
 
   const saveServerUrl = useCallback(async () => {
     await setServerUrl(urlInput.trim());
-    setServerUrlModal(false);
-    loadAll();
+    setServerUrlModal(false); loadAll();
   }, [urlInput, loadAll]);
 
   const openServerUrl = useCallback(async () => {
     const current = await getServerUrl();
-    setUrlInput(current);
-    setServerUrlModal(true);
+    setUrlInput(current); setServerUrlModal(true);
   }, []);
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={C.accent} />
         </View>
       </SafeAreaView>
     );
@@ -110,84 +151,90 @@ export default function BrainScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Brain</Text>
-        <Pressable onPress={openServerUrl} style={styles.serverBtn}>
-          <Text style={styles.serverBtnText}>⚙ Server</Text>
-        </Pressable>
+        <ScalePressable onPress={openServerUrl}>
+          <View style={styles.serverBtn}>
+            <Feather name="settings" size={13} color={C.mid} />
+            <Text style={styles.serverBtnText}>Server</Text>
+          </View>
+        </ScalePressable>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} tintColor="#6366f1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} tintColor={C.accent} />}
       >
-        {/* Brain toggle card */}
-        <View style={styles.card}>
-          <View style={styles.cardRow}>
-            <View>
-              <Text style={styles.cardTitle}>🧠 Brain</Text>
-              <Text style={styles.cardSub}>
-                {status?.brain_on ? "LLM-powered answers active" : "Rule-based fallback only"}
-              </Text>
-            </View>
-            <Switch
-              value={status?.brain_on ?? false}
-              onValueChange={toggleBrain}
-              disabled={toggling}
-              trackColor={{ false: "#334155", true: "#6366f1" }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <InfoBadge label="Model" value={status?.model ?? "—"} />
-            <InfoBadge label="LLM" value={status?.llm_reachable ? "✅ Online" : "❌ Offline"} valueColor={status?.llm_reachable ? "#22c55e" : "#ef4444"} />
-            <InfoBadge label="Chunks" value={String(status?.knowledge_chunks ?? 0)} />
-          </View>
-          <View style={[styles.infoRow, { marginTop: 8 }]}>
-            <InfoBadge label="Corrections" value={String(status?.total_corrections ?? 0)} />
-            <InfoBadge label="Active Rules" value={String(status?.active_rules ?? 0)} />
-          </View>
-        </View>
-
-        {/* Rules section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Active Rules</Text>
-          <Pressable style={styles.addBtn} onPress={() => setAddRuleModal(true)}>
-            <Text style={styles.addBtnText}>+ Add Rule</Text>
-          </Pressable>
-        </View>
-
-        {rules.length === 0 ? (
-          <View style={styles.emptyRules}>
-            <Text style={styles.emptyRulesText}>No rules yet.</Text>
-            <Text style={styles.emptyRulesSub}>Rules are injected into every LIOS answer when brain is ON.</Text>
-          </View>
-        ) : (
-          rules.map((rule) => (
-            <View key={rule.id} style={styles.ruleCard}>
-              <View style={styles.ruleTop}>
-                <View style={styles.ruleTopicChip}>
-                  <Text style={styles.ruleTopicText}>{rule.topic}</Text>
+        <Animated.View style={{ opacity: mountAnim, transform: [{ translateY }] }}>
+          {/* Brain card */}
+          <Card style={styles.brainCard}>
+            <View style={styles.brainRow}>
+              <View style={styles.brainLeft}>
+                <Feather name="cpu" size={20} color={status?.brain_on ? C.accent : C.dim} />
+                <View style={{ marginLeft: S.sm }}>
+                  <Text style={styles.cardTitle}>Brain</Text>
+                  <Text style={styles.cardSub}>
+                    {status?.brain_on ? "LLM-powered answers active" : "Rule-based fallback only"}
+                  </Text>
                 </View>
-                <Text style={styles.ruleId}>{rule.id}</Text>
-                <Pressable onPress={() => removeRule(rule.id)} style={styles.ruleDelete}>
-                  <Text style={styles.ruleDeleteText}>✕</Text>
-                </Pressable>
               </View>
-              <Text style={styles.ruleText}>{rule.rule_text}</Text>
-              <Text style={styles.ruleDate}>{new Date(rule.created_at).toLocaleDateString()}</Text>
+              <PillToggle value={status?.brain_on ?? false} onToggle={toggleBrain} disabled={toggling} />
             </View>
-          ))
-        )}
+
+            <View style={styles.divider} />
+
+            <View style={styles.badgeGrid}>
+              <InfoBadge label="Model"  icon="box"       value={status?.model ?? "—"} />
+              <InfoBadge label="LLM"    icon="wifi"      value={status?.llm_reachable ? "Online" : "Offline"}
+                valueColor={status?.llm_reachable ? C.green : C.red} />
+              <InfoBadge label="Chunks" icon="database"  value={String(status?.knowledge_chunks ?? 0)} />
+              <InfoBadge label="Rules"  icon="list"      value={String(status?.active_rules ?? 0)} />
+              <InfoBadge label="Correx" icon="edit-2"    value={String(status?.total_corrections ?? 0)} />
+            </View>
+          </Card>
+
+          {/* Rules section */}
+          <SectionHeader
+            label="Active Rules"
+            right={
+              <ScalePressable onPress={() => setAddRuleModal(true)}>
+                <View style={styles.addBtn}>
+                  <Feather name="plus-circle" size={13} color={C.accent} />
+                  <Text style={styles.addBtnText}>Add Rule</Text>
+                </View>
+              </ScalePressable>
+            }
+          />
+
+          {rules.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <Feather name="inbox" size={24} color={C.dim} style={{ marginBottom: S.sm }} />
+              <Text style={styles.emptyText}>No rules yet</Text>
+              <Text style={styles.emptySub}>Rules are injected into every answer when brain is ON.</Text>
+            </Card>
+          ) : (
+            rules.map((rule) => (
+              <Card key={rule.id} style={styles.ruleCard} surface="s2">
+                <View style={styles.ruleTop}>
+                  <View style={styles.ruleChip}>
+                    <Text style={styles.ruleChipText}>{rule.topic}</Text>
+                  </View>
+                  <Text style={styles.ruleId}>{rule.id}</Text>
+                  <ScalePressable onPress={() => removeRule(rule.id)}>
+                    <View style={styles.ruleDeleteBtn}>
+                      <Feather name="trash-2" size={13} color={C.red} />
+                    </View>
+                  </ScalePressable>
+                </View>
+                <Text style={styles.ruleText}>{rule.rule_text}</Text>
+                <Text style={styles.ruleDate}>{new Date(rule.created_at).toLocaleDateString()}</Text>
+              </Card>
+            ))
+          )}
+        </Animated.View>
       </ScrollView>
 
       {/* Add Rule Modal */}
-      <Modal visible={addRuleModal} transparent={true} animationType="slide">
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
+      <Modal visible={addRuleModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <Pressable style={styles.modalDismiss} onPress={() => setAddRuleModal(false)} />
           <View style={styles.modalCard}>
             <View style={styles.handle} />
@@ -198,58 +245,60 @@ export default function BrainScreen() {
               value={ruleText}
               onChangeText={setRuleText}
               placeholder="e.g. Always cite the EU article number"
-              placeholderTextColor="#475569"
-              multiline={true}
-              autoFocus={true}
-              textAlignVertical="top"
+              placeholderTextColor={C.dim}
+              multiline autoFocus textAlignVertical="top"
             />
             <TextInput
               style={styles.modalInputSmall}
               value={ruleTopic}
               onChangeText={setRuleTopic}
               placeholder="Topic (e.g. CSRD, general)"
-              placeholderTextColor="#475569"
+              placeholderTextColor={C.dim}
             />
             <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancel} onPress={() => setAddRuleModal(false)}>
+              <ScalePressable onPress={() => setAddRuleModal(false)} style={styles.modalCancel}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={[styles.modalSave, !ruleText.trim() && styles.btnDisabled]} onPress={addRule} disabled={!ruleText.trim()}>
+              </ScalePressable>
+              <ScalePressable
+                onPress={addRule}
+                disabled={!ruleText.trim()}
+                style={[styles.modalSave, !ruleText.trim() && styles.btnDisabled]}
+              >
                 <Text style={styles.modalSaveText}>Add Rule</Text>
-              </Pressable>
+              </ScalePressable>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
       {/* Server URL Modal */}
-      <Modal visible={serverUrlModal} transparent={true} animationType="slide">
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
+      <Modal visible={serverUrlModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <Pressable style={styles.modalDismiss} onPress={() => setServerUrlModal(false)} />
           <View style={styles.modalCard}>
             <View style={styles.handle} />
-            <Text style={styles.modalTitle}>Server URL</Text>
+            <View style={styles.modalTitleRow}>
+              <Feather name="server" size={16} color={C.accent} />
+              <Text style={[styles.modalTitle, { marginLeft: S.sm, marginBottom: 0 }]}>Server URL</Text>
+            </View>
             <Text style={styles.modalHint}>Your Mac's LAN IP — same WiFi as phone.</Text>
             <TextInput
               style={styles.modalInput}
               value={urlInput}
               onChangeText={setUrlInput}
               placeholder="http://192.168.1.x:8000"
-              placeholderTextColor="#475569"
+              placeholderTextColor={C.dim}
               autoCapitalize="none"
               keyboardType="url"
-              autoFocus={true}
+              autoFocus
             />
             <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancel} onPress={() => setServerUrlModal(false)}>
+              <ScalePressable onPress={() => setServerUrlModal(false)} style={styles.modalCancel}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={styles.modalSave} onPress={saveServerUrl}>
+              </ScalePressable>
+              <ScalePressable onPress={saveServerUrl} style={styles.modalSave}>
                 <Text style={styles.modalSaveText}>Save</Text>
-              </Pressable>
+              </ScalePressable>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -258,78 +307,62 @@ export default function BrainScreen() {
   );
 }
 
-function InfoBadge({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
-  return (
-    <View style={infoBadgeStyles.badge}>
-      <Text style={infoBadgeStyles.label}>{label}</Text>
-      <Text style={[infoBadgeStyles.value, valueColor ? { color: valueColor } : {}]}>{value}</Text>
-    </View>
-  );
-}
-
-const infoBadgeStyles = StyleSheet.create({
-  badge: { backgroundColor: "#0f172a", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, minWidth: 80 },
-  label: { fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
-  value: { fontSize: 14, fontWeight: "700", color: "#e2e8f0" },
-});
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f172a" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#1e293b" },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: "#e2e8f0" },
-  serverBtn: { backgroundColor: "#1e293b", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  serverBtnText: { color: "#94a3b8", fontSize: 12, fontWeight: "600" },
-  scroll: { padding: 16 },
-  card: { backgroundColor: "#1e293b", borderRadius: 16, padding: 16, marginBottom: 20 },
-  cardRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  cardTitle: { fontSize: 17, fontWeight: "700", color: "#e2e8f0" },
-  cardSub: { fontSize: 13, color: "#64748b", marginTop: 2 },
-  divider: { height: 1, backgroundColor: "#0f172a", marginVertical: 14 },
-  infoRow: { flexDirection: "row", gap: 8 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 },
-  addBtn: { backgroundColor: "#312e81", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  addBtnText: { color: "#a5b4fc", fontSize: 12, fontWeight: "600" },
-  emptyRules: { backgroundColor: "#1e293b", borderRadius: 12, padding: 20, alignItems: "center" },
-  emptyRulesText: { color: "#64748b", fontSize: 14, fontWeight: "600" },
-  emptyRulesSub: { color: "#334155", fontSize: 12, marginTop: 6, textAlign: "center" },
-  ruleCard: { backgroundColor: "#1e293b", borderRadius: 12, padding: 14, marginBottom: 8 },
-  ruleTop: { flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 8 },
-  ruleTopicChip: { backgroundColor: "#312e81", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  ruleTopicText: { color: "#a5b4fc", fontSize: 11, fontWeight: "600" },
-  ruleId: { flex: 1, color: "#475569", fontSize: 11 },
-  ruleDelete: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#7f1d1d", alignItems: "center", justifyContent: "center" },
-  ruleDeleteText: { color: "#fca5a5", fontSize: 11, fontWeight: "700" },
-  ruleText: { fontSize: 14, color: "#e2e8f0", lineHeight: 20 },
-  ruleDate: { fontSize: 11, color: "#475569", marginTop: 6 },
+  container:    { flex: 1, backgroundColor: C.bg },
+  center:       { flex: 1, alignItems: "center", justifyContent: "center" },
+  header:       { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: S.md, paddingVertical: S.sm + 2, borderBottomWidth: 1, borderBottomColor: C.border },
+  headerTitle:  { fontSize: F.xl, fontWeight: W.bold, color: C.text },
+  serverBtn:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.s1, borderRadius: R.full, paddingHorizontal: S.sm + 2, paddingVertical: 5, borderWidth: 1, borderColor: C.border },
+  serverBtnText:{ color: C.mid, fontSize: F.xs, fontWeight: W.semi },
+  scroll:       { padding: S.md, gap: S.md },
+
+  // Brain card
+  brainCard:  { marginBottom: S.xs },
+  brainRow:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  brainLeft:  { flexDirection: "row", alignItems: "center", flex: 1 },
+  cardTitle:  { fontSize: F.lg, fontWeight: W.bold, color: C.text },
+  cardSub:    { fontSize: F.sm, color: C.mid, marginTop: 2 },
+  divider:    { height: 1, backgroundColor: C.border, marginVertical: S.md },
+
+  // Pill toggle
+  pillTrack:  { width: 46, height: 26, borderRadius: R.full, justifyContent: "center" },
+  pillThumb:  { width: 22, height: 22, borderRadius: R.full, backgroundColor: C.text, elevation: 2 },
+
+  // Badge grid
+  badgeGrid:    { flexDirection: "row", flexWrap: "wrap", gap: S.sm },
+  infoBadge:    { backgroundColor: C.bg, borderRadius: R.sm, paddingHorizontal: S.sm + 2, paddingVertical: S.sm, minWidth: 72, alignItems: "center", borderWidth: 1, borderColor: C.border },
+  infoBadgeLabel: { fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 },
+  infoBadgeValue: { fontSize: F.md, fontWeight: W.bold, color: C.text },
+
+  // Rules
+  addBtn:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.accentDim, borderRadius: R.full, paddingHorizontal: S.sm + 2, paddingVertical: 5, borderWidth: 1, borderColor: C.borderBright },
+  addBtnText: { color: C.accent, fontSize: F.xs, fontWeight: W.semi },
+  emptyCard:  { alignItems: "center", paddingVertical: S.xl },
+  emptyText:  { color: C.mid, fontSize: F.md, fontWeight: W.semi },
+  emptySub:   { color: C.dim, fontSize: F.sm, marginTop: S.xs, textAlign: "center" },
+  ruleCard:   { marginBottom: S.sm },
+  ruleTop:    { flexDirection: "row", alignItems: "center", marginBottom: S.sm, gap: S.sm },
+  ruleChip:   { backgroundColor: C.accentDim, borderRadius: R.xs, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: C.borderBright },
+  ruleChipText: { color: C.accent, fontSize: 10, fontWeight: W.semi },
+  ruleId:     { flex: 1, color: C.dim, fontSize: F.xs },
+  ruleDeleteBtn: { width: 28, height: 28, borderRadius: R.sm, backgroundColor: C.redDim, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.red + "44" },
+  ruleText:   { fontSize: F.sm, color: C.text, lineHeight: 20 },
+  ruleDate:   { fontSize: F.xs, color: C.dim, marginTop: S.xs },
+
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  modalDismiss: { flex: 1 },
-  modalCard: {
-    backgroundColor: "#1e293b",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    paddingBottom: 36,
-  },
-  handle: { width: 36, height: 4, backgroundColor: "#334155", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  modalTitle: { fontSize: 17, fontWeight: "700", color: "#e2e8f0", marginBottom: 4 },
-  modalHint: { fontSize: 13, color: "#64748b", marginBottom: 14, lineHeight: 18 },
-  modalInput: {
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    padding: 14,
-    color: "#e2e8f0",
-    fontSize: 15,
-    minHeight: 80,
-    marginBottom: 10,
-  },
-  modalInputSmall: { backgroundColor: "#0f172a", borderRadius: 12, padding: 14, color: "#e2e8f0", fontSize: 15, marginBottom: 16 },
-  modalActions: { flexDirection: "row", gap: 10 },
-  modalCancel: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: "#0f172a", alignItems: "center" },
-  modalCancelText: { color: "#64748b", fontWeight: "600" },
-  modalSave: { flex: 2, padding: 14, borderRadius: 12, backgroundColor: "#6366f1", alignItems: "center" },
-  btnDisabled: { opacity: 0.4 },
-  modalSaveText: { color: "#fff", fontWeight: "700" },
+  modalOverlay:  { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  modalDismiss:  { flex: 1 },
+  modalCard:     { backgroundColor: C.s3, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg, padding: S.md, paddingBottom: 36, borderTopWidth: 1, borderColor: C.border },
+  handle:        { width: 36, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: "center", marginBottom: S.md },
+  modalTitleRow: { flexDirection: "row", alignItems: "center", marginBottom: S.sm },
+  modalTitle:    { fontSize: F.lg, fontWeight: W.bold, color: C.text, marginBottom: S.xs },
+  modalHint:     { fontSize: F.sm, color: C.mid, marginBottom: S.md, lineHeight: 18 },
+  modalInput:    { backgroundColor: C.s2, borderRadius: R.md, padding: S.md, color: C.text, fontSize: F.md, minHeight: 80, marginBottom: S.sm, borderWidth: 1, borderColor: C.border },
+  modalInputSmall: { backgroundColor: C.s2, borderRadius: R.md, padding: S.md, color: C.text, fontSize: F.md, marginBottom: S.md, borderWidth: 1, borderColor: C.border },
+  modalActions:  { flexDirection: "row", gap: S.sm },
+  modalCancel:   { flex: 1, padding: S.md, borderRadius: R.md, backgroundColor: C.s2, alignItems: "center" },
+  modalCancelText: { color: C.mid, fontWeight: W.semi },
+  modalSave:     { flex: 2, padding: S.md, borderRadius: R.md, backgroundColor: C.accent, alignItems: "center" },
+  btnDisabled:   { opacity: 0.4 },
+  modalSaveText: { color: C.bg, fontWeight: W.bold },
 });
