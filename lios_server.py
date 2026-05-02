@@ -254,24 +254,27 @@ def deactivate_rule(rule_id: str) -> dict:
 # ── Learn Mode ────────────────────────────────────────────────────────────────
 
 @app.get("/learn/next")
-def learn_next() -> dict:
-    topic = knowledge_map.get_next_learn_topic()
-    if not topic:
-        return {
-            "all_mastered": True,
-            "message": "All topics are functional or mastered. Impressive.",
-            "topic": None,
-            "question": None,
-        }
+def learn_next(topic_id: str | None = None) -> dict:
+    if topic_id:
+        topics = knowledge_map.get_map()
+        topic = next((t for t in topics if t["id"] == topic_id), None)
+    else:
+        topic = knowledge_map.get_next_learn_topic()
 
-    # Try prebuilt question bank first; fall back to LLM-generated
-    question = knowledge_map.get_next_question(topic["id"])
-    if not question:
-        question = generate_learn_question(
+    if not topic:
+        return {"all_mastered": True, "topic": None, "question": None, "question_type": None}
+
+    q_dict = knowledge_map.get_next_question(topic["id"])
+    if q_dict:
+        question_text = q_dict["q"]
+        question_type = q_dict["type"]
+    else:
+        question_text = generate_learn_question(
             topic_name=topic["name"],
             topic_desc=topic["description"],
             existing_pct=topic["pct"],
         )
+        question_type = "definition"
 
     return {
         "all_mastered": False,
@@ -283,8 +286,19 @@ def learn_next() -> dict:
             "pct": topic["pct"],
             "description": topic["description"],
         },
-        "question": question,
+        "question": question_text,
+        "question_type": question_type,
     }
+
+
+@app.get("/learn/topics")
+def learn_topics() -> dict:
+    """Return all topics with their full question banks — used by bootstrap learner."""
+    result = []
+    for topic in knowledge_map.get_map():
+        questions = knowledge_map.get_all_questions(topic["id"])
+        result.append({**topic, "questions": questions})
+    return {"topics": result, "total": len(result)}
 
 
 class LearnAnswerRequest(BaseModel):
