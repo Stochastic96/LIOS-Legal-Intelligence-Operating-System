@@ -16,14 +16,13 @@ import json
 import pickle
 from unittest.mock import patch
 
-import numpy as np
 import pytest
+
+np = pytest.importorskip("numpy", reason="numpy not installed; skipping RAG pipeline tests")
 
 
 def _make_random_vecs(n: int, dim: int = 64):
     """Return L2-normalised random float32 vectors for mocking embeddings."""
-    import numpy as np
-
     vecs = np.random.rand(n, dim).astype("float32")
     norms = np.linalg.norm(vecs, axis=1, keepdims=True)
     return vecs / np.maximum(norms, 1e-8)
