@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -28,6 +29,7 @@ from lios.orchestration.query_parser import (
     INTENT_APPLICABILITY,
     INTENT_BREAKDOWN,
     INTENT_CONFLICT,
+    INTENT_GENERAL_LAW,
     INTENT_ROADMAP,
     ParsedQuery,
     QueryParser,
@@ -57,6 +59,12 @@ class FullResponse:
     breakdown: LegalBreakdown | None = None
     applicability: ApplicabilityResult | None = None
     parsed_query: ParsedQuery | None = None
+    question_type: str = "GENERAL"
+    grounding_score: float = 1.0
+
+
+# Intents that justify computing heavyweight decay/conflict analysis
+_HEAVY_INTENTS = {INTENT_APPLICABILITY, INTENT_ROADMAP, INTENT_CONFLICT, INTENT_BREAKDOWN}
 
 
 class OrchestrationEngine:
@@ -87,9 +95,26 @@ class OrchestrationEngine:
             fin_agent = self._get_agent("finance")
             self.consensus_engine = ConsensusEngine([sus_agent, sc_agent, fin_agent])
 
+        # In-process LRU cache: keyed by MD5(query+profile), bounded to 128 entries.
+        self._response_cache: dict[str, FullResponse] = {}
+        self._response_cache_order: list[str] = []
+        self._response_cache_maxsize = 128
+
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _make_cache_key(
+        query: str,
+        company_profile: dict[str, Any] | None,
+        preferred_intent: str | None,
+        preferred_regulation: str | None,
+    ) -> str:
+        """Stable hash key for identical query+profile combinations."""
+        profile_str = str(sorted(company_profile.items())) if company_profile else ""
+        raw = f"{query}|{profile_str}|{preferred_intent}|{preferred_regulation}"
+        return hashlib.md5(raw.encode()).hexdigest()
 
     def route_query(
         self,
@@ -102,6 +127,12 @@ class OrchestrationEngine:
         concise: bool = True,
     ) -> FullResponse:
         logger.info("route_query called | query=%r | intent_hint=%s", query[:80], preferred_intent)
+
+        # LRU cache: return cached result for identical queries in the same session.
+        cache_key = self._make_cache_key(query, company_profile, preferred_intent, preferred_regulation)
+        if hasattr(self, "_response_cache") and cache_key in self._response_cache:
+            logger.debug("route_query: cache hit for key=%s", cache_key[:8])
+            return self._response_cache[cache_key]
 
         context: dict[str, Any] = {}
         if company_profile:
@@ -121,17 +152,23 @@ class OrchestrationEngine:
         if preferred_regulation and not parsed.regulations:
             parsed.regulations = [preferred_regulation]
 
-        # Fast path: easy definition/general questions answered by LLM directly.
-        # Only activates when the intent remained general after overrides.
+        # Classify question type once; used for routing and surfaced in the response.
+        question_type = self._question_classifier.classify(query)
+
+        # Fast path: easy definition/general questions AND general law topics answered by LLM directly.
         prefetched_chunks: list | None = None
+        is_general_law = parsed.intent == INTENT_GENERAL_LAW
         if (
-            parsed.intent in {"general_query", "legal_breakdown"}
-            and _is_easy_question(query, self._question_classifier.classify(query))
+            is_general_law
+            or (
+                parsed.intent in {"general_query", "legal_breakdown"}
+                and _is_easy_question(query, question_type)
+            )
         ):
             direct_answer, prefetched_chunks = self._try_llm_direct(query)
             if direct_answer is not None:
                 logger.debug("route_query: returning easy-path LLM-direct answer.")
-                return FullResponse(
+                easy_response = FullResponse(
                     query=query,
                     intent=parsed.intent,
                     answer=direct_answer,
@@ -159,7 +196,11 @@ class OrchestrationEngine:
                     breakdown=None,
                     applicability=None,
                     parsed_query=parsed,
+                    question_type=question_type.value,
+                    grounding_score=_LLM_DIRECT_CONFIDENCE,
                 )
+                self._cache_response(cache_key, easy_response)
+                return easy_response
 
         use_lightweight = self._should_use_lightweight(
             parsed=parsed,
@@ -204,12 +245,14 @@ class OrchestrationEngine:
             aggregated = self.aggregator.aggregate(consensus_result.agent_responses)
         except Exception as exc:
             logger.warning("ResponseAggregator failed, using empty aggregation: %s", exc)
-            from lios.orchestration.response_aggregator import AggregatedResponse
             aggregated = AggregatedResponse(summary="", key_points=[], confidence=0.0)
 
-        # Heavy analysis is skipped for lightweight/direct definition flows.
+        # Heavy analysis (decay/conflict) only runs for intents that need it.
+        # Chat queries skip this to keep latency low.
+        run_heavy = not use_lightweight and parsed.intent in _HEAVY_INTENTS
+
         decay_scores = []
-        if not use_lightweight:
+        if run_heavy:
             try:
                 decay_scores = [
                     self.decay_scorer.decay_score(reg)
@@ -220,7 +263,7 @@ class OrchestrationEngine:
 
         # Jurisdiction conflicts
         jur_conflicts: list[Conflict] = []
-        if not use_lightweight:
+        if run_heavy:
             try:
                 if all_jurisdictions:
                     for reg in all_regulations:
@@ -313,14 +356,18 @@ class OrchestrationEngine:
         except Exception as exc:
             logger.warning("LLMRefiner failed, using draft answer: %s", exc)
 
+        # Compute a grounding score from the consensus confidence.
+        grounding_score = round(consensus_result.confidence, 3)
+
         logger.info(
-            "route_query done | intent=%s | citations=%d | conflicts=%d",
+            "route_query done | intent=%s | citations=%d | conflicts=%d | grounding=%.2f",
             parsed.intent,
             len(citations),
             len(jur_conflicts),
+            grounding_score,
         )
 
-        return FullResponse(
+        full_response = FullResponse(
             query=query,
             intent=parsed.intent,
             answer=answer,
@@ -333,7 +380,11 @@ class OrchestrationEngine:
             breakdown=breakdown,
             applicability=applicability,
             parsed_query=parsed,
+            question_type=question_type.value,
+            grounding_score=grounding_score,
         )
+        self._cache_response(cache_key, full_response)
+        return full_response
 
     # ------------------------------------------------------------------
     # Helpers
@@ -418,9 +469,12 @@ class OrchestrationEngine:
         from lios.intelligence.fact_verifier import FactVerifier
         from lios.llm.ollama_client import call_ollama_sync
         from lios.reasoning.legal_reasoner import build_direct_prompt
+        from lios.orchestration.query_parser import INTENT_GENERAL_LAW as _INTENT_GL
 
+        # Detect topic area from a parsed query if available
+        _topic = "general_law" if self.parser.parse(query).intent == _INTENT_GL else "eu_regulatory"
         try:
-            llm_answer = call_ollama_sync(build_direct_prompt(query))
+            llm_answer = call_ollama_sync(build_direct_prompt(query, topic_area=_topic))
         except Exception as exc:  # noqa: BLE001
             logger.debug("LLM-direct call failed: %s", exc)
             return None, []
@@ -441,6 +495,51 @@ class OrchestrationEngine:
         except Exception as exc:  # noqa: BLE001
             logger.debug("Corpus verification failed: %s", exc)
             return None, []
+
+    def _cache_response(self, key: str, response: FullResponse) -> None:
+        """Store response in the in-process LRU cache, evicting oldest when full."""
+        if key in self._response_cache:
+            return
+        if len(self._response_cache_order) >= self._response_cache_maxsize:
+            oldest = self._response_cache_order.pop(0)
+            self._response_cache.pop(oldest, None)
+        self._response_cache[key] = response
+        self._response_cache_order.append(key)
+
+    def _get_agent(self, name: str) -> "BaseAgent":
+        """Return a cached agent instance by short name, creating it on first call."""
+        if name in self._agent_cache:
+            return self._agent_cache[name]
+
+        agent: "BaseAgent"
+        if name == "sustainability":
+            agent = SustainabilityAgent()
+        elif name == "supply_chain":
+            agent = SupplyChainAgent()
+        elif name == "finance":
+            agent = FinanceAgent()
+        else:
+            from lios.agents.unified_agent import UnifiedComplianceAgent
+            agent = UnifiedComplianceAgent()
+
+        self._agent_cache[name] = agent
+        return agent
+
+    def _select_primary_agent(self, parsed: "ParsedQuery", query: str) -> "BaseAgent":
+        """Select the most appropriate primary agent for this query."""
+        regs = {r.upper() for r in (parsed.regulations or [])}
+        q_lower = query.lower()
+
+        # Finance-specific regulation or keywords
+        if "SFDR" in regs or any(kw in q_lower for kw in ("sfdr", "pai", "principal adverse", "article 8", "article 9")):
+            return self._get_agent("finance")
+
+        # Supply chain keywords
+        if any(kw in q_lower for kw in ("supply chain", "due diligence", "cs3d", "csddd", "supplier", "upstream")):
+            return self._get_agent("supply_chain")
+
+        # Default: unified compliance agent covers everything else
+        return self._get_agent("unified")
 
     def _make_concise_answer(
         self,

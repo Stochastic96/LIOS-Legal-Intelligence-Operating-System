@@ -167,19 +167,26 @@ class AnswerSynthesizer:
         analysis: str,
         conclusion: str,
         sources: list[str],
+        actions: list[str] | None = None,
     ) -> str:
-        """Assemble the final IRAC-formatted string."""
-        rule_block = "\n".join(f"  • {r}" for r in rules) if rules else "  • No specific provision identified."
-        source_block = " | ".join(sources) if sources else ""
-        answer = (
-            f"**Issue:** {issue}\n\n"
-            f"**Rule:**\n{rule_block}\n\n"
-            f"**Analysis:** {analysis}\n\n"
-            f"**Conclusion:** {conclusion}"
-        )
+        """Assemble a structured markdown answer with consistent headings."""
+        rule_block = "\n".join(f"- {r}" for r in rules) if rules else "- No specific provision identified."
+        source_block = "\n".join(f"- {s}" for s in sources) if sources else ""
+
+        parts = [
+            f"## Summary\n{conclusion}",
+            f"## Legal Basis\n{rule_block}",
+            f"## Analysis\n{analysis}",
+        ]
+
+        if actions:
+            action_block = "\n".join(f"- [ ] {a}" for a in actions)
+            parts.append(f"## Required Actions\n{action_block}")
+
         if source_block:
-            answer += f"\n\n*Sources: {source_block}*"
-        return answer
+            parts.append(f"## Citations\n{source_block}")
+
+        return "\n\n".join(parts)
 
     def _sources_from_chunks(self, chunks: list[dict[str, Any]]) -> list[str]:
         labels: list[str] = []
@@ -231,7 +238,7 @@ class AnswerSynthesizer:
             text = c.get("text", "")
             obligations = _extract_obligations(text)
             if obligations:
-                rules.append(f"{label}: {obligations[0]}")
+                rules.append(f"**{label}**: {obligations[0]}")
                 if len(obligations) > 1:
                     analysis_parts.append(
                         f"Further, {label} specifies: {obligations[1]}"
@@ -239,18 +246,24 @@ class AnswerSynthesizer:
             else:
                 first_sent = _first_n_sentences(text, n=1)
                 if first_sent:
-                    rules.append(f"{label}: {first_sent}")
+                    rules.append(f"**{label}**: {first_sent}")
 
         analysis = " ".join(analysis_parts) if analysis_parts else (
             "Applicability depends on meeting the criteria specified in the "
-            "referenced provisions above.  Review the thresholds (e.g., employee "
+            "referenced provisions above. Review the thresholds (employee "
             "count, turnover, balance sheet size) against your company profile."
         )
 
         conclusion_text = (
-            rules[0].split(": ", 1)[-1] if rules else
-            "Confirm whether the specified thresholds and criteria are met."
+            "Applicability is determined by the thresholds and criteria set out in the legal basis below. "
+            "Verify your company's employee count, annual turnover, and balance sheet against these criteria."
         )
+
+        actions = [
+            "Map your company's employee count, turnover, and balance sheet against the thresholds",
+            "Confirm listing status and jurisdiction with your legal team",
+            "Identify which reporting phase applies to your company",
+        ]
 
         return self._irac(
             issue=question,
@@ -258,6 +271,7 @@ class AnswerSynthesizer:
             analysis=analysis,
             conclusion=conclusion_text,
             sources=self._sources_from_chunks(chunks[:4]),
+            actions=actions,
         )
 
     def _build_requirement(self, question: str, chunks: list[dict[str, Any]]) -> str:
@@ -269,7 +283,7 @@ class AnswerSynthesizer:
             text = c.get("text", "")
             obligations = _extract_obligations(text)
             for obl in obligations[:2]:
-                rules.append(f"{label}: {obl}")
+                rules.append(f"**{label}**: {obl}")
             if not obligations:
                 snippet = _first_n_sentences(text, n=1)
                 if snippet:
@@ -282,22 +296,30 @@ class AnswerSynthesizer:
             )
         else:
             analysis = (
-                "Compliance requires fulfilling all of the obligations listed "
-                "above.  The specific implementation details are set out in the "
-                "referenced provisions and any associated delegated acts or standards."
+                "Compliance requires fulfilling all of the obligations listed above. "
+                "Implementation details are set out in the referenced provisions and "
+                "any associated delegated acts or standards."
             )
 
-        rules_summary = (
-            f"{len(rules)} obligation(s) identified across "
-            f"{len({_chunk_label(c) for c in chunks[:5]})} provision(s)."
+        n_obligations = len(rules)
+        n_provisions = len({_chunk_label(c) for c in chunks[:5]})
+        conclusion = (
+            f"{n_obligations} obligation(s) identified across {n_provisions} provision(s). "
+            "Implement all obligations and document compliance for audit purposes."
         )
+
+        actions = [
+            f"Implement obligation: {r.split(': ', 1)[-1][:80]}…" if ': ' in r else f"Review: {r[:80]}"
+            for r in rules[:3]
+        ]
 
         return self._irac(
             issue=question,
             rules=rules[:6],
             analysis=analysis,
-            conclusion=rules_summary,
+            conclusion=conclusion,
             sources=self._sources_from_chunks(chunks[:5]),
+            actions=actions if actions else None,
         )
 
     def _build_procedure(self, question: str, chunks: list[dict[str, Any]]) -> str:

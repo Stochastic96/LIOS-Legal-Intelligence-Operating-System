@@ -75,27 +75,6 @@ class LLMRefiner:
     # Providers
     # ------------------------------------------------------------------
 
-    def _build_messages(self, query: str, draft_answer: str, context: dict[str, Any] | None):
-        rag_context = context.get("rag_context", "") if context else ""
-        rag_section = f"\nRetrieved legal context:\n{rag_context}\n" if rag_context else ""
-
-        extra = {k: v for k, v in context.items() if k != "rag_context"} if context else {}
-        ctx_line = f"\nContext JSON: {extra}" if extra else ""
-
-        user_msg = (
-            f"User query: {query}\n"
-            f"{rag_section}"
-            f"\nDraft answer:\n{draft_answer}\n"
-            f"{ctx_line}\n\n"
-            "Rewrite this into a concise, well-structured answer with short headings. "
-            "Do not add claims not present in the draft or retrieved context."
-        )
-
-        return [
-            {"role": "system", "content": self._system_prompt()},
-            {"role": "user", "content": user_msg},
-        ]
-
     def _refine_with_azure(self, query: str, draft_answer: str, context: dict[str, Any] | None) -> str:
         from openai import AzureOpenAI
 
@@ -154,13 +133,14 @@ class LLMRefiner:
         return content.strip() if isinstance(content, str) and content.strip() else draft_answer
 
     # ------------------------------------------------------------------
-    # Shared message builder
+    # Message builder
     # ------------------------------------------------------------------
 
     def _build_messages(
         self, query: str, draft_answer: str, context: dict[str, Any] | None
     ) -> list[dict[str, str]]:
         ctx_parts: list[str] = []
+        rag_context = ""
         if context:
             if context.get("intent"):
                 ctx_parts.append(f"Query intent: {context['intent']}")
@@ -168,14 +148,22 @@ class LLMRefiner:
                 ctx_parts.append(f"Regulations identified: {', '.join(context['regulations'])}")
             if context.get("company_profile"):
                 ctx_parts.append(f"Company profile: {context['company_profile']}")
+            rag_context = context.get("rag_context", "")
+
         ctx_block = ("\n\n**Context:**\n" + "\n".join(ctx_parts)) if ctx_parts else ""
+        rag_block = (
+            f"\n\n**Retrieved legal provisions:**\n{rag_context}"
+            if rag_context else ""
+        )
 
         user_msg = (
             f"**Compliance question:** {query}"
-            f"{ctx_block}\n\n"
-            f"**Draft (retrieved legal provisions + expert analysis):**\n{draft_answer}\n\n"
-            "Write a clear, accurate, well-structured compliance answer based strictly "
-            "on the draft above. Cite article references where available. "
-            "Do not add any facts, numbers, or dates not present in the draft."
+            f"{ctx_block}"
+            f"{rag_block}\n\n"
+            f"**Draft answer (rule-based analysis):**\n{draft_answer}\n\n"
+            "Synthesise the retrieved legal provisions and the draft into one clear, "
+            "well-structured compliance answer. Use the ## headings from the system prompt. "
+            "Cite article references where they appear. "
+            "Do not add any facts, numbers, or dates not present in the draft or retrieved context."
         )
         return [{"role": "user", "content": user_msg}]

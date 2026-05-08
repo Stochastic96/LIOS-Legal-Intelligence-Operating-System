@@ -200,9 +200,11 @@ class HybridRetriever:
 
         q_tokens = self._tokenize(query)
         lexical_scores = self._stage_a_lexical(q_tokens)
-        semantic_scores = self._stage_b_semantic(query)
+        semantic_scores = self._stage_b_semantic(query, regulations=regulations)
 
         rows: list[RetrievedChunk] = []
+        seen_articles: set[tuple[str, str]] = set()  # dedup by (regulation, article_id)
+
         for i, chunk in enumerate(self._chunks):
             if regulations and chunk.get("regulation") not in regulations:
                 continue
@@ -224,7 +226,18 @@ class HybridRetriever:
             )
 
         rows.sort(key=lambda r: r.total_score, reverse=True)
-        return rows[:top_k]
+
+        # Deduplicate: keep highest-scoring chunk per (regulation, article) pair.
+        deduped: list[RetrievedChunk] = []
+        for rc in rows:
+            key = (rc.chunk.get("regulation", ""), rc.chunk.get("article", rc.chunk.get("article_id", "")))
+            if key not in seen_articles:
+                seen_articles.add(key)
+                deduped.append(rc)
+            if len(deduped) >= top_k:
+                break
+
+        return deduped
 
     # ------------------------------------------------------------------
     # Stage A – lexical (BM25 or overlap fallback)
@@ -251,8 +264,12 @@ class HybridRetriever:
     # Stage B – semantic (pre-computed doc vecs; FAISS-accelerated if available)
     # ------------------------------------------------------------------
 
-    def _stage_b_semantic(self, query: str) -> list[float]:
-        """Compute query-doc cosine similarities using cached doc embeddings."""
+    def _stage_b_semantic(self, query: str, regulations: list[str] | None = None) -> list[float]:
+        """Compute query-doc cosine similarities using cached doc embeddings.
+
+        When *regulations* is specified, only chunks matching those regulations receive
+        a non-zero semantic score, avoiding competition across unrelated corpora.
+        """
         if self._doc_vecs is None or not self._chunks:
             return [0.0 for _ in self._chunks]
 
@@ -267,6 +284,16 @@ class HybridRetriever:
 
         q_vec = model.encode([query], normalize_embeddings=True)[0]
 
+        # Build a regulation filter mask to zero-out irrelevant chunks.
+        if regulations:
+            reg_set = {r.upper() for r in regulations}
+            allowed = [
+                i for i, c in enumerate(self._chunks)
+                if c.get("regulation", "").upper() in reg_set
+            ]
+        else:
+            allowed = None
+
         if self._faiss_index is not None:
             try:
                 import faiss  # noqa: F401
@@ -275,15 +302,22 @@ class HybridRetriever:
                     np.asarray([q_vec], dtype="float32"), len(self._chunks)
                 )
                 scores_flat = [0.0] * len(self._chunks)
+                allowed_set = set(allowed) if allowed is not None else None
                 for rank, idx in enumerate(indices[0]):
                     if 0 <= idx < len(self._chunks):
-                        scores_flat[idx] = max(0.0, (float(scores_arr[0][rank]) + 1.0) / 2.0)
+                        if allowed_set is None or idx in allowed_set:
+                            scores_flat[idx] = max(0.0, (float(scores_arr[0][rank]) + 1.0) / 2.0)
                 return scores_flat
             except Exception:
                 pass  # fall through to numpy path
 
-        scores = (self._doc_vecs @ q_vec).tolist()
-        return [max(0.0, (s + 1.0) / 2.0) for s in scores]
+        raw = (self._doc_vecs @ q_vec).tolist()
+        scores_flat = [0.0] * len(self._chunks)
+        allowed_set = set(allowed) if allowed is not None else None
+        for i, s in enumerate(raw):
+            if allowed_set is None or i in allowed_set:
+                scores_flat[i] = max(0.0, (s + 1.0) / 2.0)
+        return scores_flat
 
     # ------------------------------------------------------------------
     # Stage C – grounded rerank
@@ -300,7 +334,7 @@ class HybridRetriever:
     # Context formatting
     # ------------------------------------------------------------------
 
-    def format_context(self, chunks: list[RetrievedChunk], max_chars: int = 4000) -> str:
+    def format_context(self, chunks: list[RetrievedChunk], max_chars: int = 6000) -> str:
         """Format retrieved chunks into a single context string for an LLM prompt.
 
         Args:

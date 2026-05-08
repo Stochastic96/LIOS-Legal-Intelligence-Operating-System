@@ -20,7 +20,7 @@ from typing import Any
 def build_prompt(
     question: str,
     context: "str | list[Any]",
-    max_context_chars: int = 4000,
+    max_context_chars: int = 6000,
 ) -> str:
     """Build a structured legal reasoning prompt using IRAC format.
 
@@ -73,78 +73,138 @@ def build_prompt(
     )
 
 
-def build_direct_prompt(question: str) -> str:
+def build_direct_prompt(question: str, topic_area: str = "eu_regulatory") -> str:
     """Build a direct LLM prompt for easy questions that need no corpus context.
 
     Unlike :func:`build_prompt`, this does not supply a retrieved context block.
     Intended for DEFINITION and GENERAL questions where the LLM's training
     knowledge is sufficient. The caller should verify the answer with
     FactVerifier and fall back to the RAG path when the answer is not grounded.
+
+    Args:
+        question:    The user's legal question.
+        topic_area:  ``"eu_regulatory"`` (default) for CSRD/ESRS/SFDR topics;
+                     ``"general_law"`` for tort, contract, criminal, property law etc.
     """
     question_hint = _question_type_hint(question)
+
+    if topic_area == "general_law":
+        domain_instruction = (
+            "You are LIOS, a legal assistant with broad knowledge of common law and civil law systems.\n\n"
+            "INSTRUCTIONS:\n"
+            "- Answer the question using your knowledge of general legal principles "
+            "(tort law, contract law, criminal law, property law, company law, etc.).\n"
+            "- When relevant, note how the principle varies across jurisdictions "
+            "(e.g. English common law vs. German BGB vs. EU law).\n"
+            "- Respond ONLY in English.\n"
+            "- Do NOT invent case citations, article numbers, or specific statutes you are not confident about.\n"
+            "- If you are uncertain, say so clearly.\n"
+            "- Keep the answer clear, well-structured, and legally precise.\n\n"
+        )
+    else:
+        domain_instruction = (
+            "You are LIOS, a legal assistant specialising in EU and German law.\n\n"
+            "INSTRUCTIONS:\n"
+            "- Answer using your training knowledge of EU regulations (CSRD, ESRS, SFDR, "
+            "EU Taxonomy, GDPR, and related directives).\n"
+            "- Respond ONLY in English.\n"
+            "- Do NOT invent specific article numbers or cite non-existent provisions.\n"
+            "- If you are uncertain, say so clearly rather than guessing.\n"
+            "- Keep the answer concise and factually accurate.\n\n"
+        )
+
     return (
-        "You are LIOS, a legal assistant specialising in EU and German law.\n\n"
-        "INSTRUCTIONS:\n"
-        "- Answer using your training knowledge of EU regulations (CSRD, ESRS, SFDR, "
-        "EU Taxonomy, GDPR, and related directives).\n"
-        "- Respond ONLY in English.\n"
-        "- Do NOT invent specific article numbers or cite non-existent provisions.\n"
-        "- If you are uncertain, say so clearly rather than guessing.\n"
-        "- Keep the answer concise and factually accurate.\n"
-        "- Do NOT use an IRAC structure — give a clear, direct answer.\n\n"
+        f"{domain_instruction}"
         f"{question_hint}"
         f"Question:\n{question}\n"
     )
 
 
 def _question_type_hint(question: str) -> str:
-    """Return a short instruction paragraph tailored to the question type."""
+    """Return structured output instructions tailored to the detected question type."""
     q = question.lower()
 
-    if any(kw in q for kw in ("what is", "define", "what does", "meaning of")):
+    if any(kw in q for kw in ("what is", "define", "what does", "meaning of", "explain")):
         return (
-            "RESPONSE GUIDANCE: This is a definition question.  Provide a clear, "
-            "precise definition drawn directly from the context.\n\n"
+            "RESPONSE GUIDANCE — Definition question.\n"
+            "Structure your answer exactly as:\n"
+            "**Definition**: [precise definition from the context in 1–2 sentences]\n"
+            "**Legal Source**: [regulation + article citation]\n"
+            "**Key Terms**: [bullet list of any important sub-terms or concepts]\n"
+            "**Plain Language**: [one sentence accessible explanation]\n\n"
         )
     if any(kw in q for kw in ("applies to", "who must", "which compan", "subject to",
-                               "applicable", "do we", "are we")):
+                               "applicable", "do we", "are we", "does it apply")):
         return (
-            "RESPONSE GUIDANCE: This is an applicability question.  Identify the "
-            "specific criteria (employee thresholds, turnover, listing status, etc.) "
-            "from the context and state whether they apply.\n\n"
+            "RESPONSE GUIDANCE — Applicability question.\n"
+            "Structure your answer exactly as:\n"
+            "**Applicability**: [Yes / No / Conditional — one sentence verdict]\n"
+            "**Threshold Criteria**: [bullet list: employee count, turnover, balance sheet, listing status]\n"
+            "**Legal Basis**: [regulation + article citations]\n"
+            "**Phase-In Timeline**: [which phase and from when, if phased regulation]\n"
+            "**What This Means**: [plain-language consequence for the company]\n\n"
         )
     if any(kw in q for kw in ("penalty", "fine", "sanction", "non-compliance",
-                               "what happens if", "consequence")):
+                               "what happens if", "consequence", "enforcement")):
         return (
-            "RESPONSE GUIDANCE: This is a penalty question.  Focus on enforcement "
-            "mechanisms, sanction levels, and the responsible enforcement authority "
-            "as described in the context.\n\n"
+            "RESPONSE GUIDANCE — Penalty question.\n"
+            "Structure your answer exactly as:\n"
+            "**Penalty Type**: [administrative fine / criminal / supervisory action]\n"
+            "**Maximum Amount**: [specific amounts or ranges from the context]\n"
+            "**Enforcement Authority**: [which body enforces this]\n"
+            "**Legal Basis**: [regulation + article citations]\n"
+            "**Risk Mitigation**: [1–2 bullet points on how to avoid the penalty]\n\n"
         )
     if any(kw in q for kw in ("when", "deadline", "timeline", "by when",
-                               "phased", "financial year")):
+                               "phased", "financial year", "reporting period")):
         return (
-            "RESPONSE GUIDANCE: This is a timeline question.  Extract and clearly "
-            "list all relevant dates and deadlines from the context in chronological "
-            "order.\n\n"
+            "RESPONSE GUIDANCE — Timeline question.\n"
+            "Structure your answer exactly as:\n"
+            "**Key Dates** (chronological order):\n"
+            "- [date]: [milestone or obligation]\n"
+            "- [date]: [milestone or obligation]\n"
+            "**Legal Basis**: [regulation + article citations]\n"
+            "**Action Required**: [what must be done by each date]\n\n"
         )
     if any(kw in q for kw in ("how to", "how do", "steps", "procedure", "process",
-                               "implement", "comply")):
+                               "implement", "comply", "get started")):
         return (
-            "RESPONSE GUIDANCE: This is a procedural question.  Structure your "
-            "answer as a numbered sequence of steps drawn from the context.\n\n"
+            "RESPONSE GUIDANCE — Procedural question.\n"
+            "Structure your answer exactly as:\n"
+            "**Step-by-step process** (numbered):\n"
+            "1. [first action with legal reference]\n"
+            "2. [second action]\n"
+            "**Key Considerations**: [2–3 bullets on risks, timelines, or dependencies]\n"
+            "**Legal Basis**: [regulation + article citations]\n\n"
         )
-    if any(kw in q for kw in ("difference", "compare", "versus", " vs ", "distinguish")):
+    if any(kw in q for kw in ("difference", "compare", "versus", " vs ", "distinguish",
+                               "similarities", "overlap")):
         return (
-            "RESPONSE GUIDANCE: This is a comparison question.  Clearly contrast "
-            "the two subjects along key dimensions (scope, obligations, timeline, etc.).\n\n"
+            "RESPONSE GUIDANCE — Comparison question.\n"
+            "Structure your answer exactly as:\n"
+            "**[Regulation A]**: [scope and key obligation in 1–2 sentences]\n"
+            "**[Regulation B]**: [scope and key obligation in 1–2 sentences]\n"
+            "**Key Differences**: [bullet list of distinct obligations, scope, thresholds]\n"
+            "**Overlap / Interaction**: [where the regulations interact or create dual obligations]\n\n"
         )
     if any(kw in q for kw in ("requirement", "must", "shall", "obligat", "what must",
-                               "what are the", "disclosure")):
+                               "what are the", "disclosure", "report on")):
         return (
-            "RESPONSE GUIDANCE: This is a requirements question.  List each "
-            "obligation as a separate bullet point with its source citation.\n\n"
+            "RESPONSE GUIDANCE — Requirements question.\n"
+            "Structure your answer exactly as:\n"
+            "**Core Obligations** (bullet list, each with source citation):\n"
+            "- [obligation] — [CSRD Art.X / ESRS E1 §Y]\n"
+            "**Scope**: [who these obligations apply to]\n"
+            "**Reporting Format**: [where/how to disclose if specified in context]\n"
+            "**Deadlines**: [relevant dates if mentioned]\n\n"
         )
-    return ""
+    return (
+        "RESPONSE GUIDANCE — General legal question.\n"
+        "Structure your answer exactly as:\n"
+        "**Summary**: [direct answer in 1–2 sentences]\n"
+        "**Legal Basis**: [regulation + article citations]\n"
+        "**Details**: [supporting explanation from the context]\n\n"
+    )
 
 
 def _format_chunks(chunks: list[Any], max_chars: int) -> str:
@@ -179,7 +239,7 @@ def _format_chunks(chunks: list[Any], max_chars: int) -> str:
     return "\n\n".join(parts) if parts else "No legal context provided."
 
 
-def format_context_from_chunks(chunks: list[dict[str, Any]], max_chars: int = 4000) -> str:
+def format_context_from_chunks(chunks: list[dict[str, Any]], max_chars: int = 6000) -> str:
     """Convert a list of retrieved chunk dicts into a labelled context string.
 
     Convenience wrapper around _format_chunks for callers that already

@@ -12,7 +12,29 @@ from lios.logging_setup import get_logger
 logger = get_logger(__name__)
 
 # Maximum number of distinct query strings to cache per RegulatoryDatabase instance
-_SEARCH_CACHE_MAXSIZE = 256
+_SEARCH_CACHE_MAXSIZE = 1024
+
+# Legal synonym expansion — maps short-form / abbreviation → list of full terms.
+# Applied before keyword indexing so queries using abbreviations find full-text articles.
+_LEGAL_SYNONYMS: dict[str, list[str]] = {
+    "ghg": ["greenhouse gas", "emissions", "carbon"],
+    "scope 1": ["direct emissions", "scope one"],
+    "scope 2": ["indirect emissions", "energy", "scope two"],
+    "scope 3": ["value chain emissions", "indirect emissions", "upstream", "downstream", "scope three"],
+    "double materiality": ["impact materiality", "financial materiality", "materiality assessment"],
+    "csrd": ["corporate sustainability reporting directive", "sustainability reporting"],
+    "esrs": ["european sustainability reporting standards", "sustainability standards"],
+    "sfdr": ["sustainable finance disclosure regulation", "sustainable finance"],
+    "pai": ["principal adverse impacts", "adverse impacts", "sustainability indicators"],
+    "cs3d": ["corporate sustainability due diligence directive", "supply chain due diligence", "csddd"],
+    "taxonomy": ["eu taxonomy", "green taxonomy", "sustainable activities"],
+    "dnsh": ["do no significant harm", "significant harm"],
+    "tcfd": ["task force climate related disclosures", "climate disclosure"],
+    "esg": ["environmental social governance", "sustainability"],
+    "gdpr": ["general data protection regulation", "data protection", "personal data"],
+    "bgb": ["bürgerliches gesetzbuch", "german civil code", "civil code"],
+    "stgb": ["strafgesetzbuch", "german criminal code", "criminal code"],
+}
 
 
 class RegulatoryDatabase:
@@ -165,8 +187,13 @@ class RegulatoryDatabase:
             self._search_cache.move_to_end(cache_key)
             return self._search_cache[cache_key]
 
-        # Compute result
-        keywords = [w for w in re.findall(r"[a-z0-9]{3,}", query.lower())]
+        # Compute result — expand query with legal synonyms before tokenising
+        query_lower = query.lower()
+        expanded_query = query_lower
+        for abbrev, expansions in _LEGAL_SYNONYMS.items():
+            if abbrev in query_lower:
+                expanded_query += " " + " ".join(expansions)
+        keywords = [w for w in re.findall(r"[a-z0-9]{3,}", expanded_query)]
         result: tuple[tuple, ...]
         if not keywords:
             result = ()

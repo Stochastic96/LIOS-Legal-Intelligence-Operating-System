@@ -23,6 +23,23 @@ INTENT_ROADMAP = "compliance_roadmap"
 INTENT_BREAKDOWN = "legal_breakdown"
 INTENT_CONFLICT = "conflict_detection"
 INTENT_GENERAL = "general_query"
+INTENT_GENERAL_LAW = "general_law"  # non-EU-regulation legal topics (tort, contract, etc.)
+
+# General law topic patterns — these are handled via LLM knowledge, not the regulation corpus
+_GENERAL_LAW_PATTERNS = re.compile(
+    r"\b(tort|negligence|defamation|nuisance|trespass|"
+    r"contract law|breach of contract|consideration|offer and acceptance|void|voidable|"
+    r"property law|landlord|tenant|lease|easement|mortgage|conveyancing|"
+    r"criminal law|mens rea|actus reus|homicide|assault|battery|theft|fraud|"
+    r"constitutional|judicial review|due process|habeas corpus|"
+    r"intellectual property|copyright|trademark|patent|trade secret|"
+    r"employment law|wrongful dismissal|unfair dismissal|discrimination|"
+    r"family law|divorce|custody|inheritance|will|probate|"
+    r"company law|directors|shareholders|insolvency|liquidation|"
+    r"administrative law|public law|statutory interpretation|"
+    r"international law|treaty|convention|jurisdiction)\b",
+    re.IGNORECASE,
+)
 
 # Keyword → regulation mapping
 _REG_KEYWORDS: dict[str, str] = {
@@ -158,6 +175,9 @@ class QueryParser:
             return INTENT_APPLICABILITY
         if _BREAKDOWN_PATTERNS.search(q):
             return INTENT_BREAKDOWN
+        # General law topics (tort, contract, etc.) get LLM-direct treatment
+        if _GENERAL_LAW_PATTERNS.search(q):
+            return INTENT_GENERAL_LAW
         return INTENT_GENERAL
 
     def _extract_company_profile(

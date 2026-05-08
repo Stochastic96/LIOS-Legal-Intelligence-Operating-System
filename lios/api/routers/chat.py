@@ -119,11 +119,21 @@ async def chat_message(payload: ChatMessageRequest) -> dict[str, Any]:
         )
     )
 
+    grounding_score = getattr(result, "grounding_score", result.consensus_result.confidence)
+    grounding_label = (
+        "high" if grounding_score >= 0.75
+        else "medium" if grounding_score >= 0.5
+        else "low"
+    )
+
     return {
         "session_id": session_id,
         "answer": result.answer,
         "intent": result.intent,
+        "question_type": getattr(result, "question_type", "GENERAL"),
         "citations": citation_rows,
+        "confidence": round(grounding_score, 3),
+        "grounding": grounding_label,
         "consensus": {
             "reached": result.consensus_result.consensus_reached,
             "confidence": result.consensus_result.confidence,

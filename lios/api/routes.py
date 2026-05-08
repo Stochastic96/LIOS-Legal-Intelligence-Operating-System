@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
@@ -70,6 +70,17 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             request_id=request_id,
         ).model_dump(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Health check – used by the mobile app Settings screen
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health")
+def health_check() -> dict[str, str]:
+    """Simple liveness probe for the mobile app."""
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +298,60 @@ def synthesize_answer(request: _SynthesizeRequest) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Feedback endpoint – mobile app sends thumbs up/down + optional correction
+# ---------------------------------------------------------------------------
+
+
+class _FeedbackRequest(BaseModel):
+    query: str
+    answer: str
+    feedback_type: str  # "positive", "negative", "partial"
+    correction_text: str = ""
+    session_id: str = ""
+
+
+@app.post("/api/feedback")
+def submit_feedback(request: _FeedbackRequest) -> dict[str, Any]:
+    """Accept a feedback/correction from the mobile app and persist it.
+
+    Stores the entry in ``data/memory/corrections.json`` using the same
+    schema as the existing correction records so the LIOS learning pipeline
+    can consume it without changes.
+
+    Returns JSON with ``status`` and the assigned correction ``id``.
+    """
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    corrections_path = Path(__file__).parent.parent.parent / "data" / "memory" / "corrections.json"
+
+    try:
+        existing = json.loads(corrections_path.read_text(encoding="utf-8")) if corrections_path.exists() else []
+    except Exception:
+        existing = []
+
+    new_id = f"corr-{len(existing) + 1:04d}"
+    entry = {
+        "id": new_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "session_id": request.session_id or "mobile",
+        "user_query": request.query,
+        "original_answer": request.answer,
+        "feedback_type": request.feedback_type,
+        "correction_text": request.correction_text,
+        "made_rule": False,
+        "source": "mobile_app",
+    }
+
+    existing.append(entry)
+    corrections_path.write_text(json.dumps(existing, ensure_ascii=False, indent=4), encoding="utf-8")
+    logger.info("Mobile feedback saved: %s (%s)", new_id, request.feedback_type)
+
+    return {"status": "saved", "id": new_id}
+
+
+# ---------------------------------------------------------------------------
 # Evaluate endpoint – scores an answer against retrieved chunks
 # ---------------------------------------------------------------------------
 
@@ -331,6 +396,49 @@ def evaluate_answer(request: _EvaluateRequest) -> dict[str, Any]:
         "diversity_score": result.diversity_score,
         "feedback": result.feedback,
     }
+
+# ---------------------------------------------------------------------------
+# Document upload endpoint – index uploaded files into the retrieval corpus
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    title: str = Form(default=""),
+    regulation: str = Form(default="CUSTOM"),
+    source_description: str = Form(default=""),
+) -> dict[str, Any]:
+    """Upload a document (PDF, DOCX, or TXT) and index it into the retrieval corpus.
+
+    The document is chunked, persisted to ``data/corpus/legal_chunks.jsonl``, and
+    the HybridRetriever index is refreshed so new content is immediately searchable.
+
+    Args:
+        file:               The uploaded file (multipart/form-data).
+        title:              Optional document title (defaults to filename).
+        regulation:         Regulation or topic tag for the document (default: CUSTOM).
+        source_description: Free-text description of the document source.
+
+    Returns:
+        JSON with ``status``, ``chunks_added``, and ``filename``.
+    """
+    from lios.ingestion.document_indexer import index_uploaded_document
+
+    content = await file.read()
+    filename = file.filename or "upload"
+    content_type = file.content_type or ""
+
+    result = index_uploaded_document(
+        content=content,
+        filename=filename,
+        content_type=content_type,
+        title=title or filename,
+        regulation=regulation,
+        source_description=source_description,
+    )
+    return result
+
 
 # ---------------------------------------------------------------------------
 # Backward-compat re-exports used by existing tests

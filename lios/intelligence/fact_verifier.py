@@ -2,7 +2,8 @@
 
 :class:`FactVerifier` cross-validates key claims in a generated answer against
 multiple retrieved legal chunks to flag potential inaccuracies or unsupported
-statements.
+statements.  When sentence-transformers are available, semantic cosine similarity
+is used for grounding; otherwise falls back to token overlap.
 """
 
 from __future__ import annotations
@@ -90,14 +91,22 @@ class FactVerifier:
             f"{c.get('regulation', '')} {c.get('article', '')} {c.get('title', '')} {c.get('text', '')}"
             for c in chunks
         ]
-        chunk_token_sets = [self._tokenize(t) for t in chunk_texts]
 
         supported: list[str] = []
         unsupported: list[str] = []
 
+        # Try semantic grounding first; fall back to token overlap.
+        semantic_model = self._get_semantic_model()
+        chunk_token_sets = [self._tokenize(t) for t in chunk_texts]
+
         for sentence in claim_sentences:
-            s_tokens = self._tokenize(sentence)
-            if self._is_supported(s_tokens, chunk_token_sets):
+            if semantic_model is not None:
+                grounded = self._is_supported_semantic(sentence, chunk_texts, semantic_model)
+            else:
+                s_tokens = self._tokenize(sentence)
+                grounded = self._is_supported(s_tokens, chunk_token_sets)
+
+            if grounded:
                 supported.append(sentence)
             else:
                 unsupported.append(sentence)
@@ -142,6 +151,34 @@ class FactVerifier:
             if len(overlap) >= self._MIN_OVERLAP:
                 return True
         return False
+
+    @staticmethod
+    def _get_semantic_model() -> Any | None:
+        """Return the shared SentenceTransformer from the retriever singleton, or None."""
+        try:
+            from lios.retrieval.hybrid_retriever import _get_sentence_model
+            return _get_sentence_model()
+        except Exception:
+            return None
+
+    def _is_supported_semantic(
+        self,
+        sentence: str,
+        chunk_texts: list[str],
+        model: Any,
+        threshold: float = 0.55,
+    ) -> bool:
+        """Return True when cosine similarity between *sentence* and any chunk exceeds *threshold*."""
+        try:
+            import numpy as np
+
+            vecs = model.encode([sentence] + chunk_texts[:5], normalize_embeddings=True)
+            claim_vec = vecs[0]
+            chunk_vecs = vecs[1:]
+            sims = (chunk_vecs @ claim_vec).tolist()
+            return any(s >= threshold for s in sims)
+        except Exception:
+            return False
 
     def _detect_conflicts(self, chunks: list[dict[str, Any]]) -> list[str]:
         """Detect obvious conflicting statements across chunks.
