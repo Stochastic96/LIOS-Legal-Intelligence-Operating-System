@@ -124,6 +124,16 @@ export interface KnowledgeMap {
   categories: Record<string, KnowledgeMapTopic[]>;
 }
 
+export type LLMMode = "local" | "groq" | "azure";
+
+export interface LLMModeStatus {
+  mode: LLMMode;
+  provider: string;
+  model: string;
+  label: string;
+  reachable: boolean;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -160,5 +170,22 @@ export const api = {
         { topic_id, answer_text, reference }
       ),
     map: () => get<KnowledgeMap>("/learn/map"),
+  },
+
+  llmMode: {
+    get: () => get<LLMModeStatus>("/api/llm-mode"),
+    set: (mode: LLMMode, api_key?: string) =>
+      post<{ mode: LLMMode; label: string; model: string }>("/api/llm-mode", { mode, api_key }),
+  },
+
+  stats: {
+    tokenUsage: () => get<{
+      total_calls: number;
+      total_tokens: number;
+      total_cost_usd: number;
+      by_model: Record<string, { calls: number; tokens: number; cost_usd: number }>;
+    }>("/api/token-usage"),
+    exportTraining: (limit = 500) =>
+      get<{ samples: number; jsonl: string }>(`/api/training-export?limit=${limit}`),
   },
 };

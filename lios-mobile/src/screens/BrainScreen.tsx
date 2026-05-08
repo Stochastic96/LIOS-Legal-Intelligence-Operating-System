@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { api, BrainStatus, Rule, getServerUrl, setServerUrl } from "../api/client";
+import { api, BrainStatus, LLMMode, LLMModeStatus, Rule, getServerUrl, setServerUrl } from "../api/client";
 import { C, F, R, S, W } from "../theme";
 import ScalePressable from "../components/ScalePressable";
 import Card from "../components/Card";
@@ -80,6 +80,12 @@ function InfoBadge({ label, value, icon, valueColor, pulse }: {
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
+const LLM_MODES: { key: LLMMode; label: string; sub: string; icon: React.ComponentProps<typeof Feather>["name"] }[] = [
+  { key: "local",  label: "Local",  sub: "Ollama on your Mac",       icon: "cpu" },
+  { key: "groq",   label: "Groq",   sub: "Fast cloud · Free tier",   icon: "zap" },
+  { key: "azure",  label: "Azure",  sub: "GPT-4o · High quality",    icon: "cloud" },
+];
+
 export default function BrainScreen() {
   const [status, setStatus] = useState<BrainStatus | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
@@ -91,6 +97,8 @@ export default function BrainScreen() {
   const [ruleTopic, setRuleTopic] = useState("general");
   const [serverUrlModal, setServerUrlModal] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  const [llmMode, setLlmMode] = useState<LLMMode>("local");
+  const [switchingMode, setSwitchingMode] = useState(false);
 
   const mountAnim = useRef(new Animated.Value(0)).current;
 
@@ -103,14 +111,27 @@ export default function BrainScreen() {
   const loadAll = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
     try {
-      const [s, r] = await Promise.all([api.brain.status(), api.memory.rules()]);
+      const [s, r, m] = await Promise.all([api.brain.status(), api.memory.rules(), api.llmMode.get()]);
       setStatus(s);
       setRules(r.rules);
+      setLlmMode(m.mode);
     } catch {
       setStatus(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }, []);
+
+  const switchMode = useCallback(async (mode: LLMMode) => {
+    setSwitchingMode(true);
+    try {
+      await api.llmMode.set(mode);
+      setLlmMode(mode);
+    } catch {
+      Alert.alert("Error", "Could not switch AI mode. Is the server running?");
+    } finally {
+      setSwitchingMode(false);
     }
   }, []);
 
@@ -213,6 +234,30 @@ export default function BrainScreen() {
               <InfoBadge label="Corrections" icon="edit-2"   value={String(status?.total_corrections ?? 0)} />
               <InfoBadge label="Status"      icon="activity" value={status?.brain_on ? "Active" : "Standby"}
                 valueColor={status?.brain_on ? C.accent : C.dim} />
+            </View>
+          </Card>
+
+          {/* AI Mode selector */}
+          <Card style={styles.modeCard}>
+            <View style={styles.modeHeader}>
+              <Feather name="sliders" size={16} color={C.accent} />
+              <Text style={[styles.cardTitle, { marginLeft: S.sm }]}>AI Mode</Text>
+              {switchingMode && <ActivityIndicator size="small" color={C.accent} style={{ marginLeft: "auto" }} />}
+            </View>
+            <Text style={styles.cardSub}>Choose which AI powers your answers</Text>
+            <View style={styles.modeGrid}>
+              {LLM_MODES.map((m) => {
+                const active = llmMode === m.key;
+                return (
+                  <ScalePressable key={m.key} onPress={() => !switchingMode && switchMode(m.key)} style={{ flex: 1 }}>
+                    <View style={[styles.modeChip, active && styles.modeChipActive]}>
+                      <Feather name={m.icon} size={16} color={active ? C.accent : C.dim} />
+                      <Text style={[styles.modeChipLabel, active && { color: C.accent }]}>{m.label}</Text>
+                      <Text style={styles.modeChipSub}>{m.sub}</Text>
+                    </View>
+                  </ScalePressable>
+                );
+              })}
             </View>
           </Card>
 
@@ -364,6 +409,18 @@ const styles = StyleSheet.create({
   infoBadgeTop:   { flexDirection: "row", alignItems: "center", gap: S.xs, marginBottom: 4 },
   infoBadgeLabel: { fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.8 },
   infoBadgeValue: { fontSize: F.md, fontWeight: W.bold, color: C.text },
+
+  // AI Mode card
+  modeCard:       { marginBottom: S.sm },
+  modeHeader:     { flexDirection: "row", alignItems: "center", marginBottom: S.xs },
+  modeGrid:       { flexDirection: "row", gap: S.sm, marginTop: S.md },
+  modeChip:       {
+    flex: 1, alignItems: "center", padding: S.sm, borderRadius: R.md,
+    backgroundColor: C.s2, borderWidth: 1, borderColor: C.border, gap: S.xs,
+  },
+  modeChipActive: { borderColor: C.accent, backgroundColor: C.accentDim },
+  modeChipLabel:  { fontSize: F.sm, fontWeight: W.bold, color: C.mid },
+  modeChipSub:    { fontSize: 9, color: C.dim, textAlign: "center" },
 
   // Rules
   addBtn:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.accentDim, borderRadius: R.full, paddingHorizontal: S.sm + 2, paddingVertical: 5, borderWidth: 1, borderColor: C.borderBright },

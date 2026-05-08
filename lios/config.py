@@ -23,8 +23,21 @@ class Settings:
     # Azure OpenAI settings (used when LLM_PROVIDER=azure)
     AZURE_OPENAI_ENDPOINT: str = ""
     AZURE_OPENAI_API_KEY: str = ""
-    AZURE_OPENAI_API_VERSION: str = "2024-02-01"
-    AZURE_OPENAI_DEPLOYMENT: str = ""
+    AZURE_OPENAI_API_VERSION: str = "2024-11-01-preview"
+    AZURE_OPENAI_DEPLOYMENT: str = "gpt-4o-mini"  # cheapest good model
+
+    # Token budget — controls max output tokens per intent type.
+    # Lower = cheaper & faster; higher = more detailed answers.
+    # Override per intent via LIOS_TOKEN_BUDGET_* env vars.
+    TOKEN_BUDGET_DEFAULT: int = 800
+    TOKEN_BUDGET_DEFINITION: int = 512
+    TOKEN_BUDGET_APPLICABILITY: int = 700
+    TOKEN_BUDGET_ROADMAP: int = 1500
+    TOKEN_BUDGET_BREAKDOWN: int = 1200
+    TOKEN_BUDGET_GENERAL_LAW: int = 600
+
+    # Token usage log — append-only JSONL tracking cost per query
+    TOKEN_LOG_PATH: str = "logs/token_usage.jsonl"
 
     # Consensus settings
     CONSENSUS_THRESHOLD: int = 2  # agents that must agree (out of total)
@@ -73,6 +86,13 @@ class Settings:
         self.AZURE_OPENAI_DEPLOYMENT = os.environ.get(
             "LIOS_AZURE_OPENAI_DEPLOYMENT", self.AZURE_OPENAI_DEPLOYMENT
         )
+        self.TOKEN_BUDGET_DEFAULT = int(os.environ.get("LIOS_TOKEN_BUDGET_DEFAULT", str(self.TOKEN_BUDGET_DEFAULT)))
+        self.TOKEN_BUDGET_DEFINITION = int(os.environ.get("LIOS_TOKEN_BUDGET_DEFINITION", str(self.TOKEN_BUDGET_DEFINITION)))
+        self.TOKEN_BUDGET_APPLICABILITY = int(os.environ.get("LIOS_TOKEN_BUDGET_APPLICABILITY", str(self.TOKEN_BUDGET_APPLICABILITY)))
+        self.TOKEN_BUDGET_ROADMAP = int(os.environ.get("LIOS_TOKEN_BUDGET_ROADMAP", str(self.TOKEN_BUDGET_ROADMAP)))
+        self.TOKEN_BUDGET_BREAKDOWN = int(os.environ.get("LIOS_TOKEN_BUDGET_BREAKDOWN", str(self.TOKEN_BUDGET_BREAKDOWN)))
+        self.TOKEN_BUDGET_GENERAL_LAW = int(os.environ.get("LIOS_TOKEN_BUDGET_GENERAL_LAW", str(self.TOKEN_BUDGET_GENERAL_LAW)))
+        self.TOKEN_LOG_PATH = os.environ.get("LIOS_TOKEN_LOG_PATH", self.TOKEN_LOG_PATH)
         self.LOG_LEVEL = os.environ.get("LIOS_LOG_LEVEL", self.LOG_LEVEL)
         self.CHAT_MODE = os.environ.get("LIOS_CHAT_MODE", self.CHAT_MODE).lower()
 
