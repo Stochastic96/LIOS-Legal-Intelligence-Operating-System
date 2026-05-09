@@ -21,6 +21,7 @@ def build_prompt(
     question: str,
     context: "str | list[Any]",
     max_context_chars: int = 6000,
+    lens: str | None = None,
 ) -> str:
     """Build a structured legal reasoning prompt using IRAC format.
 
@@ -47,6 +48,14 @@ def build_prompt(
             context_text = "No legal context provided."
     else:
         context_text = _format_chunks(context, max_context_chars)
+
+    # Use lens-specific prompt when a lens is specified
+    if lens:
+        try:
+            from lios.reasoning.lawyer_prompts import build_lens_prompt
+            return build_lens_prompt(question, context_text, lens)
+        except Exception:
+            pass  # fall through to default IRAC prompt
 
     question_hint = _question_type_hint(question)
 

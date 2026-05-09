@@ -154,6 +154,14 @@ def index_uploaded_document(
         for i, chunk in enumerate(raw_chunks)
     ]
 
+    # Annotate each chunk with lawyer-lens metadata
+    try:
+        from lios.ingestion.lawyer_lens import annotate_chunk
+        for record in records:
+            annotate_chunk(record)
+    except Exception as exc:
+        logger.warning("Lawyer-lens annotation skipped: %s", exc)
+
     # Append to corpus JSONL
     _CORPUS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _CORPUS_PATH.open("a", encoding="utf-8") as f:

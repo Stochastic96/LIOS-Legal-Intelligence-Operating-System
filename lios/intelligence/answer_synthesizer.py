@@ -134,6 +134,16 @@ class AnswerSynthesizer:
             A formatted IRAC answer string.  Returns a "no context" message
             when *chunks* is empty.
         """
+        # Content stack fast-path: check pre-built answers before doing heavy synthesis
+        try:
+            from lios.intelligence.content_stack import get_stack, format_stack_answer
+            stack = get_stack()
+            hits = stack.lookup_any(question, top_k=1)
+            if hits and hits[0].get("confidence", 0) >= 0.75:
+                return format_stack_answer(hits[0])
+        except Exception:
+            pass  # fall through to chunk-based synthesis
+
         if not chunks:
             return (
                 "No relevant legal context was found in the corpus for this "

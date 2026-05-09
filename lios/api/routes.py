@@ -847,6 +847,57 @@ def set_llm_mode(request: _LLMModeRequest) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Content Stack endpoints — instant pre-built Q&A, no LLM needed
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/content-stack/{regulation}")
+async def get_content_stack_regulation(regulation: str) -> dict:
+    """Return all pre-built Q&A entries for a regulation (e.g. CSRD, GDPR)."""
+    try:
+        from lios.intelligence.content_stack import get_stack
+        stack = get_stack()
+        entries = stack.get_by_regulation(regulation.upper())
+        return {
+            "regulation": regulation.upper(),
+            "count": len(entries),
+            "entries": entries,
+        }
+    except Exception as exc:
+        logger.warning("Content stack lookup failed: %s", exc)
+        return {"regulation": regulation, "count": 0, "entries": []}
+
+
+@app.get("/api/content-stack/search")
+async def search_content_stack(q: str, top_k: int = 5) -> dict:
+    """Instant keyword search across all pre-built Q&A entries."""
+    try:
+        from lios.intelligence.content_stack import get_stack
+        stack = get_stack()
+        hits = stack.lookup_any(q, top_k=top_k)
+        return {
+            "query": q,
+            "hits": len(hits),
+            "results": hits,
+        }
+    except Exception as exc:
+        logger.warning("Content stack search failed: %s", exc)
+        return {"query": q, "hits": 0, "results": []}
+
+
+@app.get("/api/content-stack")
+async def content_stack_stats() -> dict:
+    """Return content stack statistics — total entries, regulations covered."""
+    try:
+        from lios.intelligence.content_stack import get_stack
+        stack = get_stack()
+        return stack.stats()
+    except Exception as exc:
+        logger.warning("Content stack stats failed: %s", exc)
+        return {"total_entries": 0, "regulations": 0, "by_regulation": {}}
+
+
+# ---------------------------------------------------------------------------
 # Backward-compat re-exports used by existing tests
 # ---------------------------------------------------------------------------
 # Tests import shared singletons directly from this module.  Expose them so

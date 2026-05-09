@@ -42,12 +42,28 @@ _TOKEN_OVERLAP = 50
 
 # Filename stem → canonical regulation name
 _REGULATION_MAP: dict[str, str] = {
-    "csrd": "CSRD",
-    "esrs": "ESRS",
-    "taxonomy": "EU_TAXONOMY",
-    "sfdr": "SFDR",
-    "gdpr": "GDPR",
-    "lksg": "LkSG",
+    "csrd": "CSRD", "esrs": "ESRS", "taxonomy": "EU_TAXONOMY",
+    "sfdr": "SFDR", "gdpr": "GDPR", "dsgvo": "GDPR", "lksg": "LkSG",
+    "cs3d": "CS3D", "csddd": "CS3D", "eudr": "EUDR", "cbam": "CBAM",
+    "nis2": "NIS2", "dora": "DORA", "ai_act": "AI_ACT", "ai-act": "AI_ACT",
+    "mifid": "MiFID2", "srd2": "SRD2", "whistleblower": "WHISTLEBLOWER",
+    "green_deal": "GREEN_DEAL", "green_claims": "GREEN_CLAIMS",
+    "greenwashing": "GREENWASHING", "paris": "PARIS_AGREEMENT",
+    "mica": "MiCA", "data_act": "DATA_ACT", "reach": "REACH", "ied": "IED",
+    "ets": "ETS", "batteries": "EU_BATTERIES",
+    "hgb": "HGB", "aktg": "AktG", "gmbhg": "GmbHG", "bgb": "BGB",
+    "behg": "BEHG", "ksg": "KSG", "uwg": "UWG", "wphg": "WpHG",
+    "zpo": "ZPO", "bdsg": "BDSG", "prodhaftg": "ProdHaftG",
+    "teu": "TEU", "tfeu": "TFEU", "charter": "EU_CHARTER",
+    "van_gend": "CJEU_VAN_GEND", "costa": "CJEU_COSTA",
+    "cassis": "CJEU_CASSIS", "francovich": "CJEU_FRANCOVICH",
+    "rancovich": "CJEU_FRANCOVICH", "schrems": "CJEU_SCHREMS",
+    "google_spain": "CJEU_GOOGLE_SPAIN", "janecek": "CJEU_JANECEK",
+    "tcfd": "TCFD", "ifrs_s1": "IFRS_S1", "ifrs_s2": "IFRS_S2",
+    "gri": "GRI", "efrag": "EFRAG", "vsme": "VSME", "oecd": "OECD_DD",
+    "omnibus": "CSRD_OMNIBUS", "horizontal": "EU_COMPETITION",
+    "merger": "EU_COMPETITION", "fit_for_55": "FIT_FOR_55",
+    "englisch_ksg": "KSG",
 }
 
 
@@ -60,6 +76,7 @@ def ingest_pdfs(
     folder: str | Path = _DEFAULT_PDF_FOLDER,
     corpus_path: str | Path = _DEFAULT_CORPUS,
     dry_run: bool = False,
+    annotate: bool = True,
 ) -> int:
     """Scan *folder* for PDF files, extract chunks, and write to corpus.
 
@@ -92,6 +109,13 @@ def ingest_pdfs(
     for pdf_path in pdf_files:
         chunks = extract_chunks_from_pdf(pdf_path)
         novel = [c for c in chunks if c["text"][:80] not in existing_prefixes]
+        if annotate:
+            try:
+                from lios.ingestion.lawyer_lens import annotate_chunk
+                for c in novel:
+                    annotate_chunk(c)
+            except Exception as exc:
+                logger.warning("Lawyer-lens annotation skipped: %s", exc)
         print(f"  {pdf_path.name} → {len(novel)} articles extracted")
         for c in novel:
             existing_prefixes.add(c["text"][:80])

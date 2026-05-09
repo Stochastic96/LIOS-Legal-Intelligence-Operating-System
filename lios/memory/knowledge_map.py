@@ -165,6 +165,7 @@ _SEED_MAP: list[dict] = [
 
 _QUESTION_BANK: dict[str, list[dict]] = {
     "csrd": [
+        # --- existing questions ---
         {"type": "definition", "q": "Was ist die CSRD und welche Richtlinie ersetzt sie?"},
         {"type": "application", "q": "Eine deutsche AG hat 400 Mitarbeiter, €80 Mio. Umsatz, €45 Mio. Bilanzsumme. Gilt CSRD ab 2025?"},
         {"type": "application", "q": "Ein börsennotiertes KMU mit 150 Mitarbeitern möchte CSRD bis 2028 aussetzen. Ist dies zulässig?"},
@@ -172,6 +173,27 @@ _QUESTION_BANK: dict[str, list[dict]] = {
         {"type": "case", "q": "Ein Unternehmen veröffentlicht einen Nachhaltigkeitsbericht, lässt Scope-3-Emissionen wegen fehlender Daten aus. Ist dies CSRD-konform?"},
         {"type": "definition", "q": "Welche drei Phasentermine sieht das schrittweise Inkrafttreten der CSRD vor?"},
         {"type": "application", "q": "Eine Nicht-EU-Muttergesellschaft hat eine große EU-Tochter. Ab wann gilt CSRD für die Gruppe?"},
+        # --- Student perspective ---
+        {"type": "student", "q": "Erkläre die CSRD in einfachen Worten — welches Problem löst sie?"},
+        {"type": "student", "q": "Wie unterscheidet sich die CSRD von der alten NFRD (Nicht-Finanzberichterstattungsrichtlinie)?"},
+        {"type": "student", "q": "Was bedeutet 'doppelte Wesentlichkeit' und warum ist sie das Herzstück der CSRD?"},
+        # --- Teacher perspective ---
+        {"type": "teacher", "q": "Gib ein Lehrbeispiel: Wann gilt die CSRD für ein KMU und wann nicht?"},
+        {"type": "teacher", "q": "Erkläre die dreistufige Einführung der CSRD anhand einer Zeitleiste."},
+        # --- Lawyer perspective ---
+        {"type": "lawyer", "q": "Was sagt Art. 2 CSRD zum Begriff 'großes Unternehmen' — nennen Sie die genauen Schwellenwerte."},
+        {"type": "lawyer", "q": "Welche Ausnahmen vom CSRD-Anwendungsbereich sieht Art. 2 Abs. 2 für Tochtergesellschaften vor?"},
+        {"type": "lawyer", "q": "Welche Anforderungen stellt CSRD Art. 8 an die externe Prüfung des Nachhaltigkeitsberichts?"},
+        # --- Business owner perspective ---
+        {"type": "business_owner", "q": "Mein Unternehmen hat 260 Mitarbeiter und €50 Mio. Umsatz. Bin ich von der CSRD betroffen?"},
+        {"type": "business_owner", "q": "Was kostet die CSRD-Compliance ungefähr und was muss ich zuerst tun?"},
+        {"type": "business_owner", "q": "Ich bin Geschäftsführer einer GmbH mit 320 Mitarbeitern — ab wann muss ich berichten und was droht bei Verstoß?"},
+        # --- National court perspective ---
+        {"type": "court", "q": "Wie ist CSRD Art. 19a auszulegen, wenn eine nationale Behörde den Begriff 'Nachhaltigkeitsinformation' interpretiert?"},
+        {"type": "court", "q": "Kann ein Einzelner aus der CSRD unmittelbare Rechte gegenüber einem Unternehmen ableiten?"},
+        # --- European Court perspective ---
+        {"type": "ecj", "q": "Welche Erwägungsgründe der CSRD erläutern den Gesetzeszweck und wie sollten sie bei der Auslegung von Art. 19a herangezogen werden?"},
+        {"type": "ecj", "q": "Steht die CSRD-Prüfpflicht (Art. 8) im Einklang mit dem Verhältnismäßigkeitsprinzip für KMU?"},
     ],
     "esrs": [
         {"type": "definition", "q": "Was ist der Unterschied zwischen ESRS 1 und ESRS 2?"},
@@ -180,6 +202,21 @@ _QUESTION_BANK: dict[str, list[dict]] = {
         {"type": "case", "q": "Ein Prüfer stellt fest, dass ein Unternehmen nur finanzielle Wesentlichkeit bewertet, nicht aber die Auswirkungswesentlichkeit. Welcher ESRS wird verletzt?"},
         {"type": "definition", "q": "Was deckt ESRS G1 ab und für wen gilt er?"},
         {"type": "application", "q": "Welcher ESRS-Standard regelt die eigene Belegschaft — Lohngleichheit, Arbeitsbedingungen, Gewerkschaften?"},
+        # --- Student ---
+        {"type": "student", "q": "Was sind die ESRS und wozu braucht man sie neben der CSRD?"},
+        {"type": "student", "q": "Erkläre den Unterschied zwischen themenspezifischen ESRS (E1–E5, S1–S4, G1) und den übergreifenden ESRS 1 und 2."},
+        # --- Lawyer ---
+        {"type": "lawyer", "q": "Welche ESRS-Angaben sind 'freiwillig' und welche sind bei Wesentlichkeit Pflicht?"},
+        {"type": "lawyer", "q": "Was fordert ESRS 2 IRO-1 konkret und welche Dokumentationspflichten entstehen?"},
+        # --- Business owner ---
+        {"type": "business_owner", "q": "Welche ESRS-Standards müssen wir zwingend anwenden — gibt es eine Mindestliste?"},
+        {"type": "business_owner", "q": "Unser Unternehmen hat keine Biodiversitätsrisiken identifiziert. Müssen wir ESRS E4 trotzdem anwenden?"},
+        # --- Teacher ---
+        {"type": "teacher", "q": "Erkläre das IRO-Konzept (Impact, Risk, Opportunity) anhand eines Produktionsunternehmens."},
+        # --- Court ---
+        {"type": "court", "q": "Wie sind die ESRS rechtlich einzuordnen — haben sie unmittelbare Bindungswirkung oder gelten sie nur über die CSRD?"},
+        # --- ECJ ---
+        {"type": "ecj", "q": "Welche Erwägungsgründe der ESRS-Delegierten Verordnung 2023/2772 erläutern den Begriff 'Wesentlichkeit'?"},
     ],
     "eu_taxonomy": [
         {"type": "definition", "q": "Welche 6 Umweltziele hat die EU-Taxonomieverordnung?"},
