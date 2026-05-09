@@ -439,6 +439,497 @@ _QUESTION_BANK: dict[str, list[dict]] = {
     ],
 }
 
+# ── 6-perspective extensions ────────────────────────────────────────────────────
+
+_QUESTION_BANK["eu_taxonomy"].extend([
+    {"type": "student", "q": "Erkläre die EU-Taxonomie in einfachen Worten — was klassifiziert sie und warum?"},
+    {"type": "student", "q": "Was ist der Unterschied zwischen 'Klimaschutz' und 'Klimaanpassung' als Umweltziele der EU-Taxonomie?"},
+    {"type": "teacher", "q": "Zeige anhand eines Windenergieprojekts, wie die drei Taxonomiekriterien (wesentlicher Beitrag, DNSH, Mindestschutz) geprüft werden."},
+    {"type": "teacher", "q": "Erkläre mit einem einfachen Beispiel, was 'Do No Significant Harm' (DNSH) in der Praxis bedeutet."},
+    {"type": "lawyer", "q": "Welche vier kumulativen Voraussetzungen muss eine Wirtschaftstätigkeit nach Art. 3 EU-Taxonomie-VO erfüllen?"},
+    {"type": "lawyer", "q": "Was genau müssen Nicht-Finanzunternehmen mit mehr als 500 Mitarbeitern nach Art. 8 der Taxonomie-Offenlegungsverordnung offenlegen?"},
+    {"type": "business_owner", "q": "Muss ich als produzierendes Unternehmen Taxonomiequoten offenlegen und wenn ja, welche KPIs?"},
+    {"type": "business_owner", "q": "Unser Unternehmen hat keine Taxonomie-eligible Aktivitäten. Welche Erklärung müssen wir im CSRD-Bericht abgeben?"},
+    {"type": "court", "q": "Wie ist 'wesentlicher Beitrag' nach Art. 10 EU-Taxonomie-VO auszulegen, wenn delegierte Rechtsakte keine Grenzwerte für eine Aktivität festlegen?"},
+    {"type": "ecj", "q": "Ist die Einbeziehung von Erdgas und Kernenergie als Übergangstätigkeiten mit dem Nachhaltigkeitsprinzip nach Art. 3 Abs. 3 TEU vereinbar?"},
+])
+
+_QUESTION_BANK["sfdr"].extend([
+    {"type": "student", "q": "Was ist SFDR und warum unterscheidet sie Produkte in Artikel 6, 8 und 9?"},
+    {"type": "student", "q": "Erkläre den Begriff 'Principal Adverse Impacts' (PAI) — was sind Hauptnachteile für Nachhaltigkeitsfaktoren?"},
+    {"type": "teacher", "q": "Gib ein Lehrbeispiel für einen Artikel-8-Fonds vs. Artikel-9-Fonds — wie unterscheiden sie sich in Praxis und Offenlegungspflichten?"},
+    {"type": "lawyer", "q": "Was fordert SFDR Art. 9 von einem Produkt, das als 'Fonds mit nachhaltigem Investment' klassifiziert wird — alle Voraussetzungen?"},
+    {"type": "lawyer", "q": "Welche Informationen sind nach SFDR Art. 6 zu Nachhaltigkeitsrisiken in vorvertraglichen Unterlagen verpflichtend?"},
+    {"type": "business_owner", "q": "Ich biete Vermögensverwaltung für Privatkunden an — falle ich unter SFDR und was muss ich auf meiner Website veröffentlichen?"},
+    {"type": "business_owner", "q": "Unser Artikel-8-Fonds hält eine Anleihe ohne E/S-Ziel. Verlieren wir die Klassifizierung?"},
+    {"type": "court", "q": "Wie ist 'nachhaltige Investition' in Art. 2 Nr. 17 SFDR auszulegen, wenn keine verbindlichen Mindestkriterien festgelegt sind?"},
+    {"type": "ecj", "q": "Verstößt die SFDR gegen den Grundsatz der Rechtssicherheit, weil der Begriff 'nachhaltige Investition' keine klare Legaldefinition hat?"},
+])
+
+_QUESTION_BANK["cs3d"].extend([
+    {"type": "student", "q": "Was ist die CS3D und wie unterscheidet sie sich grundlegend vom deutschen LkSG?"},
+    {"type": "student", "q": "Welche Unternehmen fallen unter die CS3D — erkläre die Schwellenwerte für Anfänger."},
+    {"type": "teacher", "q": "Erkläre anhand einer globalen Lieferkette, welche Sorgfaltspflichten die CS3D von Unternehmen verlangt."},
+    {"type": "lawyer", "q": "Was fordert CS3D Art. 5 zum Sorgfaltspflichtensystem — welche 6 Schritte sind vorgesehen?"},
+    {"type": "lawyer", "q": "Welche zivilrechtliche Haftung sieht CS3D Art. 22 für Unternehmen vor, die Sorgfaltspflichten verletzen?"},
+    {"type": "business_owner", "q": "Mein Unternehmen hat €450 Mio. Umsatz und 1.200 EU-Mitarbeiter — falle ich unter CS3D und ab wann?"},
+    {"type": "business_owner", "q": "Was sind die ersten drei Schritte für CS3D-Compliance, die ich heute einleiten muss?"},
+    {"type": "court", "q": "Wie ist CS3D Art. 22 zur zivilrechtlichen Haftung auszulegen, wenn der Schaden durch einen Tier-3-Lieferanten verursacht wurde?"},
+    {"type": "ecj", "q": "Steht die CS3D-Haftungsregelung (Art. 22) im Einklang mit dem Verhältnismäßigkeitsprinzip, angesichts der globalen Lieferkettenausdehnung?"},
+])
+
+_QUESTION_BANK["eudr"] = [
+    {"type": "definition", "q": "Was ist die EU-Entwaldungsverordnung (EUDR) und welche 7 Rohstoffkategorien deckt sie ab?"},
+    {"type": "definition", "q": "Was bedeutet 'entwaldungsfrei' nach EUDR und welcher Stichtag gilt für die Landnutzung?"},
+    {"type": "application", "q": "Ein Unternehmen importiert Palmöl aus Indonesien. Welche EUDR-Sorgfaltspflichten muss es erfüllen?"},
+    {"type": "case", "q": "Ein Händler kann für seinen Kakaolieferanten keine GPS-Koordinaten der Herkunftsflächen vorlegen. Welche EUDR-Konsequenzen drohen?"},
+    {"type": "student", "q": "Was ist die EUDR in einfachen Worten — warum gibt es sie und was soll sie verhindern?"},
+    {"type": "student", "q": "Was bedeutet 'Entwaldungsfreiheit' nach EUDR — was müssen Unternehmen nachweisen?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Schokoladenherstellers, wie die EUDR-Sorgfaltserklärung in der Praxis funktioniert."},
+    {"type": "lawyer", "q": "Was sind die drei Schritte der EUDR-Sorgfaltspflicht nach Art. 8–10 und welche Dokumentation ist erforderlich?"},
+    {"type": "lawyer", "q": "Welche Sanktionen sieht Art. 25 EUDR vor und wie hoch sind die Mindestbußgelder?"},
+    {"type": "business_owner", "q": "Ich importiere Kaffee aus Brasilien — falle ich unter die EUDR und was muss ich bis Ende 2025 einrichten?"},
+    {"type": "business_owner", "q": "Was ist die EUDR-Sorgfaltserklärung und wer ist für ihre Einreichung verantwortlich?"},
+    {"type": "court", "q": "Wie ist der Begriff 'Betreiber' in der EUDR auszulegen, wenn ein Unternehmen Zwischenhändler in der Lieferkette ist?"},
+    {"type": "ecj", "q": "Ist das EUDR-Marktverbot (Art. 3) verhältnismäßig im Hinblick auf die Handelsfreiheit nach AEUV Art. 34 ff.?"},
+]
+
+_QUESTION_BANK["green_deal"] = [
+    {"type": "definition", "q": "Was ist der Europäische Green Deal und welche Hauptziele hat er bis 2050?"},
+    {"type": "definition", "q": "Was ist das 'Fit for 55'-Paket und wie hängt es mit dem Green Deal zusammen?"},
+    {"type": "application", "q": "Ein Unternehmen der Stahlindustrie plant eine neue Anlage. Welche Green-Deal-Rechtsakte sind relevant?"},
+    {"type": "case", "q": "Ein Mitgliedstaat verzögert die Umsetzung von Green-Deal-Richtlinien. Welche Konsequenzen drohen?"},
+    {"type": "student", "q": "Erkläre den Europäischen Green Deal in 3 Sätzen — was ist das Ziel und welche Instrumente nutzt die EU?"},
+    {"type": "student", "q": "Wie hängen CSRD, EU-Taxonomie und Green Deal zusammen — erkläre den Zusammenhang."},
+    {"type": "teacher", "q": "Erkläre anhand von 'Fit for 55', wie der Green Deal konkrete Gesetzgebung erzeugt."},
+    {"type": "lawyer", "q": "Welchen rechtlichen Status hat der Green Deal — ist er verbindliches Recht oder politisches Programm?"},
+    {"type": "lawyer", "q": "Welches Primärrecht (TEU/AEUV) bildet die Rechtsgrundlage für Green-Deal-Maßnahmen?"},
+    {"type": "business_owner", "q": "Wie wirkt sich der Green Deal konkret auf ein produzierendes Unternehmen aus — welche Gesetze muss ich kennen?"},
+    {"type": "business_owner", "q": "Was ist das EU-Klimagesetz und welche verbindliche Verpflichtung ergibt sich für mein Unternehmen?"},
+    {"type": "court", "q": "Hat der European Green Deal als Mitteilung der Kommission unmittelbare Rechtswirkung oder nur die darauf basierenden Einzelmaßnahmen?"},
+    {"type": "ecj", "q": "Inwiefern kann der Grundsatz der Klimaneutralität aus dem EU-Klimagesetz als Auslegungsmaßstab für andere EU-Umweltrechtsakte dienen?"},
+]
+
+_QUESTION_BANK["ied"].extend([
+    {"type": "student", "q": "Was ist die Industrieemissionsrichtlinie (IED) in einfachen Worten — welche Anlagen sind betroffen?"},
+    {"type": "student", "q": "Was ist 'Beste Verfügbare Technik' (BVT) und warum ist sie das Herzstück der IED?"},
+    {"type": "teacher", "q": "Erkläre anhand einer Zementfabrik, wie eine IED-Genehmigung beantragt und überwacht wird."},
+    {"type": "lawyer", "q": "Was sind BVT-Schlussfolgerungen nach IED Art. 13 und welche Rechtswirkung haben sie für Genehmigungen?"},
+    {"type": "lawyer", "q": "Welche Sanktionen und Berichtspflichten sieht die IED vor, wenn Emissionsgrenzwerte überschritten werden?"},
+    {"type": "business_owner", "q": "Meine Anlage produziert 50.000 Tonnen Stahl/Jahr — falle ich unter die IED und welche Genehmigung brauche ich?"},
+    {"type": "business_owner", "q": "Welche Behörde ist in Deutschland für IED-Genehmigungen zuständig?"},
+    {"type": "court", "q": "Wie ist 'Stand der Technik' nach IED auszulegen, wenn BVT-Schlussfolgerungen eine bestimmte Technologie nicht explizit erwähnen?"},
+    {"type": "ecj", "q": "Kann ein Einzelner (Anwohner) aus IED-Emissionsgrenzwerten direkt Ansprüche gegen eine Anlage geltend machen?"},
+])
+
+_QUESTION_BANK["reach"].extend([
+    {"type": "student", "q": "Was ist REACH in einfachen Worten — was müssen Unternehmen mit chemischen Stoffen tun?"},
+    {"type": "student", "q": "Erkläre den Unterschied zwischen REACH-Registrierung, Zulassung und Beschränkung."},
+    {"type": "teacher", "q": "Zeige anhand eines Chemikalienproduzenten mit einem Stoff über 10 t/Jahr, was REACH-Registrierung bedeutet."},
+    {"type": "lawyer", "q": "Was sind 'besonders besorgniserregende Stoffe' (SVHC) nach REACH Art. 57 und wie werden sie in die Kandidatenliste aufgenommen?"},
+    {"type": "lawyer", "q": "Welche Mitteilungspflichten hat ein Importeur nach REACH Art. 7 für Erzeugnisse mit SVHC-Anteilen über 0,1 Gewichtsprozent?"},
+    {"type": "business_owner", "q": "Wir importieren Textilien aus China — welche REACH-Pflichten haben wir als Importeur?"},
+    {"type": "business_owner", "q": "Welche Behörde überwacht REACH in Deutschland und welche Sanktionen drohen bei Verstößen?"},
+    {"type": "court", "q": "Wie ist die REACH-Zulassungspflicht nach Art. 56 auszulegen, wenn eine Substitutionsmöglichkeit für SVHC nur theoretisch besteht?"},
+    {"type": "ecj", "q": "Steht die REACH-Zulassungspflicht im Einklang mit dem Verhältnismäßigkeitsprinzip, wenn sie KMU stark belastet?"},
+])
+
+_QUESTION_BANK["mifid2"].extend([
+    {"type": "student", "q": "Was ist MiFID II und welche Finanzdienstleistungen reguliert sie?"},
+    {"type": "student", "q": "Was bedeutet die ESG-Integrationsanforderung in MiFID II für Anlageberater?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Beratungsgesprächs, wie ein Berater seit 2022 Nachhaltigkeitspräferenzen abfragen muss."},
+    {"type": "lawyer", "q": "Was fordert MiFID II Art. 25 Abs. 2 seit der ESG-Änderung 2022 zur Geeignetheitsprüfung?"},
+    {"type": "lawyer", "q": "Was sind die drei Nachhaltigkeitspräferenzoptionen nach MiFID II und wie müssen Berater sie dokumentieren?"},
+    {"type": "business_owner", "q": "Mein Beratungsunternehmen berät Privatkunden bei Wertpapieranlagen — welche ESG-Pflichten muss ich seit 2022 erfüllen?"},
+    {"type": "business_owner", "q": "Was passiert, wenn ich als Berater die ESG-Präferenzabfrage beim Kunden unterlasse?"},
+    {"type": "court", "q": "Wie ist 'Nachhaltigkeitspräferenz' in MiFID II auszulegen, wenn ein Kunde keine klare Präferenz hat?"},
+    {"type": "ecj", "q": "Ist die MiFID-II-ESG-Integrationsanforderung mit dem Grundsatz der Vertragsfreiheit und der Anlagefreiheit vereinbar?"},
+])
+
+_QUESTION_BANK["srd2"].extend([
+    {"type": "student", "q": "Was ist die Aktionärsrechterichtlinie II (SRD II) und welche Aktionärsrechte stärkt sie?"},
+    {"type": "student", "q": "Was bedeutet 'Say on Pay' nach SRD II — haben Aktionäre ein verbindliches Stimmrecht über Vorstandsvergütung?"},
+    {"type": "teacher", "q": "Erkläre anhand einer börsennotierten AG, wie das Vergütungssystem nach SRD II genehmigt werden muss."},
+    {"type": "lawyer", "q": "Was fordert SRD II Art. 9a zur Aktionärsstimmabgabe über die Vergütungspolitik des Vorstands?"},
+    {"type": "lawyer", "q": "Welche Offenlegungspflichten bei Transaktionen mit nahestehenden Parteien sieht SRD II Art. 9c vor?"},
+    {"type": "business_owner", "q": "Unsere AG ist an der Frankfurter Börse notiert — welche SRD-II-Pflichten treffen uns jedes Jahr?"},
+    {"type": "business_owner", "q": "Was ist der Unterschied zwischen Vergütungsbericht und Vergütungspolitik nach SRD II?"},
+    {"type": "court", "q": "Wie ist SRD II Art. 9c zu nahestehenden Parteien auszulegen, wenn ein Vorstandsmitglied gleichzeitig Hauptaktionär ist?"},
+    {"type": "ecj", "q": "Steht das SRD-II-Stimmrecht über Vergütungspolitik im Einklang mit dem Eigentumsrecht nach Art. 17 EU-Grundrechtecharta?"},
+])
+
+_QUESTION_BANK["eu_whistleblower"].extend([
+    {"type": "student", "q": "Was ist die EU-Hinweisgeberschutzrichtlinie und wen schützt sie?"},
+    {"type": "student", "q": "Erkläre den Unterschied zwischen internem und externem Meldekanal nach der Richtlinie."},
+    {"type": "teacher", "q": "Zeige anhand eines Unternehmens mit 250 Mitarbeitern, wie ein konformes Hinweisgebersystem eingerichtet wird."},
+    {"type": "lawyer", "q": "Welche Arten von Hinweisgebern schützt Richtlinie 2019/1937 und gegen welche Vergeltungsmaßnahmen?"},
+    {"type": "lawyer", "q": "Was fordert Richtlinie 2019/1937 Art. 9 zu internen Meldekanälen — Vertraulichkeit, Fristen, Rückmeldung?"},
+    {"type": "business_owner", "q": "Mein Unternehmen hat 60 Mitarbeiter — bin ich verpflichtet, einen internen Meldekanal einzurichten?"},
+    {"type": "business_owner", "q": "Was passiert, wenn ich als Unternehmen eine Hinweisgeberin nach ihrer Meldung entlasse?"},
+    {"type": "court", "q": "Wie ist der Schutzbereich der Richtlinie auszulegen, wenn ein Hinweisgeber Informationen durch unbefugten Zugang erlangt hat?"},
+    {"type": "ecj", "q": "Steht der Schutz anonymer Hinweisgeber nach der EU-Richtlinie im Einklang mit dem Recht auf effektiven Rechtsschutz?"},
+])
+
+_QUESTION_BANK["eu_competition"].extend([
+    {"type": "student", "q": "Was verbietet EU-Wettbewerbsrecht nach AEUV Art. 101 und 102 — erkläre es mit einem einfachen Beispiel."},
+    {"type": "student", "q": "Was ist der Unterschied zwischen einem Kartell (Art. 101 AEUV) und dem Missbrauch einer marktbeherrschenden Stellung (Art. 102)?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Preisabsprache-Beispiels, wie die EU-Kommission einen Art.-101-Fall untersucht."},
+    {"type": "lawyer", "q": "Was sind die vier Voraussetzungen für eine Freistellung nach Art. 101 Abs. 3 AEUV?"},
+    {"type": "lawyer", "q": "Unter welchen Voraussetzungen kann die Kommission nach der EU-Fusionskontrollverordnung einen Zusammenschluss untersagen?"},
+    {"type": "business_owner", "q": "Dürfen wir als Branchenteilnehmer Nachhaltigkeitskostendaten mit Wettbewerbern teilen, ohne Art. 101 zu verletzen?"},
+    {"type": "business_owner", "q": "Wie hoch können EU-Kartellgeldbußen maximal sein und wie berechnet die Kommission sie?"},
+    {"type": "court", "q": "Wie ist Art. 102 AEUV auszulegen, wenn ein marktbeherrschendes Unternehmen nachhaltigkeitsbezogene Anforderungen an Lieferanten stellt?"},
+    {"type": "ecj", "q": "Inwiefern können nachhaltigkeitsbezogene Vereinbarungen zwischen Wettbewerbern unter Art. 101 Abs. 3 AEUV freigestellt werden?"},
+])
+
+_QUESTION_BANK["lksg"].extend([
+    {"type": "student", "q": "Was ist das LkSG in einfachen Worten — welches Problem soll es lösen?"},
+    {"type": "student", "q": "Was bedeutet 'angemessene Sorgfalt' nach LkSG — müssen Unternehmen Menschenrechtsverletzungen verhindern oder nur versuchen?"},
+    {"type": "teacher", "q": "Erkläre anhand eines deutschen Automobilzulieferers, wie die LkSG-Risikoanalyse in der Praxis durchgeführt wird."},
+    {"type": "lawyer", "q": "Was fordert § 5 LkSG zur Risikoanalyse — Umfang, Häufigkeit und Dokumentation?"},
+    {"type": "lawyer", "q": "Was sieht § 24 LkSG als Sanktion vor und welche Behörde verhängt Bußgelder?"},
+    {"type": "business_owner", "q": "Mein Unternehmen hat 3.500 Mitarbeiter — bin ich ab 2023 oder 2024 von LkSG betroffen?"},
+    {"type": "business_owner", "q": "Was ist der Unterschied zwischen unmittelbaren Zulieferern (§ 3 LkSG) und mittelbaren Zulieferern (§ 9 LkSG)?"},
+    {"type": "court", "q": "Können Betroffene nach LkSG direkte zivilrechtliche Ansprüche gegen deutsche Unternehmen geltend machen?"},
+    {"type": "ecj", "q": "Wie verhält sich das LkSG zur CS3D — gilt das LkSG als ausreichende Vorwegnahme?"},
+])
+
+_QUESTION_BANK["behg"].extend([
+    {"type": "student", "q": "Was ist das BEHG und wie funktioniert der nationale CO₂-Preis in Deutschland?"},
+    {"type": "student", "q": "Warum gibt es ein nationales BEHG, wenn es bereits das EU-ETS gibt?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Heizöllieferanten, wie BEHG-Zertifikate erworben und abgegeben werden."},
+    {"type": "lawyer", "q": "Welche Emissionsmengen fallen unter das BEHG und wer ist Inverkehrbringer nach § 3 BEHG?"},
+    {"type": "lawyer", "q": "Was ist die jährliche BEHG-Zertifikatsabgabefrist und welche Sanktionen gelten bei Nichterfüllung?"},
+    {"type": "business_owner", "q": "Ich betreibe Fernwärme mit Erdgas — welche BEHG-Pflichten treffen mich und wie berechne ich meine CO₂-Kosten?"},
+    {"type": "business_owner", "q": "Gibt es BEHG-Ausnahmen oder Befreiungen für bestimmte Unternehmen?"},
+    {"type": "court", "q": "Wie ist 'Inverkehrbringen' im BEHG auszulegen, wenn Kraftstoff grenzüberschreitend geliefert wird?"},
+    {"type": "ecj", "q": "Ist das BEHG mit EU-Beihilferecht vereinbar, wenn bestimmte Sektoren von der CO₂-Bepreisung ausgenommen sind?"},
+])
+
+_QUESTION_BANK["ksg"].extend([
+    {"type": "student", "q": "Was ist das deutsche Klimaschutzgesetz (KSG) und welche Ziele setzt es?"},
+    {"type": "student", "q": "Was ist ein 'Jahresemissionsbudget' nach KSG und was passiert, wenn ein Sektor es überschreitet?"},
+    {"type": "teacher", "q": "Erkläre, wie die Sektorziele des KSG (Verkehr, Gebäude, Energie) kontrolliert und durchgesetzt werden."},
+    {"type": "lawyer", "q": "Was ordnet § 8 KSG an, wenn ein Sektor das Jahresemissionsbudget überschreitet?"},
+    {"type": "lawyer", "q": "Welche Behörde überwacht die KSG-Zielerreichung und welche Rechtswirkung haben KSG-Sofortprogramme?"},
+    {"type": "business_owner", "q": "Hat das KSG direkte Auswirkungen auf mein Unternehmen oder nur auf den Staat?"},
+    {"type": "business_owner", "q": "Wie hängen KSG-Sektorziele und BEHG-CO₂-Preis in der Praxis zusammen?"},
+    {"type": "court", "q": "Können NGOs aufgrund des KSG Klagen gegen den deutschen Staat einreichen? (vgl. Neubauer-Urteil BVerfG)"},
+    {"type": "ecj", "q": "Ist das KSG mit dem europäischen Klimagesetz (Verordnung 2021/1119) vereinbar und besteht ein Umsetzungsvorrang?"},
+])
+
+_QUESTION_BANK["german_corporate"].extend([
+    {"type": "student", "q": "Was ist der Unterschied zwischen GmbH und AG nach deutschem Recht — wann wählt man welche?"},
+    {"type": "student", "q": "Was ist der Aufsichtsrat in einer deutschen AG und warum gibt es ihn?"},
+    {"type": "teacher", "q": "Erkläre anhand einer Unternehmensübernahme, welche Organe nach AktG zustimmen müssen."},
+    {"type": "lawyer", "q": "Was ist die Business Judgment Rule nach § 93 Abs. 1 S. 2 AktG und wann schützt sie Vorstandsmitglieder?"},
+    {"type": "lawyer", "q": "Was sieht § 119 AktG zur Hauptversammlung vor und welche Beschlüsse sind der HV vorbehalten?"},
+    {"type": "business_owner", "q": "Ich möchte meine GmbH in eine AG umwandeln — welche Schritte sind nach deutschem Recht erforderlich?"},
+    {"type": "business_owner", "q": "Was ist das Mindeststammkapital einer GmbH und welche Haftung habe ich als Gesellschafter?"},
+    {"type": "court", "q": "Wie ist die Treuepflicht von Gesellschaftern nach GmbHG auszulegen, wenn ein Mehrheitsgesellschafter Minderheitsinteressen ignoriert?"},
+    {"type": "ecj", "q": "Steht die deutsche Mitbestimmungsregelung (paritätischer Aufsichtsrat) im Einklang mit der EU-Niederlassungsfreiheit nach AEUV Art. 49?"},
+])
+
+_QUESTION_BANK["bgb_contracts"].extend([
+    {"type": "student", "q": "Wie entsteht ein Vertrag nach BGB — erkläre Angebot und Annahme in einfachen Worten."},
+    {"type": "student", "q": "Was ist der Unterschied zwischen Nichtigkeit und Anfechtbarkeit eines Vertrags nach BGB?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Kaufvertrags über fehlerhafte Waren, welche Rechte der Käufer nach BGB hat."},
+    {"type": "lawyer", "q": "Was sind die Voraussetzungen für einen Schadensersatzanspruch nach § 280 Abs. 1 BGB?"},
+    {"type": "lawyer", "q": "Was regelt § 305 BGB zu AGB und wann ist eine AGB-Klausel nach § 307 BGB unwirksam?"},
+    {"type": "business_owner", "q": "Mein Lieferant liefert mangelhaft und verweigert Nacherfüllung — welche BGB-Rechte habe ich und in welcher Reihenfolge?"},
+    {"type": "business_owner", "q": "Was ist die Verjährungsfrist für Kaufvertragsansprüche nach BGB und ab wann beginnt sie?"},
+    {"type": "court", "q": "Wie ist § 242 BGB (Treu und Glauben) als Generalklausel bei einem Vertragsverstoß auszulegen?"},
+    {"type": "ecj", "q": "Inwiefern wird das deutsche BGB-Vertragsrecht durch EU-Richtlinien (z.B. Verbraucherrechte-RL) überlagert?"},
+])
+
+_QUESTION_BANK["gdpr"].extend([
+    {"type": "student", "q": "Was ist die DSGVO in einfachen Worten — welche Rechte gibt sie Einzelpersonen?"},
+    {"type": "student", "q": "Was ist der Unterschied zwischen Verantwortlichem und Auftragsverarbeiter nach DSGVO?"},
+    {"type": "teacher", "q": "Erkläre anhand einer Kundendatenbank, welche DSGVO-Pflichten ein Unternehmen beim Aufbau erfüllen muss."},
+    {"type": "lawyer", "q": "Was sind besondere Kategorien personenbezogener Daten nach Art. 9 DSGVO und welche Rechtsgrundlage ist für ihre Verarbeitung erforderlich?"},
+    {"type": "lawyer", "q": "Was fordert Art. 13 DSGVO zur Informationspflicht — welche Informationen müssen bei Datenerhebung bereitgestellt werden?"},
+    {"type": "business_owner", "q": "Mein Online-Shop nutzt Google Analytics — welche DSGVO-Anforderungen muss ich erfüllen?"},
+    {"type": "business_owner", "q": "Was ist ein Auftragsverarbeitungsvertrag (AVV) und wann ist er Pflicht?"},
+    {"type": "court", "q": "Wie ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse) auszulegen, wenn ein Unternehmen Marketing-Daten ohne Einwilligung verarbeitet?"},
+    {"type": "ecj", "q": "Wie verhält sich Art. 17 DSGVO (Recht auf Löschung) zu nationalen Archivierungspflichten — welches Recht hat Vorrang?"},
+])
+
+_QUESTION_BANK["hgb"].extend([
+    {"type": "student", "q": "Was ist das HGB und welche Unternehmen müssen nach HGB Bücher führen?"},
+    {"type": "student", "q": "Was ist der Unterschied zwischen Jahresabschluss und Lagebericht nach HGB?"},
+    {"type": "teacher", "q": "Erkläre anhand einer mittelgroßen GmbH, welche HGB-Pflichten zum Jahresabschluss bestehen und bis wann."},
+    {"type": "lawyer", "q": "Was sind die HGB-Größenklassen (§ 267 HGB) und welche Offenlegungspflichten gelten für jede Klasse?"},
+    {"type": "lawyer", "q": "Was fordert § 289c HGB zum nichtfinanziellen Bericht für große kapitalmarktorientierte Unternehmen?"},
+    {"type": "business_owner", "q": "Meine GmbH hat €8 Mio. Umsatz und 55 Mitarbeiter — welche HGB-Abschluss- und Offenlegungspflichten habe ich?"},
+    {"type": "business_owner", "q": "Bis wann muss ich meinen Jahresabschluss beim Bundesanzeiger einreichen und welche Strafe droht bei Verspätung?"},
+    {"type": "court", "q": "Wie ist der handelsrechtliche Grundsatz der Vorsicht (§ 252 HGB) auszulegen, wenn ein Wertminderungsrisiko unsicher ist?"},
+    {"type": "ecj", "q": "Wie verhält sich die HGB-Rechnungslegung zur IFRS-Pflicht für kapitalmarktorientierte Unternehmen nach der EU-IAS-Verordnung?"},
+])
+
+_QUESTION_BANK["eu_legal_terms"].extend([
+    {"type": "student", "q": "Erkläre den Unterschied zwischen primärem EU-Recht (Verträge) und sekundärem EU-Recht (Richtlinien, Verordnungen)."},
+    {"type": "student", "q": "Was ist eine Vorabentscheidung des EuGH und warum ist sie für nationale Gerichte bindend?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Beispiels, wie das Subsidiaritätsprinzip bestimmt, wer — EU oder Mitgliedstaat — gesetzgeberisch tätig werden darf."},
+    {"type": "lawyer", "q": "Was ist der Grundsatz der richtlinienkonformen Auslegung und welche Grenzen hat er nach der EuGH-Rechtsprechung?"},
+    {"type": "lawyer", "q": "Was ist der Unterschied zwischen unmittelbarer Anwendbarkeit einer EU-Verordnung und unmittelbarer Wirkung einer Richtlinienbestimmung?"},
+    {"type": "business_owner", "q": "Was bedeutet es für mein Unternehmen, wenn eine EU-Verordnung direkt gilt, ohne nationale Umsetzung?"},
+    {"type": "business_owner", "q": "Kann ich als Unternehmen ein EU-Recht vor einem deutschen Gericht geltend machen, auch wenn Deutschland es nicht umgesetzt hat?"},
+    {"type": "court", "q": "Was ist die Pflicht zur richtlinienkonformen Auslegung nationalen Rechts und wo sind ihre Grenzen (contra legem)?"},
+    {"type": "ecj", "q": "Was ist die Rewe/Comet-Doktrin und wie schützt das EU-Recht individuelle Rechte vor nationalen Verfahrenshindernissen?"},
+])
+
+_QUESTION_BANK["greenwashing_law"].extend([
+    {"type": "student", "q": "Was ist Greenwashing und warum ist es nach EU-Recht verboten?"},
+    {"type": "student", "q": "Was ist die EU-Richtlinie über Umweltaussagen (Green Claims Directive) — wann tritt sie in Kraft?"},
+    {"type": "teacher", "q": "Erkläre anhand eines 'klimaneutral'-Labels, wie ein Unternehmen es legal verwenden kann."},
+    {"type": "lawyer", "q": "Was fordert die vorgeschlagene EU-Richtlinie über Umweltaussagen zur Nachweispflicht vor einer Umweltbehauptung?"},
+    {"type": "lawyer", "q": "Was sind die Sanktionen nach der EU-Richtlinie zur Stärkung der Verbraucher für den ökologischen Wandel (Richtlinie 2024/825)?"},
+    {"type": "business_owner", "q": "Darf ich mein Produkt 'CO₂-neutral' nennen, wenn ich Emissionen durch Waldzertifikate kompensiere?"},
+    {"type": "business_owner", "q": "Was ist ein 'anerkanntes Umweltzeichen' nach der vorgeschlagenen EU-Richtlinie und welche Labels zählen dazu?"},
+    {"type": "court", "q": "Wie ist UWG § 5 zur irreführenden Werbung bei Umweltbehauptungen auszulegen, wenn die Aussage faktisch korrekt, aber irreführend kontextualisiert ist?"},
+    {"type": "ecj", "q": "Wie verhält sich das EU-Recht über Umweltaussagen zum nationalen UWG — gilt Vollharmonisierung?"},
+])
+
+_QUESTION_BANK["double_materiality"].extend([
+    {"type": "student", "q": "Was ist doppelte Wesentlichkeit und warum ist sie der Schlüsselbegriff der CSRD?"},
+    {"type": "student", "q": "Erkläre den Unterschied zwischen Auswirkungswesentlichkeit (Inside-out) und finanzieller Wesentlichkeit (Outside-in)."},
+    {"type": "teacher", "q": "Zeige anhand eines Automobilherstellers, wie er eine doppelte Wesentlichkeitsanalyse durchführt."},
+    {"type": "lawyer", "q": "Was fordert ESRS 1 Abschnitt 3 zur Wesentlichkeitsbeurteilung — Prozess, Dokumentation, externe Überprüfung?"},
+    {"type": "lawyer", "q": "Was ist der Unterschied zwischen dem ESRS-Wesentlichkeitsbegriff und dem IFRS-S-Wesentlichkeitsbegriff (Investor focus)?"},
+    {"type": "business_owner", "q": "Wie führe ich eine Wesentlichkeitsanalyse durch und wen muss ich dabei einbeziehen?"},
+    {"type": "business_owner", "q": "Was bedeutet es praktisch, dass ein Thema wesentlich ist — muss ich zwingend darüber berichten?"},
+    {"type": "court", "q": "Wie ist 'Wesentlichkeit' nach ESRS auszulegen, wenn Auswirkungen kurzfristig nicht finanziell messbar sind?"},
+    {"type": "ecj", "q": "Sind die ESRS-Wesentlichkeitsstandards verhältnismäßig, wenn sie KMU als Zulieferer indirekt über große Unternehmen binden?"},
+])
+
+_QUESTION_BANK["tcfd"].extend([
+    {"type": "student", "q": "Was ist TCFD und welche vier Säulen bilden den Rahmen?"},
+    {"type": "student", "q": "Was sind physische Klimarisiken und Übergangsrisiken nach TCFD — gib je ein Beispiel."},
+    {"type": "teacher", "q": "Erkläre anhand eines Energieunternehmens, wie ein TCFD-konformer Klimarisikobericht aufgebaut ist."},
+    {"type": "lawyer", "q": "Was fordert ESRS E1 vom TCFD-Rahmen — ist TCFD-Konformität ausreichend für CSRD-Compliance?"},
+    {"type": "lawyer", "q": "Welche Szenarien verlangt TCFD für Klimarisikoanalysen und welche Temperaturpfade sind Standard?"},
+    {"type": "business_owner", "q": "Müssen wir als nicht-börsennotiertes Unternehmen TCFD-Berichte erstellen?"},
+    {"type": "business_owner", "q": "Was ist der Unterschied zwischen einem TCFD-Bericht und einem ESRS-E1-Klimabericht?"},
+    {"type": "court", "q": "Welche Bedeutung haben TCFD-Leitlinien als 'Soft Law' bei der Auslegung von ESRS E1?"},
+    {"type": "ecj", "q": "Inwiefern verpflichtet der EU-Klimacheck-Vorbehalt im EU-Klimagesetz nationale Gerichte, Klimaszenarien bei Genehmigungen zu berücksichtigen?"},
+])
+
+_QUESTION_BANK["gri"].extend([
+    {"type": "student", "q": "Was sind GRI-Standards und für wen sind sie gedacht?"},
+    {"type": "student", "q": "Was ist der Unterschied zwischen 'GRI In Übereinstimmung' und 'referenziert GRI'?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Unternehmens mit 200 Mitarbeitern, wie ein GRI-Bericht aufgebaut wird."},
+    {"type": "lawyer", "q": "Sind GRI-Standards rechtlich verbindlich oder freiwillig — und in welchem Verhältnis stehen sie zur CSRD?"},
+    {"type": "lawyer", "q": "Welche GRI-Standards sind mit ESRS kompatibel und wo bestehen inhaltliche Unterschiede?"},
+    {"type": "business_owner", "q": "Wir berichten seit Jahren nach GRI — können wir Teile für unseren CSRD-Bericht wiederverwenden?"},
+    {"type": "business_owner", "q": "Was ist der Unterschied zwischen GRI-Wesentlichkeit und ESRS-doppelter Wesentlichkeit?"},
+    {"type": "court", "q": "Können GRI-Standards als Auslegungsmaßstab für ESRS-Begriffe herangezogen werden?"},
+    {"type": "ecj", "q": "Hat die EU-Kommission durch die ESRS-Delegierten Verordnung GRI-Konzepte rechtsverbindlich gemacht?"},
+])
+
+_QUESTION_BANK["issb"].extend([
+    {"type": "student", "q": "Was ist das ISSB und was unterscheidet IFRS S1 von IFRS S2?"},
+    {"type": "student", "q": "Für wen sind ISSB-Standards gedacht — EU-Unternehmen oder globale Kapitalmärkte?"},
+    {"type": "teacher", "q": "Erkläre anhand eines börsennotierten Unternehmens, wie IFRS S1 und S2 in einem integrierten Bericht angewendet werden."},
+    {"type": "lawyer", "q": "Was fordert IFRS S2 von Unternehmen zu klimabezogenen Risiken — welche Metriken sind verpflichtend?"},
+    {"type": "lawyer", "q": "Wie verhält sich ISSB zu ESRS — gibt es eine Interoperabilitätsbrücke und welche Lücken bleiben?"},
+    {"type": "business_owner", "q": "Reicht ein ISSB-konformer Bericht für die ESRS-Pflichten unter der CSRD?"},
+    {"type": "business_owner", "q": "Welche Länder haben ISSB bereits verpflichtend eingeführt und was bedeutet das für global operierende Unternehmen?"},
+    {"type": "court", "q": "Können ISSB-Standards als Auslegungsmaßstab für ESRS-Anforderungen herangezogen werden, wenn ESRS eine Lücke hat?"},
+    {"type": "ecj", "q": "Inwiefern muss die EU bei der Anerkennung von ISSB als Äquivalenz sicherstellen, dass ESRS-Schutzniveaus nicht unterschritten werden?"},
+])
+
+_QUESTION_BANK["teu"].extend([
+    {"type": "student", "q": "Was ist der TEU und was regelt er — erkläre den Unterschied zum AEUV."},
+    {"type": "student", "q": "Was sind die Grundwerte der EU nach Art. 2 TEU und was passiert, wenn ein Mitgliedstaat sie verletzt?"},
+    {"type": "teacher", "q": "Erkläre anhand des Art.-7-Verfahrens, wie die EU auf Rechtsstaatsverstöße eines Mitgliedstaats reagieren kann."},
+    {"type": "lawyer", "q": "Was regelt Art. 4 Abs. 2 TEU zur nationalen Identität und welche Bedeutung hat er für EU-Gesetzgebung?"},
+    {"type": "lawyer", "q": "Was sind die EU-Zuständigkeiten nach Art. 3–6 TEU (ausschließlich, geteilt, unterstützend) — nennen Sie je ein Beispiel?"},
+    {"type": "business_owner", "q": "Welche Bedeutung hat der TEU für mein Unternehmen — regelt er direkt unternehmerische Pflichten?"},
+    {"type": "business_owner", "q": "Was ist der Unterschied zwischen EU-Recht und nationalem Recht und wie wirkt sich das auf mein Unternehmen aus?"},
+    {"type": "court", "q": "Wie ist Art. 4 Abs. 3 TEU (Grundsatz der loyalen Zusammenarbeit) bei einem nationalen Umsetzungsversäumnis auszulegen?"},
+    {"type": "ecj", "q": "Inwiefern begrenzt Art. 5 TEU (begrenzte Einzelermächtigung) die EU-Zuständigkeit im Bereich Unternehmensbesteuerung?"},
+])
+
+_QUESTION_BANK["tfeu"].extend([
+    {"type": "student", "q": "Was sind die vier Grundfreiheiten des AEUV und warum sind sie für den Binnenmarkt zentral?"},
+    {"type": "student", "q": "Was ist der Unterschied zwischen Niederlassungsfreiheit (Art. 49 AEUV) und freiem Dienstleistungsverkehr (Art. 56)?"},
+    {"type": "teacher", "q": "Erkläre anhand eines deutschen Unternehmens, das in Frankreich Dienstleistungen anbietet, wie Art. 56 AEUV funktioniert."},
+    {"type": "lawyer", "q": "Was sind die Keck-Doktrin-Ausnahmen von der Dassonville-Formel für Maßnahmen gleicher Wirkung nach Art. 34 AEUV?"},
+    {"type": "lawyer", "q": "Was ist Art. 114 AEUV als Rechtsgrundlage für Binnenmarktharmonisierung und welche Mehrheit ist im Rat erforderlich?"},
+    {"type": "business_owner", "q": "Mein deutsches Unternehmen will eine Niederlassung in Polen eröffnen — welche AEUV-Rechte habe ich?"},
+    {"type": "business_owner", "q": "Darf Deutschland meinen Wettbewerbern aus anderen EU-Ländern den Marktzugang erschweren?"},
+    {"type": "court", "q": "Wie ist 'Maßnahmen gleicher Wirkung' nach Art. 34 AEUV auszulegen, wenn nationale Vorschriften importierte Waren stärker belasten?"},
+    {"type": "ecj", "q": "Unter welchen Voraussetzungen darf Deutschland nach Art. 36 AEUV Einfuhrbeschränkungen aus Gründen des Gesundheitsschutzes rechtfertigen?"},
+])
+
+_QUESTION_BANK["eu_charter"].extend([
+    {"type": "student", "q": "Was ist die EU-Grundrechtecharta und ab wann ist sie rechtlich bindend?"},
+    {"type": "student", "q": "Erkläre den Unterschied zwischen Rechten und Grundsätzen in der Charta — welche sind vor Gericht einklagbar?"},
+    {"type": "teacher", "q": "Erkläre anhand eines DSGVO-Falls, wie Art. 7 (Datenschutz) und Art. 8 (Privatsphäre) der Charta angewendet werden."},
+    {"type": "lawyer", "q": "Was ist die horizontale Wirkung der EU-Grundrechtecharta — gilt sie zwischen Privatpersonen?"},
+    {"type": "lawyer", "q": "Was regelt Art. 51 der Charta zum Anwendungsbereich — wann sind Mitgliedstaaten an die Charta gebunden?"},
+    {"type": "business_owner", "q": "Hat die Charta direkte Auswirkungen auf mein Unternehmen oder gilt sie nur für den Staat?"},
+    {"type": "business_owner", "q": "Kann ein Arbeitnehmer sich gegenüber meinem Unternehmen auf Grundrechte aus der Charta berufen?"},
+    {"type": "court", "q": "Wie ist Art. 47 der Charta (effektiver Rechtsschutz) auszulegen, wenn ein nationales Verfahren EU-Recht unangemessen beschränkt?"},
+    {"type": "ecj", "q": "Inwiefern kann Art. 17 der Charta (Eigentumsrecht) gegen EU-Regulierung wie CSRD oder Taxonomie geltend gemacht werden?"},
+])
+
+_QUESTION_BANK["eu_legislative"].extend([
+    {"type": "student", "q": "Was ist das ordentliche EU-Gesetzgebungsverfahren — erkläre die drei Schritte."},
+    {"type": "student", "q": "Was ist ein Trilog und warum gibt es ihn?"},
+    {"type": "teacher", "q": "Zeige anhand der CSRD-Entstehung, wie ein EU-Gesetzgebungsverfahren in der Praxis funktioniert."},
+    {"type": "lawyer", "q": "Was ist der Unterschied zwischen erster, zweiter und dritter Lesung im EU-Gesetzgebungsverfahren?"},
+    {"type": "lawyer", "q": "Was sind delegierte Rechtsakte (Art. 290 AEUV) vs. Durchführungsrechtsakte (Art. 291) — je ein Beispiel?"},
+    {"type": "business_owner", "q": "Kann ich als Unternehmen den EU-Gesetzgebungsprozess beeinflussen und wenn ja, wie?"},
+    {"type": "business_owner", "q": "Was ist eine öffentliche Konsultation der EU-Kommission und warum sollte ich daran teilnehmen?"},
+    {"type": "court", "q": "Kann ein nationales Gericht einen EU-Rechtsakt wegen Verfahrensfehlern für ungültig erklären?"},
+    {"type": "ecj", "q": "Was ist Komitologie und wie kontrolliert der EuGH die Befugnisse der Kommission bei delegierten Rechtsakten?"},
+])
+
+_QUESTION_BANK["van_gend_loos"].extend([
+    {"type": "student", "q": "Was hat der EuGH in Van Gend en Loos (1963) entschieden — erkläre es in einfachen Worten."},
+    {"type": "student", "q": "Was bedeutet 'unmittelbare Wirkung' — kann ich als Bürger EU-Recht direkt vor einem deutschen Gericht geltend machen?"},
+    {"type": "teacher", "q": "Erkläre anhand eines konkreten Falls, wie unmittelbare Wirkung nach Van Gend en Loos in der Praxis angewendet wird."},
+    {"type": "lawyer", "q": "Was sind die drei Voraussetzungen für die unmittelbare Wirkung einer EU-Norm nach Van Gend en Loos?"},
+    {"type": "lawyer", "q": "Was ist der Unterschied zwischen vertikaler unmittelbarer Wirkung (Staat vs. Bürger) und horizontaler unmittelbarer Wirkung (Bürger vs. Bürger)?"},
+    {"type": "business_owner", "q": "Was bedeutet Van Gend en Loos für mein Unternehmen im Verhältnis zum deutschen Staat?"},
+    {"type": "business_owner", "q": "Kann ich als Unternehmen direkt auf eine EU-Verordnung pochen, wenn Deutschland sie nicht national umgesetzt hat?"},
+    {"type": "court", "q": "Wann hat eine Richtlinienbestimmung nach Van Gend en Loos unmittelbare Wirkung und wann nicht?"},
+    {"type": "ecj", "q": "Welche Bedeutung hatte Van Gend en Loos für die Entwicklung des EU-Rechts als 'neue Rechtsordnung'?"},
+])
+
+_QUESTION_BANK["costa_enel"].extend([
+    {"type": "student", "q": "Was hat Costa v. ENEL (1964) entschieden — erkläre den Vorrang des EU-Rechts für Anfänger."},
+    {"type": "student", "q": "Warum hat EU-Recht Vorrang vor nationalem Recht — welcher Fall begründet das?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Beispiels, was passiert, wenn ein deutsches Gesetz gegen EU-Recht verstößt."},
+    {"type": "lawyer", "q": "Was ist der Unterschied zwischen Vorrang des EU-Rechts (Costa) und unmittelbarer Wirkung (Van Gend en Loos)?"},
+    {"type": "lawyer", "q": "Wie ist der Vorrang des EU-Rechts nach Costa in Bezug auf nationales Verfassungsrecht zu bewerten (Solange-Rechtsprechung)?"},
+    {"type": "business_owner", "q": "Was bedeutet der EU-Rechtsvorrang für mein Unternehmen, wenn nationale und EU-Vorschriften widersprüchlich sind?"},
+    {"type": "business_owner", "q": "Muss ein deutsches Gericht ein nationales Gesetz, das gegen EU-Recht verstößt, unangewendet lassen?"},
+    {"type": "court", "q": "Was muss ein deutsches Gericht tun, wenn ein Gesetz gegen eine EU-Verordnung verstößt?"},
+    {"type": "ecj", "q": "Inwiefern schränkt das BVerfG-Urteil zum EU-Anleihekaufprogramm (PSPP) den EU-Rechtsvorrang nach Costa ein?"},
+])
+
+_QUESTION_BANK["cassis_dijon"].extend([
+    {"type": "student", "q": "Was hat das Cassis-de-Dijon-Urteil (1979) entschieden und warum ist es für den Binnenmarkt wichtig?"},
+    {"type": "student", "q": "Was ist das Prinzip der gegenseitigen Anerkennung — wie hilft es Unternehmen im EU-Binnenmarkt?"},
+    {"type": "teacher", "q": "Erkläre anhand eines deutschen Produkts, das in Frankreich verboten wird, wie Cassis angewendet wird."},
+    {"type": "lawyer", "q": "Was sind die vier 'zwingenden Erfordernisse' des Allgemeininteresses nach Cassis de Dijon?"},
+    {"type": "lawyer", "q": "Wie hat der EuGH in Keck (1993) die Cassis-Doktrin eingeschränkt — was gilt seitdem für Verkaufsmodalitäten?"},
+    {"type": "business_owner", "q": "Mein in Deutschland zugelassenes Produkt wird von Frankreich als illegal abgelehnt — was kann ich tun?"},
+    {"type": "business_owner", "q": "Warum muss ich mein Produkt nicht für jeden EU-Markt separat zertifizieren lassen?"},
+    {"type": "court", "q": "Wann ist eine nationale Produktregel nach Cassis eine zulässige Beschränkung und wann verletzt sie Art. 34 AEUV?"},
+    {"type": "ecj", "q": "Wie hat sich das Cassis-Prinzip der gegenseitigen Anerkennung durch das Binnenmarktprogramm von 1985 institutionalisiert?"},
+])
+
+_QUESTION_BANK["francovich"].extend([
+    {"type": "student", "q": "Was hat Francovich (1991) entschieden — können Bürger den Staat für EU-Rechtsverstöße verklagen?"},
+    {"type": "student", "q": "Was ist Staatshaftung im EU-Recht und warum ist sie ein wichtiges Instrument für Einzelpersonen?"},
+    {"type": "teacher", "q": "Erkläre anhand eines Arbeitnehmers, dessen Unternehmen insolvent ist, wie Francovich-Ansprüche funktionieren."},
+    {"type": "lawyer", "q": "Was sind die drei Francovich-Voraussetzungen für die Staatshaftung bei Umsetzungsversäumnis?"},
+    {"type": "lawyer", "q": "Was ist der Unterschied zwischen Francovich-Haftung (Umsetzungsversäumnis) und Brasserie-du-Pêcheur-Haftung (hinreichend qualifizierter Verstoß)?"},
+    {"type": "business_owner", "q": "Kann mein Unternehmen Schadensersatz vom deutschen Staat verlangen, wenn Deutschland eine EU-Richtlinie zu spät umsetzt?"},
+    {"type": "business_owner", "q": "Wie hoch ist die Beweislast bei einem Francovich-Anspruch und welches Gericht ist zuständig?"},
+    {"type": "court", "q": "Was ist ein 'hinreichend qualifizierter Verstoß' nach Brasserie du Pêcheur/Factortame (1996) — wie wird er bestimmt?"},
+    {"type": "ecj", "q": "Inwiefern hat Francovich die Durchsetzung des EU-Rechts gestärkt und welche Grenzen bestehen?"},
+])
+
+_QUESTION_BANK["schrems"].extend([
+    {"type": "student", "q": "Was haben Schrems I und Schrems II entschieden — erkläre es für Nicht-Juristen."},
+    {"type": "student", "q": "Was ist das EU-US-Datenschutzrahmenwerk (Data Privacy Framework 2023) und warum gibt es es?"},
+    {"type": "teacher", "q": "Erkläre anhand eines US-Cloud-Anbieters, was Schrems II für europäische Unternehmen bedeutet."},
+    {"type": "lawyer", "q": "Was sind die Voraussetzungen für die Nutzung von Standardvertragsklauseln nach Schrems II und welche 'zusätzlichen Maßnahmen' sind erforderlich?"},
+    {"type": "lawyer", "q": "Was hat das Urteil C-311/18 (Schrems II) zu US-Geheimdienstüberwachung im Verhältnis zu Art. 52 EU-Grundrechtecharta entschieden?"},
+    {"type": "business_owner", "q": "Ich nutze Salesforce (US-Cloud) für EU-Kundendaten — was sind meine Pflichten nach Schrems II?"},
+    {"type": "business_owner", "q": "Ist das EU-US-Datenschutzrahmenwerk von 2023 sicher oder droht ein Schrems III?"},
+    {"type": "court", "q": "Wie ist Art. 46 DSGVO zu Standardvertragsklauseln nach Schrems II auszulegen, wenn Überwachungsgesetze im Drittland bestehen?"},
+    {"type": "ecj", "q": "Inwiefern verpflichtet Schrems II nationale Datenschutzbehörden, US-Datentransfers ohne Transfer Impact Assessment zu untersagen?"},
+])
+
+_QUESTION_BANK["google_spain"].extend([
+    {"type": "student", "q": "Was hat Google Spain (2014) entschieden — was ist das Recht auf Vergessenwerden?"},
+    {"type": "student", "q": "Warum sind Suchmaschinenergebnisse personenbezogene Daten — was hat der EuGH in Google Spain festgestellt?"},
+    {"type": "teacher", "q": "Erkläre anhand eines veralteten Zeitungsartikels über eine Privatperson, wie das Recht auf Vergessenwerden funktioniert."},
+    {"type": "lawyer", "q": "Was sind die Voraussetzungen für einen erfolgreichen Antrag auf Löschung von Suchergebnissen nach Google Spain?"},
+    {"type": "lawyer", "q": "Wie verhält sich Google Spain zu Art. 17 DSGVO — hat Google Spain die DSGVO-Norm beeinflusst?"},
+    {"type": "business_owner", "q": "Mein Unternehmen erscheint in negativen Suchergebnissen — kann ich Google Spain/Art. 17 DSGVO nutzen?"},
+    {"type": "business_owner", "q": "Gilt das Recht auf Vergessenwerden auch außerhalb der EU, z.B. auf google.com?"},
+    {"type": "court", "q": "Wie ist das Recht auf Vergessenwerden mit der Pressefreiheit (Art. 11 Charta) in Ausgleich zu bringen?"},
+    {"type": "ecj", "q": "Welche Bedeutung hat das Urteil C-136/17 (GC v. CNIL) für sensible Daten in Suchergebnissen?"},
+])
+
+_QUESTION_BANK["cjeu_cases"].extend([
+    {"type": "student", "q": "Was ist die Klimaklage-Welle und wie hat der EuGH zu Klimapflichten beigetragen?"},
+    {"type": "student", "q": "Erkläre die Bedeutung der Janecek-Entscheidung (C-237/07) für das Recht auf saubere Luft."},
+    {"type": "teacher", "q": "Erkläre anhand von Urgenda, wie strategische Klimaklagen das EU- und nationale Umweltrecht beeinflussen."},
+    {"type": "lawyer", "q": "Was entschied der EuGH in C-594/18 P (Österreich vs. Kommission) zur EU-Beihilfe für Atomkraft?"},
+    {"type": "lawyer", "q": "Welche Grundsätze für Umwelthaftung hat der EuGH in Nomarchiaki Aftodioikisi Aitoloakarnanias (C-43/10) entwickelt?"},
+    {"type": "business_owner", "q": "Was bedeutet das EuGH-Urteil zu Umweltinformationen (C-204/09, Flachglas Torgau) für mein Unternehmen?"},
+    {"type": "business_owner", "q": "Welches EuGH-Urteil verpflichtet EU-Institutionen, Umweltinformationen herauszugeben?"},
+    {"type": "court", "q": "Welche Bedeutung hat das Vorabentscheidungsverfahren für das nationale Umwelthaftungsrecht?"},
+    {"type": "ecj", "q": "Wie hat der EuGH den Begriff 'Umweltschaden' in der Umwelthaftungsrichtlinie 2004/35/EG ausgelegt?"},
+])
+
+_QUESTION_BANK["eu_commission"].extend([
+    {"type": "student", "q": "Was macht die EU-Kommission und warum hat sie als einzige Institution das Initiativmonopol?"},
+    {"type": "student", "q": "Was ist ein Vertragsverletzungsverfahren und was passiert, wenn Deutschland eine EU-Richtlinie nicht umsetzt?"},
+    {"type": "teacher", "q": "Erkläre den Weg von einer Kommissionsinitiative bis zu einem fertigen EU-Gesetz."},
+    {"type": "lawyer", "q": "Welche Befugnisse hat die Kommission nach Art. 17 TEU im EU-Wettbewerbsrecht (Art. 101/102 AEUV)?"},
+    {"type": "lawyer", "q": "Was ist ein Konformitätsbeschluss der Kommission und welche Rechtswirkung hat er?"},
+    {"type": "business_owner", "q": "Wie kann mein Unternehmen an Kommissionskonsultationen teilnehmen und warum ist das wichtig?"},
+    {"type": "business_owner", "q": "Was bedeutet eine Kommissionsbeihilfe-Untersuchung für mein Unternehmen, wenn ich staatliche Förderung erhalten habe?"},
+    {"type": "court", "q": "Inwiefern bindet eine Kommissionsentscheidung nationale Gerichte in einem daraus folgenden Schadensersatzverfahren?"},
+    {"type": "ecj", "q": "Was ist die 'institutionelle Balance' zwischen Kommission, Rat und Parlament und wie hat der EuGH sie gestärkt?"},
+])
+
+_QUESTION_BANK["eu_parliament"].extend([
+    {"type": "student", "q": "Was macht das EU-Parlament und warum wird es direkt gewählt?"},
+    {"type": "student", "q": "Warum darf das EU-Parlament keine Gesetzesinitiativen einbringen — und wie übt es trotzdem Einfluss aus?"},
+    {"type": "teacher", "q": "Erkläre anhand des AI Act, welche Rolle das Parlament im Gesetzgebungsverfahren gespielt hat."},
+    {"type": "lawyer", "q": "Was sind die Befugnisse des Parlaments im ordentlichen Gesetzgebungsverfahren nach Art. 294 AEUV?"},
+    {"type": "lawyer", "q": "Wie funktioniert das Haushaltsverfahren nach Art. 314 AEUV und welche Sonderrolle hat das Parlament?"},
+    {"type": "business_owner", "q": "Warum sollte ich die Arbeit des EU-Parlaments verfolgen — wie beeinflusst es Unternehmensregulierung?"},
+    {"type": "business_owner", "q": "Was ist ein EP-Bericht und welche praktische Bedeutung hat er im Gesetzgebungsverfahren?"},
+    {"type": "court", "q": "Hat das EU-Parlament Klagebefugnis vor dem EuGH und in welchen Situationen nutzt es sie?"},
+    {"type": "ecj", "q": "Inwiefern hat das Europäische Parlament durch den Lissabonner Vertrag im Bereich Handelsabkommen (Art. 207 AEUV) neue Rechte erhalten?"},
+])
+
+_QUESTION_BANK["cjeu_court"].extend([
+    {"type": "student", "q": "Was ist der EuGH und was ist der Unterschied zwischen EuGH (Gerichtshof) und EuG (Gericht)?"},
+    {"type": "student", "q": "Was ist ein Vorabentscheidungsverfahren und welches nationale Gericht stellt die Fragen?"},
+    {"type": "teacher", "q": "Erkläre anhand eines deutschen Unternehmensrechtsstreits, wie und warum ein Gericht den EuGH einschalten würde."},
+    {"type": "lawyer", "q": "Was ist der Unterschied zwischen Vorabentscheidungsverfahren (Art. 267 AEUV) und Nichtigkeitsklage (Art. 263)?"},
+    {"type": "lawyer", "q": "Unter welchen Voraussetzungen können Einzelpersonen nach Art. 263 Abs. 4 AEUV direkt gegen EU-Rechtsakte klagen?"},
+    {"type": "business_owner", "q": "Kann mein Unternehmen direkt vor dem EuGH klagen und wenn ja, unter welchen Voraussetzungen?"},
+    {"type": "business_owner", "q": "Was ist ein EuGH-Gutachten (Art. 218 Abs. 11 AEUV) und wann wird es eingeholt?"},
+    {"type": "court", "q": "Was ist die Bindungswirkung eines EuGH-Vorabentscheidungsurteils für das nationale Gericht, das die Frage gestellt hat?"},
+    {"type": "ecj", "q": "Was ist das CILFIT-Urteil (1982) und wie begrenzt es die Vorlageverpflichtung letztinstanzlicher nationaler Gerichte?"},
+])
+
+_QUESTION_BANK["ai_act"].extend([
+    {"type": "student", "q": "Was ist der EU AI Act und wie klassifiziert er KI-Systeme nach Risiko?"},
+    {"type": "student", "q": "Was sind 'verbotene KI-Praktiken' nach dem EU AI Act — nenne drei Beispiele."},
+    {"type": "teacher", "q": "Erkläre anhand eines HR-Tools zur Bewerbungsauswahl, wie der AI Act es einordnet und was das für das Unternehmen bedeutet."},
+    {"type": "lawyer", "q": "Was sind die Pflichten für Anbieter von Hochrisiko-KI-Systemen nach Art. 9–15 AI Act?"},
+    {"type": "lawyer", "q": "Was sind die Transparenzpflichten nach Art. 50 AI Act für KI-Systeme, die mit Menschen interagieren?"},
+    {"type": "business_owner", "q": "Mein Unternehmen setzt KI-gestütztes Kreditscoring ein — falle ich unter Hochrisiko-KI und was muss ich tun?"},
+    {"type": "business_owner", "q": "Was ist ein KI-Konformitätsbewertungsverfahren (Conformity Assessment) und wie läuft es ab?"},
+    {"type": "court", "q": "Wie ist 'erhebliches Risiko' bei Allzweck-KI-Modellen nach Art. 51 AI Act auszulegen — welcher Schwellenwert gilt?"},
+    {"type": "ecj", "q": "Steht das AI-Act-Verbot bestimmter biometrischer Kategorisierungssysteme im Einklang mit Art. 8 EU-Grundrechtecharta?"},
+])
+
+_QUESTION_BANK["nis2"].extend([
+    {"type": "student", "q": "Was ist NIS2 und welche Unternehmen müssen sich registrieren?"},
+    {"type": "student", "q": "Was ist der Unterschied zwischen 'wesentlichen' und 'wichtigen' Einrichtungen nach NIS2?"},
+    {"type": "teacher", "q": "Erkläre anhand eines mittelgroßen Energieunternehmens, welche NIS2-Pflichten es hat."},
+    {"type": "lawyer", "q": "Was fordert NIS2 Art. 21 zu Cybersicherheitsmaßnahmen — welche 10 Mindestmaßnahmen sind vorgesehen?"},
+    {"type": "lawyer", "q": "Was sind die Meldepflichten nach NIS2 Art. 23 bei einem bedeutenden Sicherheitsvorfall — Fristen und Inhalt?"},
+    {"type": "business_owner", "q": "Unser Unternehmen hat 60 Mitarbeiter und €12 Mio. Umsatz im Gesundheitssektor — fällt es unter NIS2?"},
+    {"type": "business_owner", "q": "Was passiert, wenn wir einen Cyberangriff nicht fristgerecht melden — welche Sanktionen drohen?"},
+    {"type": "court", "q": "Wie ist 'bedeutender Sicherheitsvorfall' nach NIS2 Art. 23 auszulegen — gibt es Schwellenwerte?"},
+    {"type": "ecj", "q": "Inwiefern ist NIS2 mit der DSGVO vereinbar, wenn Sicherheitsvorfallsmeldungen personenbezogene Daten enthalten?"},
+])
+
 
 def _load() -> list[dict]:
     if _MAP_FILE.exists():

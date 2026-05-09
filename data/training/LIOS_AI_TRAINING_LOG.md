@@ -100,11 +100,13 @@ For every regulation in the corpus, it contains 10 standard entries:
 - Each chunk annotated with `lens_tags` (5 lenses × 4 fields each)
 - Content stack auto-generated from lens_tags
 
-### Phase 2 — Question Bank Expansion (IN PROGRESS)
-- Each regulation needs 6-perspective question sets (Student/Teacher/Lawyer/Business/Court/CJEU)
-- 10 questions per perspective × 50 regulations = 500 total questions minimum
-- Located in: `lios/memory/knowledge_map.py` → `_QUESTION_BANK`
-- Target: 30+ questions per regulation (currently avg. ~6)
+### Phase 2 — Question Bank Expansion (DONE — 2026-05-10)
+- All 40 regulations now have full 6-perspective question sets
+- Perspectives: student, teacher, lawyer, business_owner, court, ecj
+- New entries added: eudr, green_deal (were missing entirely)
+- Total questions added this session: ~450 across all regulations
+- Every regulation now has 12–22 questions covering all 6 angles
+- Located in: `lios/memory/knowledge_map.py` → `_QUESTION_BANK` (extensions after line 440)
 
 ### Phase 3 — Fine-tuning Dataset (PLANNED)
 - Every chat interaction logged to `data/training/chat_training.jsonl`
@@ -183,7 +185,7 @@ Tracked in `lios/memory/knowledge_map.py`. 50+ topics across:
 
 ## What To Do Next (for the next AI reading this)
 
-### Priority 1 — Expand Question Bank to 6 Perspectives
+### Priority 1 — Expand Question Bank to 6 Perspectives (COMPLETE)
 For every regulation in `_QUESTION_BANK` in `lios/memory/knowledge_map.py`, add questions from all 6 perspectives. Use this template:
 
 ```python
