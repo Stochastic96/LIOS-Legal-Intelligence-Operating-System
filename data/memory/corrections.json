@@ -1,104 +1,114 @@
 [
-    {
-        "id": "corr-0001",
-        "created_at": "2026-05-01T17:44:44.364094+00:00",
-        "session_id": "lios-1777657413893",
-        "user_query": "What is csrd ?",
-        "original_answer": "Based on my knowledge base:\n\n[EU_TAXONOMY Art.8]: Financial market participants, large public interest entities, and non-financial undertakings subject to NFRD/CSRD shall disclose how and to what extent their activities are associated with environmentally sustainable economic activities. Key performance indicators include: taxonomy-eligible activities as proportion of turnover, capex, and opex.\n[CSRD Art.1]: This Directive amends Directive 2013/34/EU as regards the disclosure of non-financial and diversity information by certain large undertakings and groups. It introduces mandatory sustainability reporting requirements for large companies and listed SMEs operating in the EU.\n[CSRD Art.2]: For the purposes of this Directive: 'sustainability reporting' means reporting on sustainability matters including environmental, social and governance (ESG) factors. 'Large undertaking' means an undertaking which exceeds the limits of at least two of three size criteria: net turnover > 40 million EUR, balance sheet > 20 million EUR, employees > 250 on average during the financial year.\n\n_(Brain is off — turn it on for LLM-powered answers)_",
-        "feedback_type": "partial",
-        "correction_text": "Information is nit structured",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0002",
-        "created_at": "2026-05-01T23:49:40.741269+00:00",
-        "session_id": "learn_mode",
-        "user_query": "[LEARN] TCFD",
-        "original_answer": "",
-        "feedback_type": "partial",
-        "correction_text": "So the full set of the 4 TCFD pillars is:\n\n1. Governance – how the organization oversees climate-related risks and opportunities\n2. Strategy – how climate issues affect the business model and long-term planning\n3. Risk Management – how climate risks are identified, assessed, and managed\n4. Metrics and Targets – the data and goals used to measure and manage climate-related performance\n\nOfficial reference (TCFD):\nThe TCFD recommendations clearly define these four pillars in their core guidance documents (e.g., Recommendations of the TCFD, 2017, updated status reports thereafter). (Reference: https://www.fsb-tcfd.org/recommendations/)",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0003",
-        "created_at": "2026-05-01T23:52:59.926694+00:00",
-        "session_id": "learn_mode",
-        "user_query": "[LEARN] ISSB / IFRS S1 S2",
-        "original_answer": "",
-        "feedback_type": "partial",
-        "correction_text": "Both are issued by the International Sustainability Standards Board under the IFRS Foundation.\n\nHere’s the clear difference:\n\n⸻\n\n🔹 IFRS S1 — General sustainability disclosures\n\n* Full name: General Requirements for Disclosure of Sustainability-related Financial Information\n* Scope: Covers all sustainability risks and opportunities (environmental, social, governance – ESG)\n* Purpose:\n    * Provides the overall framework for sustainability reporting\n    * Requires companies to disclose material sustainability-related risks/opportunities that could affect financial performance\n* Acts as: the baseline / umbrella standard\n\n👉 Think of IFRS S1 as: “Report all relevant sustainability issues affecting the business.”\n\n⸻\n\n🔹 IFRS S2 — Climate-related disclosures\n\n* Full name: Climate-related Disclosures\n* Scope: Focused only on climate\n* Built on: the Task Force on Climate-related Financial Disclosures structure\n* Requires disclosure of:\n    * Climate risks (physical & transition)\n    * Scenario analysis\n    * Greenhouse gas emissions (Scope 1, 2, and 3)\n    * Climate targets and transition plans\n\n👉 Think of IFRS S2 as: “Go deep specifically on climate.”\n\n⸻\n\n🧠 Key difference in one line\n\n* IFRS S1 = broad (all sustainability topics)\n* IFRS S2 = specific (climate only)\n\n⸻\n\n🔗 How they work together\n\n* IFRS S2 is not standalone — it must be used with IFRS S1\n* Both use the same structure:\n    Governance, Strategy, Risk Management, Metrics & Targets (aligned with TCFD) ja (Reference: Here are the official reference URLs for IFRS S1 and IFRS S2 under the International Sustainability Standards Board:  ⸻  📘 IFRS S1 (General sustainability disclosures)  * IFRS S1 official page * IFRS S1 full PDF (official standard)  ⸻  🌍 IFRS S2 (Climate-related disclosures)  * IFRS S2 full PDF (official standard)  ⸻  🔎 Supporting overview (official IFRS site)  * Introduction to ISSB and IFRS S1/S2  ⸻  ✅ What these confirm  * IFRS S1 covers all sustainability-related risks and opportunities * IFRS S2 covers climate-related disclosures only * Both standards must be used together and follow the same structure (governance, strategy, risk management, metrics & targets))",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0004",
-        "created_at": "2026-05-02T11:03:34.132585+00:00",
-        "session_id": "learn_mode",
-        "user_query": "[LEARN] Industrial Emissions Directive",
-        "original_answer": "",
-        "feedback_type": "partial",
-        "correction_text": "a Best Available Technique (BAT) is a key concept used to control industrial pollution across the EU.\n\nWhat is a BAT?\n\nA BAT is defined as:\n\n* Best → the most effective in achieving a high level of environmental protection\n* Available → technically and economically viable for the industry\n* Technique → not just technology, but also how installations are designed, built, operated, and decommissioned\n\nIn practice, BAT represents the most effective and practical methods for reducing emissions and environmental impact from industrial activities.\n\nBAT conclusions often include:\n\n* Emission limits (BAT-AELs)\n* Monitoring requirements\n* Operational practices\n\n⸻\n\nWho sets BAT?\n\nBAT is determined at the EU level through a structured process coordinated by the European Commission.\n\nHere’s how it works:\n\n1. The European Integrated Pollution Prevention and Control Bureau (EIPPCB), based in Seville, gathers technical data from:\n    * Industry\n    * Member States\n    * NGOs\n2. This information is compiled into BREFs (BAT Reference Documents).\n3. From these, BAT Conclusions are formally adopted by the European Commission through implementing decisions.\n4. These BAT Conclusions become legally binding benchmarks that national authorities must use when issuing permits for industrial installations.\n\n⸻\n\nBottom line\n\n* BAT = the EU’s benchmark for environmentally sound industrial practices\n* Set at EU level (by the European Commission)\n* Applied locally by national authorities when granting permits",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0005",
-        "created_at": "2026-05-02T11:04:27.908606+00:00",
-        "session_id": "learn_mode",
-        "user_query": "[LEARN] REACH Regulation",
-        "original_answer": "",
-        "feedback_type": "partial",
-        "correction_text": "Under the REACH Regulation, any company that manufactures or imports a chemical substance in quantities of 1 tonne or more per year must:\n\n📋 Register the substance\n\nThey are required to submit a registration dossier to the European Chemicals Agency (ECHA).\n\n⸻\n\nWhat the registration includes\n\nThe dossier must contain:\n\n* Information on the substance’s properties\n    (physical, chemical, toxicological, ecotoxicological)\n* Assessment of hazards and risks\n    including how the substance may affect human health and the environment\n* Identified uses and exposure scenarios\n    explaining how the substance is used safely across its lifecycle\n* Guidance on safe handling\n    such as risk management measures for workers and users\n\n⸻\n\nKey principle\n\nREACH follows the principle:\n👉 “No data, no market”\n\nThis means:\n\n* If a company does not register a substance ≥1 tonne/year\n* It cannot legally manufacture or place it on the EU market\n\n⸻\n\nBottom line\n\nFor ≥1 tonne/year, companies must:\n➡️ Generate data + assess risks + register with ECHA before market access",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0006",
-        "created_at": "2026-05-02T11:05:23.940180+00:00",
-        "session_id": "learn_mode",
-        "user_query": "[LEARN] MiFID II",
-        "original_answer": "",
-        "feedback_type": "partial",
-        "correction_text": "The MiFID II was amended to integrate sustainability into investment advice as part of the EU’s sustainable finance framework.\n\nWhat changed?\n\nThe key amendment requires investment firms to:\n\n* Ask clients about their sustainability preferences (e.g. interest in ESG or sustainable investments)\n* Incorporate those preferences into suitability assessments when giving investment advice or portfolio management\n* Align recommendations with related frameworks like the Sustainable Finance Disclosure Regulation (SFDR) and the EU Taxonomy\n\nIn short, sustainability is now treated as a mandatory factor—not optional—when assessing whether an investment is suitable for a client.\n\n⸻\n\nWhen did it apply?\n\nThese amendments started to apply from:\n\n📅 2 August 2022\n\nThey were introduced through delegated acts adopted by the European Commission.\n\n⸻\n\nBottom line\n\n* MiFID II now requires systematic consideration of sustainability preferences\n* Applies since August 2022\n* Aims to channel capital toward more sustainable activities across the EU",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0007",
-        "created_at": "2026-05-02T11:06:23.739487+00:00",
-        "session_id": "learn_mode",
-        "user_query": "[LEARN] Shareholder Rights Directive II",
-        "original_answer": "",
-        "feedback_type": "partial",
-        "correction_text": "The Shareholder Rights Directive II (SRD II) introduced specific shareholder engagement obligations for institutional investors (and asset managers) to encourage long-term, responsible ownership.\n\n⸻\n\nWhat institutional investors must do\n\n1) Develop and disclose an engagement policy\n\nThey must create and publicly disclose a policy describing how they engage with investee companies. This includes:\n\n* Monitoring companies on:\n    * Strategy and performance\n    * Financial and non-financial risks\n    * Environmental, social, and governance (ESG) factors\n* How they:\n    * Exercise voting rights\n    * Engage in dialogue with company management\n    * Cooperate with other shareholders\n    * Manage conflicts of interest\n\n⸻\n\n2) Report on implementation (comply or explain)\n\nEach year, they must either:\n\n* Disclose how the engagement policy was implemented, including:\n    * Voting behavior\n    * Use of proxy advisors\n* OR explain why they did not comply (“comply or explain” principle)\n\n⸻\n\n3) Transparency on investment strategy\n\nInstitutional investors must disclose how their:\n\n* Investment strategy aligns with the long-term performance of their assets\n* Strategy contributes to medium- to long-term value creation\n\n⸻\n\n4) Relationships with asset managers\n\nIf they use asset managers, they must disclose:\n\n* Key elements of arrangements with them\n* How those arrangements incentivize long-term engagement, not short-term gains\n\n⸻\n\nBottom line\n\nSRD II requires institutional investors to:\n➡️ Actively engage with companies\n➡️ Be transparent about how they do it\n➡️ Focus on long-term, sustainable value creation (including ESG factors)",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0008",
-        "created_at": "2026-05-02T14:59:28.430491+00:00",
-        "session_id": "learn_mode",
-        "user_query": "[LEARN] EU Whistleblower Directive",
-        "original_answer": "",
-        "feedback_type": "partial",
-        "correction_text": "From my knowledge base:\n\n[EU_GREENWASHING Green-Claims-Directive]: EU Green Claims Directive (proposed 2023). Requires companies making voluntary green claims to: (1) Substantiate claims with scientific evidence before making them; (2) Have claims verified by an accredited third-party verifier; (3) Ensure claims are specific and precise; (4) Comparative claims must compare on equivalent basis. Prohibited: 'carbon neutral' claims based solely on offsets; generic claims ('eco-friendly', 'green', 'natural') without substantiation; claims about products containing hazardous substances. Enforcement: Member States must impose effective, proportionate and dissuasive penalties.\n[CSRD Art.1]: This Directive amends Directive 2013/34/EU as regards the disclosure of non-financial and diversity information by certain large undertakings and groups. It introduces mandatory sustainability reporting requirements for large companies and listed SMEs operating in the EU.\n\n_(Turn Brain ON for a synthesised answer)_ (Reference: LIOS corpus (auto-synthesized))",
-        "made_rule": false
-    },
-    {
-        "id": "corr-0009",
-        "created_at": "2026-05-07T20:07:53.922917+00:00",
-        "session_id": "session-1778184298845",
-        "user_query": "What is esg",
-        "original_answer": " Issue: The question asks for a definition of ESG.\n\nRule: [2] CSRD Art.2 defines ESG as Environmental, Social and Governance factors.\n\nAnalysis: The term ESG is defined in Article 2 of the Corporate Sustainability Reporting Directive (CSRD) to refer to environmental, social, and governance factors.\n\nConclusion: ESG stands for Environmental, Social, and Governance factors, according to CSRD Art.2.",
-        "feedback_type": "positive",
-        "correction_text": "",
-        "made_rule": false,
-        "source": "mobile_app"
-    },
-    {
-        "id": "corr-0010",
-        "created_at": "2026-05-08T00:06:52.759452+00:00",
-        "session_id": "session-1778198551009",
-        "user_query": "What is gdpr?",
-        "original_answer": " 1. Issue: The question asks for a definition of GDPR.\n2. Rule: The legal provision that applies here is the EU General Data Protection Regulation (GDPR). This can be found in its entirety at the provided source: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679\n3. Analysis: The GDPR is a regulation enacted by the European Union, with the full title of \"Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data, and repealing Directive 95/46/EC (General Data Protection Regulation)\".\n4. Conclusion: The GDPR is a regulation that sets guidelines for the protection of natural persons with regard to the processing of personal data and on the free movement of such data within the European Union.",
-        "feedback_type": "positive",
-        "correction_text": "",
-        "made_rule": false,
-        "source": "mobile_app"
-    }
+  {
+    "id": "corr-0001",
+    "created_at": "2026-05-01T17:44:44.364094+00:00",
+    "session_id": "lios-1777657413893",
+    "user_query": "What is csrd ?",
+    "original_answer": "Based on my knowledge base:\n\n[EU_TAXONOMY Art.8]: Financial market participants, large public interest entities, and non-financial undertakings subject to NFRD/CSRD shall disclose how and to what extent their activities are associated with environmentally sustainable economic activities. Key performance indicators include: taxonomy-eligible activities as proportion of turnover, capex, and opex.\n[CSRD Art.1]: This Directive amends Directive 2013/34/EU as regards the disclosure of non-financial and diversity information by certain large undertakings and groups. It introduces mandatory sustainability reporting requirements for large companies and listed SMEs operating in the EU.\n[CSRD Art.2]: For the purposes of this Directive: 'sustainability reporting' means reporting on sustainability matters including environmental, social and governance (ESG) factors. 'Large undertaking' means an undertaking which exceeds the limits of at least two of three size criteria: net turnover > 40 million EUR, balance sheet > 20 million EUR, employees > 250 on average during the financial year.\n\n_(Brain is off — turn it on for LLM-powered answers)_",
+    "feedback_type": "partial",
+    "correction_text": "Information is nit structured",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0002",
+    "created_at": "2026-05-01T23:49:40.741269+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] TCFD",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "So the full set of the 4 TCFD pillars is:\n\n1. Governance – how the organization oversees climate-related risks and opportunities\n2. Strategy – how climate issues affect the business model and long-term planning\n3. Risk Management – how climate risks are identified, assessed, and managed\n4. Metrics and Targets – the data and goals used to measure and manage climate-related performance\n\nOfficial reference (TCFD):\nThe TCFD recommendations clearly define these four pillars in their core guidance documents (e.g., Recommendations of the TCFD, 2017, updated status reports thereafter). (Reference: https://www.fsb-tcfd.org/recommendations/)",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0003",
+    "created_at": "2026-05-01T23:52:59.926694+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] ISSB / IFRS S1 S2",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "Both are issued by the International Sustainability Standards Board under the IFRS Foundation.\n\nHere’s the clear difference:\n\n⸻\n\n🔹 IFRS S1 — General sustainability disclosures\n\n* Full name: General Requirements for Disclosure of Sustainability-related Financial Information\n* Scope: Covers all sustainability risks and opportunities (environmental, social, governance – ESG)\n* Purpose:\n    * Provides the overall framework for sustainability reporting\n    * Requires companies to disclose material sustainability-related risks/opportunities that could affect financial performance\n* Acts as: the baseline / umbrella standard\n\n👉 Think of IFRS S1 as: “Report all relevant sustainability issues affecting the business.”\n\n⸻\n\n🔹 IFRS S2 — Climate-related disclosures\n\n* Full name: Climate-related Disclosures\n* Scope: Focused only on climate\n* Built on: the Task Force on Climate-related Financial Disclosures structure\n* Requires disclosure of:\n    * Climate risks (physical & transition)\n    * Scenario analysis\n    * Greenhouse gas emissions (Scope 1, 2, and 3)\n    * Climate targets and transition plans\n\n👉 Think of IFRS S2 as: “Go deep specifically on climate.”\n\n⸻\n\n🧠 Key difference in one line\n\n* IFRS S1 = broad (all sustainability topics)\n* IFRS S2 = specific (climate only)\n\n⸻\n\n🔗 How they work together\n\n* IFRS S2 is not standalone — it must be used with IFRS S1\n* Both use the same structure:\n    Governance, Strategy, Risk Management, Metrics & Targets (aligned with TCFD) ja (Reference: Here are the official reference URLs for IFRS S1 and IFRS S2 under the International Sustainability Standards Board:  ⸻  📘 IFRS S1 (General sustainability disclosures)  * IFRS S1 official page * IFRS S1 full PDF (official standard)  ⸻  🌍 IFRS S2 (Climate-related disclosures)  * IFRS S2 full PDF (official standard)  ⸻  🔎 Supporting overview (official IFRS site)  * Introduction to ISSB and IFRS S1/S2  ⸻  ✅ What these confirm  * IFRS S1 covers all sustainability-related risks and opportunities * IFRS S2 covers climate-related disclosures only * Both standards must be used together and follow the same structure (governance, strategy, risk management, metrics & targets))",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0004",
+    "created_at": "2026-05-02T11:03:34.132585+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] Industrial Emissions Directive",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "a Best Available Technique (BAT) is a key concept used to control industrial pollution across the EU.\n\nWhat is a BAT?\n\nA BAT is defined as:\n\n* Best → the most effective in achieving a high level of environmental protection\n* Available → technically and economically viable for the industry\n* Technique → not just technology, but also how installations are designed, built, operated, and decommissioned\n\nIn practice, BAT represents the most effective and practical methods for reducing emissions and environmental impact from industrial activities.\n\nBAT conclusions often include:\n\n* Emission limits (BAT-AELs)\n* Monitoring requirements\n* Operational practices\n\n⸻\n\nWho sets BAT?\n\nBAT is determined at the EU level through a structured process coordinated by the European Commission.\n\nHere’s how it works:\n\n1. The European Integrated Pollution Prevention and Control Bureau (EIPPCB), based in Seville, gathers technical data from:\n    * Industry\n    * Member States\n    * NGOs\n2. This information is compiled into BREFs (BAT Reference Documents).\n3. From these, BAT Conclusions are formally adopted by the European Commission through implementing decisions.\n4. These BAT Conclusions become legally binding benchmarks that national authorities must use when issuing permits for industrial installations.\n\n⸻\n\nBottom line\n\n* BAT = the EU’s benchmark for environmentally sound industrial practices\n* Set at EU level (by the European Commission)\n* Applied locally by national authorities when granting permits",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0005",
+    "created_at": "2026-05-02T11:04:27.908606+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] REACH Regulation",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "Under the REACH Regulation, any company that manufactures or imports a chemical substance in quantities of 1 tonne or more per year must:\n\n📋 Register the substance\n\nThey are required to submit a registration dossier to the European Chemicals Agency (ECHA).\n\n⸻\n\nWhat the registration includes\n\nThe dossier must contain:\n\n* Information on the substance’s properties\n    (physical, chemical, toxicological, ecotoxicological)\n* Assessment of hazards and risks\n    including how the substance may affect human health and the environment\n* Identified uses and exposure scenarios\n    explaining how the substance is used safely across its lifecycle\n* Guidance on safe handling\n    such as risk management measures for workers and users\n\n⸻\n\nKey principle\n\nREACH follows the principle:\n👉 “No data, no market”\n\nThis means:\n\n* If a company does not register a substance ≥1 tonne/year\n* It cannot legally manufacture or place it on the EU market\n\n⸻\n\nBottom line\n\nFor ≥1 tonne/year, companies must:\n➡️ Generate data + assess risks + register with ECHA before market access",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0006",
+    "created_at": "2026-05-02T11:05:23.940180+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] MiFID II",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "The MiFID II was amended to integrate sustainability into investment advice as part of the EU’s sustainable finance framework.\n\nWhat changed?\n\nThe key amendment requires investment firms to:\n\n* Ask clients about their sustainability preferences (e.g. interest in ESG or sustainable investments)\n* Incorporate those preferences into suitability assessments when giving investment advice or portfolio management\n* Align recommendations with related frameworks like the Sustainable Finance Disclosure Regulation (SFDR) and the EU Taxonomy\n\nIn short, sustainability is now treated as a mandatory factor—not optional—when assessing whether an investment is suitable for a client.\n\n⸻\n\nWhen did it apply?\n\nThese amendments started to apply from:\n\n📅 2 August 2022\n\nThey were introduced through delegated acts adopted by the European Commission.\n\n⸻\n\nBottom line\n\n* MiFID II now requires systematic consideration of sustainability preferences\n* Applies since August 2022\n* Aims to channel capital toward more sustainable activities across the EU",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0007",
+    "created_at": "2026-05-02T11:06:23.739487+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] Shareholder Rights Directive II",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "The Shareholder Rights Directive II (SRD II) introduced specific shareholder engagement obligations for institutional investors (and asset managers) to encourage long-term, responsible ownership.\n\n⸻\n\nWhat institutional investors must do\n\n1) Develop and disclose an engagement policy\n\nThey must create and publicly disclose a policy describing how they engage with investee companies. This includes:\n\n* Monitoring companies on:\n    * Strategy and performance\n    * Financial and non-financial risks\n    * Environmental, social, and governance (ESG) factors\n* How they:\n    * Exercise voting rights\n    * Engage in dialogue with company management\n    * Cooperate with other shareholders\n    * Manage conflicts of interest\n\n⸻\n\n2) Report on implementation (comply or explain)\n\nEach year, they must either:\n\n* Disclose how the engagement policy was implemented, including:\n    * Voting behavior\n    * Use of proxy advisors\n* OR explain why they did not comply (“comply or explain” principle)\n\n⸻\n\n3) Transparency on investment strategy\n\nInstitutional investors must disclose how their:\n\n* Investment strategy aligns with the long-term performance of their assets\n* Strategy contributes to medium- to long-term value creation\n\n⸻\n\n4) Relationships with asset managers\n\nIf they use asset managers, they must disclose:\n\n* Key elements of arrangements with them\n* How those arrangements incentivize long-term engagement, not short-term gains\n\n⸻\n\nBottom line\n\nSRD II requires institutional investors to:\n➡️ Actively engage with companies\n➡️ Be transparent about how they do it\n➡️ Focus on long-term, sustainable value creation (including ESG factors)",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0008",
+    "created_at": "2026-05-02T14:59:28.430491+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] EU Whistleblower Directive",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "From my knowledge base:\n\n[EU_GREENWASHING Green-Claims-Directive]: EU Green Claims Directive (proposed 2023). Requires companies making voluntary green claims to: (1) Substantiate claims with scientific evidence before making them; (2) Have claims verified by an accredited third-party verifier; (3) Ensure claims are specific and precise; (4) Comparative claims must compare on equivalent basis. Prohibited: 'carbon neutral' claims based solely on offsets; generic claims ('eco-friendly', 'green', 'natural') without substantiation; claims about products containing hazardous substances. Enforcement: Member States must impose effective, proportionate and dissuasive penalties.\n[CSRD Art.1]: This Directive amends Directive 2013/34/EU as regards the disclosure of non-financial and diversity information by certain large undertakings and groups. It introduces mandatory sustainability reporting requirements for large companies and listed SMEs operating in the EU.\n\n_(Turn Brain ON for a synthesised answer)_ (Reference: LIOS corpus (auto-synthesized))",
+    "made_rule": false
+  },
+  {
+    "id": "corr-0009",
+    "created_at": "2026-05-07T20:07:53.922917+00:00",
+    "session_id": "session-1778184298845",
+    "user_query": "What is esg",
+    "original_answer": " Issue: The question asks for a definition of ESG.\n\nRule: [2] CSRD Art.2 defines ESG as Environmental, Social and Governance factors.\n\nAnalysis: The term ESG is defined in Article 2 of the Corporate Sustainability Reporting Directive (CSRD) to refer to environmental, social, and governance factors.\n\nConclusion: ESG stands for Environmental, Social, and Governance factors, according to CSRD Art.2.",
+    "feedback_type": "positive",
+    "correction_text": "",
+    "made_rule": false,
+    "source": "mobile_app"
+  },
+  {
+    "id": "corr-0010",
+    "created_at": "2026-05-08T00:06:52.759452+00:00",
+    "session_id": "session-1778198551009",
+    "user_query": "What is gdpr?",
+    "original_answer": " 1. Issue: The question asks for a definition of GDPR.\n2. Rule: The legal provision that applies here is the EU General Data Protection Regulation (GDPR). This can be found in its entirety at the provided source: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679\n3. Analysis: The GDPR is a regulation enacted by the European Union, with the full title of \"Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data, and repealing Directive 95/46/EC (General Data Protection Regulation)\".\n4. Conclusion: The GDPR is a regulation that sets guidelines for the protection of natural persons with regard to the processing of personal data and on the free movement of such data within the European Union.",
+    "feedback_type": "positive",
+    "correction_text": "",
+    "made_rule": false,
+    "source": "mobile_app"
+  },
+  {
+    "id": "corr-0011",
+    "created_at": "2026-05-08T18:49:03.117301+00:00",
+    "session_id": "learn_mode",
+    "user_query": "[LEARN] EU Competition Law",
+    "original_answer": "",
+    "feedback_type": "partial",
+    "correction_text": "https://competition-policy.ec.europa.eu/index_en",
+    "made_rule": false
+  }
 ]
