@@ -24,6 +24,7 @@ import textwrap
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import httpx
@@ -212,6 +213,11 @@ def count_entries(path: Path) -> int:
         return sum(1 for line in fh if line.strip())
 
 
+def is_local_server(base: str) -> bool:
+    host = (urlparse(base).hostname or "").lower()
+    return host in {"localhost", "127.0.0.1"}
+
+
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 async def run(base: str, agent: str, depth: int,
@@ -256,13 +262,17 @@ async def run(base: str, agent: str, depth: int,
         if not allow_local_reset:
             print("  [!] target not reached and reset disabled; stopping.")
             break
-        if not str(base).startswith("http://localhost") and not str(base).startswith("http://127.0.0.1"):
+        if not is_local_server(base):
             print("  [!] target not reached and remote server detected; stopping (no safe reset).")
             break
         if not map_file.exists():
             print(f"  [!] target not reached but map file not found: {map_file}")
             break
-        map_file.unlink()
+        try:
+            map_file.unlink()
+        except OSError as e:
+            print(f"  [!] could not reset map file {map_file}: {e}")
+            break
         print(f"  ↻ Reset knowledge map and continue (entries={current_entries}/{target_entries})")
 
     print("\n" + "━" * 60)
