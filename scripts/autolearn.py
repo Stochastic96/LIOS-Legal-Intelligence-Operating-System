@@ -12,6 +12,7 @@ Usage:
   python3 scripts/autolearn.py --agent api            # Anthropic API (ANTHROPIC_API_KEY)
   python3 scripts/autolearn.py --url http://IP:8000   # remote server
   python3 scripts/autolearn.py --depth 5              # deeper pipeline
+  python3 scripts/autolearn.py --target-entries 10000 # repeat until >= N entries
 """
 
 import argparse
@@ -22,6 +23,7 @@ import sys
 import textwrap
 import time
 from datetime import datetime
+from pathlib import Path
 
 try:
     import httpx
@@ -31,6 +33,9 @@ except ImportError:
 # ── Config ─────────────────────────────────────────────────────────────────────
 
 DEFAULT_QUEUE_DEPTH = 3
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HISTORY_FILE = REPO_ROOT / "data/memory/answer_history.jsonl"
+DEFAULT_MAP_FILE = REPO_ROOT / "data/memory/knowledge_map.json"
 
 SYSTEM = (
     "You are a German EU compliance expert. "
@@ -199,29 +204,72 @@ async def status_ticker(base: str, done: asyncio.Event):
                 except Exception:
                     pass
 
+
+def count_entries(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as fh:
+        return sum(1 for line in fh if line.strip())
+
+
 # ── Entry point ────────────────────────────────────────────────────────────────
 
-async def run(base: str, agent: str, depth: int):
+async def run(base: str, agent: str, depth: int,
+              target_entries: int = 0,
+              history_file: Path = DEFAULT_HISTORY_FILE,
+              map_file: Path = DEFAULT_MAP_FILE,
+              allow_local_reset: bool = True):
     print("━" * 60)
     print("  LIOS Auto-Trainer  —  pipeline mode")
     print(f"  Server : {base}")
     print(f"  Agent  : {agent}   Queue depth : {depth}")
     print("  LIOS stays ahead · agent never waits")
+    if target_entries > 0:
+        print(f"  Target : >= {target_entries} entries ({history_file})")
     print("━" * 60)
 
-    stats: dict = {"answered": 0}
-    done  = asyncio.Event()
-    queue: asyncio.Queue[dict] = asyncio.Queue()
+    total_answered = 0
+    cycle = 0
+    while True:
+        if target_entries > 0 and count_entries(history_file) >= target_entries:
+            break
 
-    async with httpx.AsyncClient() as client:
-        await asyncio.gather(
-            producer(client, base, queue, done, depth),
-            consumer(client, base, queue, done, agent, stats),
-            status_ticker(base, done),
-        )
+        cycle += 1
+        print(f"\n▶ Cycle {cycle}")
+
+        stats: dict = {"answered": 0}
+        done = asyncio.Event()
+        queue: asyncio.Queue[dict] = asyncio.Queue()
+
+        async with httpx.AsyncClient() as client:
+            await asyncio.gather(
+                producer(client, base, queue, done, depth),
+                consumer(client, base, queue, done, agent, stats),
+                status_ticker(base, done),
+            )
+
+        total_answered += stats["answered"]
+        current_entries = count_entries(history_file)
+        if target_entries <= 0 or current_entries >= target_entries:
+            break
+
+        if not allow_local_reset:
+            print("  [!] target not reached and reset disabled; stopping.")
+            break
+        if not str(base).startswith("http://localhost") and not str(base).startswith("http://127.0.0.1"):
+            print("  [!] target not reached and remote server detected; stopping (no safe reset).")
+            break
+        if not map_file.exists():
+            print(f"  [!] target not reached but map file not found: {map_file}")
+            break
+        map_file.unlink()
+        print(f"  ↻ Reset knowledge map and continue (entries={current_entries}/{target_entries})")
 
     print("\n" + "━" * 60)
-    print(f"  ✓ Fertig — {stats['answered']} Antworten eingereicht.")
+    final_entries = count_entries(history_file)
+    print(f"  ✓ Fertig — {total_answered} Antworten eingereicht.")
+    if target_entries > 0:
+        print(f"  Entries: {final_entries}/{target_entries}")
     print("━" * 60)
 
 
@@ -234,8 +282,24 @@ def main():
                    help="Answering backend")
     p.add_argument("--depth", type=int, default=DEFAULT_QUEUE_DEPTH,
                    help="How many questions LIOS pre-fetches ahead (default 3)")
+    p.add_argument("--target-entries", type=int, default=0,
+                   help="Repeat cycles until answer_history has at least this many entries")
+    p.add_argument("--history-file", type=Path, default=DEFAULT_HISTORY_FILE,
+                   help=f"Path to answer history JSONL (default: {DEFAULT_HISTORY_FILE})")
+    p.add_argument("--map-file", type=Path, default=DEFAULT_MAP_FILE,
+                   help=f"Path to knowledge map file used for local reset (default: {DEFAULT_MAP_FILE})")
+    p.add_argument("--no-reset-map", action="store_true",
+                   help="Do not reset local knowledge map between cycles")
     args = p.parse_args()
-    asyncio.run(run(args.url, args.agent, args.depth))
+    asyncio.run(
+        run(
+            args.url, args.agent, args.depth,
+            target_entries=args.target_entries,
+            history_file=args.history_file,
+            map_file=args.map_file,
+            allow_local_reset=not args.no_reset_map,
+        )
+    )
 
 
 if __name__ == "__main__":
