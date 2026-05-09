@@ -6,7 +6,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const DEFAULT_URL = "http://192.168.0.101:8000";
+const DEFAULT_URL = "http://localhost:8000";
 const URL_KEY = "lios_server_url";
 
 export async function getServerUrl(): Promise<string> {
@@ -40,6 +40,16 @@ async function del<T>(path: string): Promise<T> {
   const base = await getServerUrl();
   const res = await fetch(`${base}${path}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}`);
+  return res.json();
+}
+
+async function postForm<T>(path: string, form: FormData): Promise<T> {
+  const base = await getServerUrl();
+  const res = await fetch(`${base}${path}`, { method: "POST", body: form });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.status.toString());
+    throw new Error(`UPLOAD ${path} → ${res.status}: ${text}`);
+  }
   return res.json();
 }
 
@@ -126,6 +136,65 @@ export interface KnowledgeMap {
 
 export type LLMMode = "local" | "groq" | "azure";
 
+// ── Intelligence types ────────────────────────────────────────────────────────
+
+export interface IntelligenceStats {
+  total_chunks: number;
+  total_regulations: number;
+  total_official_docs: number;
+  total_topics: number;
+  total_questions_in_bank: number;
+  total_answers_submitted: number;
+  valid_answers: number;
+  topics_functional_or_mastered: number;
+  overall_learning_pct: number;
+  corrections_count: number;
+  answers_last_7_days: number;
+  target_chunks: number;
+  target_questions: number;
+  corpus_completeness_pct: number;
+}
+
+export interface CorpusRegulation {
+  regulation: string;
+  celex_id: string;
+  jurisdiction: string;
+  chunk_count: number;
+  article_count: number;
+  articles: string[];
+  source_url: string;
+  last_indexed: string;
+  published_date: string;
+}
+
+export interface TopicCoverage {
+  id: string;
+  name: string;
+  category: string;
+  status: string;
+  pct: number;
+  questions_in_bank: number;
+  questions_asked: number;
+  questions_answered: number;
+  last_activity: string | null;
+  has_corpus_chunks: boolean;
+  corpus_chunk_count: number;
+}
+
+export interface AnswerRecord {
+  id: string;
+  ts: string;
+  topic_name: string;
+  category: string;
+  question: string;
+  user_answer: string;
+  reference: string;
+  pct_before: number;
+  pct_after: number;
+  valid: boolean;
+  corpus_hint: string;
+}
+
 export interface LLMModeStatus {
   mode: LLMMode;
   provider: string;
@@ -187,5 +256,20 @@ export const api = {
     }>("/api/token-usage"),
     exportTraining: (limit = 500) =>
       get<{ samples: number; jsonl: string }>(`/api/training-export?limit=${limit}`),
+  },
+
+  upload: {
+    document: (form: FormData) =>
+      postForm<{ status: string; chunks_added: number; filename: string }>("/api/upload", form),
+    corrections: (limit = 100) =>
+      get<{ corrections: Correction[]; total: number }>(`/memory/corrections?limit=${limit}`),
+  },
+
+  intelligence: {
+    stats:   () => get<IntelligenceStats>("/intelligence/stats"),
+    corpus:  () => get<CorpusRegulation[]>("/intelligence/corpus"),
+    topics:  () => get<TopicCoverage[]>("/intelligence/topics"),
+    answers: (limit = 20) =>
+      get<{ answers: AnswerRecord[]; total: number }>(`/intelligence/answers?limit=${limit}`),
   },
 };

@@ -1,46 +1,55 @@
-// Deep Forest — Japanese eco-minimal design system
+// LIOS — German Compliance Design System
+// Clean, precise, institutional. EU blue + white + structured gray.
 
 export const C = {
   // Backgrounds
-  bg:        "#0E1A11",  // deep forest
-  s1:        "#162019",  // dark moss (cards)
-  s2:        "#1D2B1F",  // bamboo panel (inputs, nested)
-  s3:        "#243027",  // lifted panel
+  bg:    "#F1F4F9",   // cool light gray — main background
+  card:  "#FFFFFF",   // pure white — card surfaces
+  s2:    "#EBF0F8",   // blue-tinted — inputs, nested panels
+  s3:    "#E3EAF5",   // deeper tint — modal sheets
 
   // Borders
-  border:    "#2A3D2C",  // natural divider
-  borderBright: "#3A5040", // focused / active border
+  border:      "#C8D3E3",
+  borderBright:"#7A9CC8",   // focused / active
 
   // Text
-  text:      "#E8E6DC",  // warm cream
-  mid:       "#95A895",  // sage gray
-  dim:       "#4A5F4C",  // forest dim (placeholders)
+  text:  "#0F1C33",   // near-black navy
+  mid:   "#4A5E7A",   // medium blue-gray
+  dim:   "#8A9BB5",   // placeholder / muted
 
-  // Accent — bamboo green
-  accent:    "#7CB87F",
-  accentDim: "#1E3022",  // tinted surface
-  accentPress: "#5A9F5D",
+  // Primary — EU institutional blue
+  primary:     "#003399",
+  primaryDark: "#001F6B",
+  primaryDim:  "#DAEAFF",   // tinted background
+  primaryPress:"#0044CC",
+
+  // Chat bubbles
+  userMsg:  "#003399",   // user: primary blue bubble
+  userText: "#FFFFFF",   // user: white text on blue
+  aiBg:     "#FFFFFF",   // AI: white card
+  aiText:   "#0F1C33",
 
   // Semantic
-  green:     "#6BBF6B",  // moss green (success)
-  greenDim:  "#1A2E1A",
-  amber:     "#D4A04A",  // autumn leaf
-  red:       "#C46060",  // dried maple
-  redDim:    "#2E1414",
+  green:   "#15692A",   // compliance confirmed
+  greenBg: "#D1FAE5",
+  amber:   "#7C4D0F",   // warning
+  amberBg: "#FEF3C7",
+  red:     "#991B1B",   // error / violation
+  redBg:   "#FEE2E2",
 
-  // Chat-specific
-  userMsg:   "#1E3022",  // user bubble bg
-  userText:  "#C8DCC8",  // user bubble text
+  // Status dots (used in badges)
+  online:  "#16A34A",
+  offline: "#DC2626",
 };
 
 export const F = {
-  xs:  11,
-  sm:  13,
-  md:  15,
-  lg:  17,
-  xl:  20,
-  xxl: 28,
-  huge: 44,
+  xs:   11,
+  sm:   13,
+  md:   15,
+  lg:   17,
+  xl:   20,
+  xxl:  26,
+  huge: 42,
 };
 
 export const W = {
@@ -52,10 +61,11 @@ export const W = {
 };
 
 export const R = {
-  xs:  4,
-  sm:  8,
-  md:  14,
-  lg:  20,
+  xs:   3,
+  sm:   6,
+  md:   12,
+  lg:   18,
+  xl:   24,
   full: 999,
 };
 
@@ -68,9 +78,14 @@ export const S = {
   xxl: 48,
 };
 
-// Pct-based color: green ≥80%, amber 40-79%, red <40%
 export function pctColor(pct: number): string {
   if (pct >= 80) return C.green;
   if (pct >= 40) return C.amber;
   return C.red;
+}
+
+export function pctBgColor(pct: number): string {
+  if (pct >= 80) return C.greenBg;
+  if (pct >= 40) return C.amberBg;
+  return C.redBg;
 }

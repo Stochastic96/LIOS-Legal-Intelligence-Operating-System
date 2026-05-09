@@ -3,26 +3,28 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
 import ChatScreen from "./src/screens/ChatScreen";
 import LearnScreen from "./src/screens/LearnScreen";
-import KnowledgeMapScreen from "./src/screens/KnowledgeMapScreen";
-import BrainScreen from "./src/screens/BrainScreen";
-import { C, S } from "./src/theme";
+import IntelligenceScreen from "./src/screens/IntelligenceScreen";
+import UploadScreen from "./src/screens/UploadScreen";
+import { C, F, S, W } from "./src/theme";
 
 const Tab = createBottomTabNavigator();
 
 type FeatherName = React.ComponentProps<typeof Feather>["name"];
 
 const TAB_ICONS: Record<string, FeatherName> = {
-  Chat:  "message-circle",
-  Learn: "book-open",
-  Map:   "map",
-  Brain: "cpu",
+  Assistent:   "message-square",
+  Lernen:      "book-open",
+  Intelligenz: "activity",
+  Hochladen:   "upload",
 };
 
 export default function App() {
   return (
     <SafeAreaProvider>
+      <StatusBar style="dark" backgroundColor={C.card} />
       <NavigationContainer>
         <Tab.Navigator
           id="MainTabs"
@@ -30,35 +32,35 @@ export default function App() {
             headerShown: false,
             freezeOnBlur: false,
             tabBarStyle: {
-              backgroundColor: C.s1,
+              backgroundColor: C.card,
               borderTopWidth: 1,
               borderTopColor: C.border,
-              height: 60,
+              height: 62,
               paddingBottom: S.sm,
-              paddingTop: S.xs,
+              paddingTop: S.xs + 2,
             },
-            tabBarActiveTintColor: C.accent,
+            tabBarActiveTintColor:   C.primary,
             tabBarInactiveTintColor: C.dim,
             tabBarLabelStyle: {
               fontSize: 10,
-              fontWeight: "600",
-              letterSpacing: 0.8,
-              marginTop: 2,
+              fontWeight: W.semi,
+              letterSpacing: 0.6,
+              marginTop: 1,
             },
             tabBarIcon: ({ focused, color }) => (
               <Feather
                 name={TAB_ICONS[route.name]}
-                size={22}
+                size={21}
                 color={color}
-                style={{ opacity: focused ? 1 : 0.55 }}
+                style={{ opacity: focused ? 1 : 0.5 }}
               />
             ),
           })}
         >
-          <Tab.Screen name="Chat"  component={ChatScreen} />
-          <Tab.Screen name="Learn" component={LearnScreen} />
-          <Tab.Screen name="Map"   component={KnowledgeMapScreen} />
-          <Tab.Screen name="Brain" component={BrainScreen} />
+          <Tab.Screen name="Assistent"   component={ChatScreen} />
+          <Tab.Screen name="Lernen"      component={LearnScreen} />
+          <Tab.Screen name="Intelligenz" component={IntelligenceScreen} />
+          <Tab.Screen name="Hochladen"   component={UploadScreen} />
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

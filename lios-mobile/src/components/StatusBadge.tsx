@@ -6,11 +6,12 @@ interface Props {
   label: string;
   color: string;
   bgColor: string;
+  bordered?: boolean;
 }
 
-export default function StatusBadge({ label, color, bgColor }: Props) {
+export default function StatusBadge({ label, color, bgColor, bordered }: Props) {
   return (
-    <View style={[styles.badge, { backgroundColor: bgColor }]}>
+    <View style={[styles.badge, { backgroundColor: bgColor }, bordered && { borderWidth: 1, borderColor: color + "55" }]}>
       <Text style={[styles.text, { color }]}>{label}</Text>
     </View>
   );
@@ -18,14 +19,14 @@ export default function StatusBadge({ label, color, bgColor }: Props) {
 
 const styles = StyleSheet.create({
   badge: {
-    borderRadius: R.full,
-    paddingHorizontal: 10,
+    borderRadius: R.xs,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     alignSelf: "flex-start",
   },
   text: {
     fontSize: F.xs,
     fontWeight: W.semi,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
 });

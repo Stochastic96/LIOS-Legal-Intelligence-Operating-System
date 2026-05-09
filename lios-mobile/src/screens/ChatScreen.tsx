@@ -13,17 +13,19 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { api, ChatResponse } from "../api/client";
+import { api, BrainStatus, ChatResponse, getServerUrl, LLMModeStatus, setServerUrl } from "../api/client";
 import ScalePressable from "../components/ScalePressable";
+import TypingIndicator from "../components/TypingIndicator";
+import UploadScreen from "./UploadScreen";
 import { C, F, R, S, W } from "../theme";
 
 const SESSION_ID = "lios-" + Date.now();
 
 const QUICK_STARTS = [
-  "What is CSRD and who must comply?",
-  "Explain EU Taxonomy green criteria",
-  "What are ESRS reporting standards?",
-  "How does GDPR define personal data?",
+  "Wer muss CSRD einhalten?",
+  "Was sind ESRS-Berichtsstandards?",
+  "EU-Taxonomie: grüne Kriterien",
+  "SFDR-Klassifizierung von Fonds",
 ];
 
 interface Message {
@@ -36,86 +38,71 @@ interface Message {
   feedback?: "good" | "wrong" | "partial" | null;
 }
 
+const CONF_LABEL: Record<string, string> = {
+  high: "Hoch", medium: "Mittel", low: "Niedrig",
+};
+
 const CONF_COLOR: Record<string, string> = {
   high: C.green, medium: C.amber, low: C.red,
 };
 
+const CONF_BG: Record<string, string> = {
+  high: C.greenBg, medium: C.amberBg, low: C.redBg,
+};
+
 function relativeTime(ts: number): string {
   const s = (Date.now() - ts) / 1000;
-  if (s < 60)   return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400)return `${Math.floor(s / 3600)}h ago`;
-  return new Date(ts).toLocaleDateString();
+  if (s < 60)    return "Gerade eben";
+  if (s < 3600)  return `vor ${Math.floor(s / 60)} Min.`;
+  if (s < 86400) return `vor ${Math.floor(s / 3600)} Std.`;
+  return new Date(ts).toLocaleDateString("de-DE");
 }
 
-// 3-dot staggered pulse
-function ThinkingDots() {
-  const dots = [
-    useRef(new Animated.Value(0.25)).current,
-    useRef(new Animated.Value(0.25)).current,
-    useRef(new Animated.Value(0.25)).current,
-  ];
-  useEffect(() => {
-    const pulse = (a: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(a, { toValue: 1,    duration: 300, useNativeDriver: true }),
-          Animated.timing(a, { toValue: 0.25, duration: 300, useNativeDriver: true }),
-          Animated.delay(600 - delay),
-        ])
-      );
-    const anims = dots.map((d, i) => pulse(d, i * 160));
-    anims.forEach((a) => a.start());
-    return () => anims.forEach((a) => a.stop());
-  }, []);
-  return (
-    <View style={s.thinking}>
-      {dots.map((d, i) => (
-        <Animated.View key={i} style={[s.dot, { opacity: d }]} />
-      ))}
-      <Text style={s.thinkingText}>thinking</Text>
-    </View>
-  );
-}
 
 export default function ChatScreen() {
-  const [messages, setMessages]   = useState<Message[]>([]);
-  const [input, setInput]         = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [brainOn, setBrainOn]     = useState(true);
+  const [messages, setMessages]     = useState<Message[]>([]);
+  const [input, setInput]           = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [online, setOnline]         = useState<boolean | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
-  const [correction, setCorrection] = useState<{
-    msg: Message; type: "wrong" | "partial";
-  } | null>(null);
-  const [corrText, setCorrText]   = useState("");
-  const [makeRule, setMakeRule]   = useState(false);
-  const listRef   = useRef<FlatList>(null);
+  const [correction, setCorrection] = useState<{ msg: Message; type: "wrong" | "partial" } | null>(null);
+  const [corrText, setCorrText]     = useState("");
+  const [makeRule, setMakeRule]     = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [serverUrl, setServerUrlState] = useState("");
+  const [uploadOpen, setUploadOpen]     = useState(false);
+  const [brainStatus, setBrainStatus]   = useState<BrainStatus | null>(null);
+  const [llmMode, setLlmMode]           = useState<LLMModeStatus | null>(null);
+  const [brainLoading, setBrainLoading] = useState(false);
+  const listRef  = useRef<FlatList>(null);
   const mountAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    api.brain.status().then((s) => setBrainOn(s.brain_on)).catch(() => {});
-    Animated.timing(mountAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
+    api.health().then(() => setOnline(true)).catch(() => setOnline(false));
+    getServerUrl().then(setServerUrlState);
+    Animated.timing(mountAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, []);
 
-  // Pulse the brain status dot when on
-  useEffect(() => {
-    pulseLoop.current?.stop();
-    if (brainOn) {
-      pulseLoop.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 2.2, duration: 900, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1,   duration: 900, useNativeDriver: true }),
-        ])
-      );
-      pulseLoop.current.start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-    return () => pulseLoop.current?.stop();
-  }, [brainOn]);
+  const loadBrainStatus = useCallback(async () => {
+    setBrainLoading(true);
+    try {
+      const [status, mode] = await Promise.all([api.brain.status(), api.llmMode.get()]);
+      setBrainStatus(status);
+      setLlmMode(mode);
+    } catch {}
+    finally { setBrainLoading(false); }
+  }, []);
+
+  const openSettings = useCallback(() => {
+    setSettingsOpen(true);
+    loadBrainStatus();
+  }, [loadBrainStatus]);
+
+  const saveServerUrl = useCallback(async () => {
+    await setServerUrl(serverUrl);
+    setSettingsOpen(false);
+    api.health().then(() => setOnline(true)).catch(() => setOnline(false));
+  }, [serverUrl]);
 
   const toBottom = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
@@ -143,7 +130,7 @@ export default function ChatScreen() {
         ...p,
         {
           id: `e${Date.now()}`, role: "assistant", feedback: null, timestamp: Date.now(),
-          text: "Server unreachable.\n\nRun:  bash start.sh\nThen set your IP in Brain → Settings",
+          text: "Server nicht erreichbar.\n\nBitte starten: bash start.sh\nDann IP unter System → Server einstellen.",
         },
       ]);
     } finally {
@@ -174,62 +161,69 @@ export default function ChatScreen() {
     setCorrection(null); setCorrText(""); setMakeRule(false);
   }, [correction, corrText, makeRule, giveFeedback]);
 
-  const openCorr = (msg: Message, type: "wrong" | "partial") => {
-    setCorrection({ msg, type }); setCorrText(""); setMakeRule(false);
-  };
-
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === "user";
-    return (
-      <View style={[s.msgWrap, isUser && s.msgWrapUser]}>
-        {!isUser && (
-          <View style={s.msgCol}>
-            <View style={s.lTag}><Text style={s.lTagText}>L</Text></View>
-            <View style={s.msgLine} />
+    if (isUser) {
+      return (
+        <View style={s.userRow}>
+          <View style={s.userBubble}>
+            <Text style={s.userText}>{item.text}</Text>
+            <Text style={s.userTs}>{relativeTime(item.timestamp)}</Text>
           </View>
-        )}
-        <View style={isUser ? s.msgBodyUser : s.msgBodyAI}>
-          <Text style={[s.msgText, isUser && s.msgTextUser]}>{item.text}</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={s.aiRow}>
+        <View style={s.aiAvatar}>
+          <Text style={s.aiAvatarText}>L</Text>
+        </View>
+        <View style={s.aiBubble}>
+          <Text style={s.aiText}>{item.text}</Text>
 
-          {!isUser && item.confidence && (
+          {item.confidence && (
             <View style={s.metaRow}>
-              <View style={[s.metaDot, { backgroundColor: CONF_COLOR[item.confidence] ?? C.dim }]} />
-              <Text style={s.metaText}>{item.confidence}</Text>
+              <View style={[s.confBadge, { backgroundColor: CONF_BG[item.confidence] ?? C.s2 }]}>
+                <View style={[s.confDot, { backgroundColor: CONF_COLOR[item.confidence] ?? C.dim }]} />
+                <Text style={[s.confText, { color: CONF_COLOR[item.confidence] ?? C.dim }]}>
+                  {CONF_LABEL[item.confidence] ?? item.confidence}
+                </Text>
+              </View>
               {item.brain_used && (
-                <Text style={[s.metaText, { color: C.accent, marginLeft: S.sm }]}>brain</Text>
+                <View style={s.brainBadge}>
+                  <Feather name="cpu" size={10} color={C.primary} />
+                  <Text style={s.brainBadgeText}>KI aktiv</Text>
+                </View>
               )}
-              <Text style={[s.metaText, { marginLeft: "auto" as any }]}>{relativeTime(item.timestamp)}</Text>
+              <Text style={s.aiTs}>{relativeTime(item.timestamp)}</Text>
             </View>
           )}
 
-          {isUser && (
-            <Text style={s.tsUser}>{relativeTime(item.timestamp)}</Text>
-          )}
-
-          {!isUser && item.feedback === null && (
+          {item.feedback === null && (
             <View style={s.fbRow}>
               <ScalePressable onPress={() => giveFeedback(item, "good")}>
-                <View style={s.fbGood}>
-                  <Feather name="check" size={12} color={C.green} />
+                <View style={s.fbBtn}>
+                  <Feather name="thumbs-up" size={12} color={C.green} />
+                  <Text style={[s.fbBtnText, { color: C.green }]}>Korrekt</Text>
                 </View>
               </ScalePressable>
-              <ScalePressable onPress={() => openCorr(item, "wrong")}>
-                <View style={s.fbBad}>
-                  <Feather name="x" size={12} color={C.mid} />
-                  <Text style={s.fbBadText}>wrong</Text>
+              <ScalePressable onPress={() => { setCorrection({ msg: item, type: "wrong" }); setCorrText(""); setMakeRule(false); }}>
+                <View style={s.fbBtn}>
+                  <Feather name="thumbs-down" size={12} color={C.mid} />
+                  <Text style={s.fbBtnText}>Falsch</Text>
                 </View>
               </ScalePressable>
-              <ScalePressable onPress={() => openCorr(item, "partial")}>
-                <View style={s.fbBad}>
-                  <Feather name="minus" size={12} color={C.mid} />
-                  <Text style={s.fbBadText}>partial</Text>
+              <ScalePressable onPress={() => { setCorrection({ msg: item, type: "partial" }); setCorrText(""); setMakeRule(false); }}>
+                <View style={s.fbBtn}>
+                  <Feather name="edit-2" size={12} color={C.mid} />
+                  <Text style={s.fbBtnText}>Ergänzen</Text>
                 </View>
               </ScalePressable>
             </View>
           )}
-          {!isUser && item.feedback != null && (
+          {item.feedback != null && (
             <Text style={s.fbDone}>
-              {item.feedback === "good" ? "noted ✓" : item.feedback === "wrong" ? "corrected" : "noted ~"}
+              {item.feedback === "good" ? "✓ Bestätigt" : item.feedback === "wrong" ? "Korrektur gespeichert" : "Ergänzung gespeichert"}
             </Text>
           )}
         </View>
@@ -241,21 +235,30 @@ export default function ChatScreen() {
     <SafeAreaView style={s.root} edges={["top"]}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.logo}>LIOS</Text>
-        <View style={s.statusRow}>
-          {/* Pulsing halo behind the dot */}
-          <View style={s.dotWrap}>
-            {brainOn && (
-              <Animated.View
-                style={[
-                  s.statusHalo,
-                  { transform: [{ scale: pulseAnim }], opacity: pulseAnim.interpolate({ inputRange: [1, 2.2], outputRange: [0.5, 0] }) },
-                ]}
-              />
-            )}
-            <View style={[s.statusDot, { backgroundColor: brainOn ? C.green : C.dim }]} />
+        <View style={s.headerLeft}>
+          <View style={s.logoBox}>
+            <Text style={s.logoText}>L</Text>
           </View>
-          <Text style={s.statusText}>{brainOn ? "brain on" : "brain off"}</Text>
+          <View>
+            <Text style={s.title}>LIOS</Text>
+            <Text style={s.subtitle}>Rechts­intelligenz</Text>
+          </View>
+        </View>
+        <View style={s.headerActions}>
+          <View style={s.statusPill}>
+            <View style={[s.statusDot, { backgroundColor: online === true ? C.online : online === false ? C.offline : C.dim }]} />
+            <Text style={s.statusLabel}>{online === true ? "Verbunden" : online === false ? "Offline" : "…"}</Text>
+          </View>
+          <ScalePressable onPress={() => setUploadOpen(true)}>
+            <View style={s.gearBtn}>
+              <Feather name="upload-cloud" size={16} color={C.mid} />
+            </View>
+          </ScalePressable>
+          <ScalePressable onPress={openSettings}>
+            <View style={s.gearBtn}>
+              <Feather name="settings" size={16} color={C.mid} />
+            </View>
+          </ScalePressable>
         </View>
       </View>
 
@@ -264,31 +267,32 @@ export default function ChatScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 56 : 0}
       >
-        <Animated.View
-          style={[s.flex, {
-            opacity: mountAnim,
-            transform: [{ translateY: mountAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
-          }]}
-        >
+        <Animated.View style={[s.flex, { opacity: mountAnim }]}>
           <FlatList
             ref={listRef}
             data={messages}
             keyExtractor={(m) => m.id}
             renderItem={renderItem}
             style={s.flex}
-            contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.list}
+            contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.listContent}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={toBottom}
             ListEmptyComponent={
               <View style={s.empty}>
-                <Feather name="feather" size={36} color={C.dim} style={{ marginBottom: S.md }} />
-                <Text style={s.emptyTitle}>Ask LIOS</Text>
-                <Text style={s.emptySub}>EU law · Compliance · Sustainability</Text>
-                {/* Quick-start chips */}
-                <View style={s.chipsWrap}>
+                <View style={s.emptyIcon}>
+                  <Feather name="shield" size={28} color={C.primary} />
+                </View>
+                <Text style={s.emptyTitle}>Compliance-Assistent</Text>
+                <Text style={s.emptySub}>
+                  CSRD · ESRS · EU-Taxonomie · SFDR · DSGVO
+                </Text>
+                <View style={s.divider} />
+                <Text style={s.quickLabel}>HÄUFIGE FRAGEN</Text>
+                <View style={s.chipsGrid}>
                   {QUICK_STARTS.map((q) => (
                     <ScalePressable key={q} onPress={() => send(q)}>
                       <View style={s.chip}>
+                        <Feather name="chevron-right" size={12} color={C.primary} />
                         <Text style={s.chipText}>{q}</Text>
                       </View>
                     </ScalePressable>
@@ -299,29 +303,120 @@ export default function ChatScreen() {
           />
         </Animated.View>
 
-        {loading && <ThinkingDots />}
+        {loading && <TypingIndicator />}
 
         {/* Input bar */}
-        <View style={s.bar}>
+        <View style={s.inputBar}>
           <TextInput
             style={[s.input, inputFocused && s.inputFocused]}
             value={input}
             onChangeText={setInput}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder="Ask about EU law…"
+            placeholder="Frage zum EU-Recht stellen…"
             placeholderTextColor={C.dim}
-            multiline={true}
+            multiline
             maxLength={500}
             onSubmitEditing={() => send()}
           />
           <ScalePressable onPress={() => send()} disabled={!input.trim() || loading}>
-            <View style={[s.send, (!input.trim() || loading) && s.sendOff]}>
-              <Feather name="send" size={16} color={input.trim() && !loading ? C.bg : C.dim} />
+            <View style={[s.sendBtn, (!input.trim() || loading) && s.sendBtnOff]}>
+              <Feather name="send" size={15} color={input.trim() && !loading ? C.card : C.dim} />
             </View>
           </ScalePressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Settings modal */}
+      <Modal visible={settingsOpen} transparent animationType="slide">
+        <KeyboardAvoidingView
+          style={s.overlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <Pressable style={s.flex} onPress={() => setSettingsOpen(false)} />
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>System</Text>
+
+            {/* Brain status section */}
+            <View style={s.statusSection}>
+              {brainLoading ? (
+                <View style={s.statusRow}>
+                  <Feather name="cpu" size={14} color={C.dim} />
+                  <Text style={s.statusSectionText}>Lade Systemstatus…</Text>
+                </View>
+              ) : brainStatus ? (
+                <>
+                  <View style={s.statusRow}>
+                    <View style={[s.statusDot, { backgroundColor: brainStatus.llm_reachable ? C.online : C.offline }]} />
+                    <Text style={s.statusSectionText}>
+                      KI: {brainStatus.llm_reachable ? "Erreichbar" : "Nicht erreichbar"}
+                      {llmMode ? `  ·  ${llmMode.label}` : ""}
+                    </Text>
+                  </View>
+                  <View style={s.statusRow}>
+                    <Feather name="cpu" size={13} color={brainStatus.brain_on ? C.primary : C.dim} />
+                    <Text style={s.statusSectionText}>
+                      Gehirn: {brainStatus.brain_on ? "Aktiv" : "Inaktiv"}
+                    </Text>
+                    <Pressable
+                      style={[s.brainToggle, brainStatus.brain_on && s.brainToggleOn]}
+                      onPress={async () => {
+                        const next = !brainStatus.brain_on;
+                        const updated = await api.brain.toggle(next).catch(() => null);
+                        if (updated) setBrainStatus(updated);
+                      }}
+                    >
+                      <Text style={[s.brainToggleText, brainStatus.brain_on && s.brainToggleTextOn]}>
+                        {brainStatus.brain_on ? "Ein" : "Aus"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <View style={s.statusRow}>
+                    <Feather name="database" size={13} color={C.dim} />
+                    <Text style={s.statusSectionText}>
+                      {brainStatus.knowledge_chunks} Chunks · {brainStatus.active_rules} Regeln · {brainStatus.total_corrections} Korrekturen
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View style={s.statusRow}>
+                  <View style={[s.statusDot, { backgroundColor: C.offline }]} />
+                  <Text style={s.statusSectionText}>Systemstatus nicht verfügbar</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={s.sectionDivider} />
+            <Text style={s.sheetSubtitle}>Server-Adresse</Text>
+            <TextInput
+              style={s.corrInput}
+              value={serverUrl}
+              onChangeText={setServerUrlState}
+              placeholder="http://..."
+              placeholderTextColor={C.dim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <View style={s.sheetBtns}>
+              <ScalePressable onPress={() => setSettingsOpen(false)} style={{ flex: 1 }}>
+                <View style={s.btnCancel}><Text style={s.btnCancelText}>Abbrechen</Text></View>
+              </ScalePressable>
+              <ScalePressable onPress={saveServerUrl} style={{ flex: 2 }}>
+                <View style={s.btnSave}>
+                  <Text style={s.btnSaveText}>Speichern</Text>
+                </View>
+              </ScalePressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Upload modal */}
+      <Modal visible={uploadOpen} animationType="slide" onRequestClose={() => setUploadOpen(false)}>
+        <UploadScreen onClose={() => setUploadOpen(false)} />
+      </Modal>
 
       {/* Correction modal */}
       <Modal visible={correction !== null} transparent animationType="slide">
@@ -331,31 +426,33 @@ export default function ChatScreen() {
         >
           <Pressable style={s.flex} onPress={() => setCorrection(null)} />
           <View style={s.sheet}>
-            <View style={s.sheetBar} />
+            <View style={s.sheetHandle} />
             <Text style={s.sheetTitle}>
-              {correction?.type === "wrong" ? "What is correct?" : "What was missing?"}
+              {correction?.type === "wrong" ? "Was ist korrekt?" : "Was fehlt in der Antwort?"}
             </Text>
             <TextInput
               style={s.corrInput}
               value={corrText}
               onChangeText={setCorrText}
-              placeholder="Type the correction…"
+              placeholder="Korrekte Information eingeben…"
               placeholderTextColor={C.dim}
-              multiline autoFocus textAlignVertical="top"
+              multiline
+              autoFocus
+              textAlignVertical="top"
             />
             <Pressable style={s.ruleRow} onPress={() => setMakeRule((v) => !v)}>
               <View style={[s.checkbox, makeRule && s.checkboxOn]}>
-                {makeRule && <Feather name="check" size={11} color={C.bg} />}
+                {makeRule && <Feather name="check" size={10} color={C.card} />}
               </View>
-              <Text style={s.ruleLabel}>Remember as permanent rule</Text>
+              <Text style={s.ruleLabel}>Als dauerhafter Merksatz speichern</Text>
             </Pressable>
             <View style={s.sheetBtns}>
               <ScalePressable onPress={() => setCorrection(null)} style={{ flex: 1 }}>
-                <View style={s.btnCancel}><Text style={s.btnCancelText}>Cancel</Text></View>
+                <View style={s.btnCancel}><Text style={s.btnCancelText}>Abbrechen</Text></View>
               </ScalePressable>
               <ScalePressable onPress={submitCorr} disabled={!corrText.trim()} style={{ flex: 2 }}>
                 <View style={[s.btnSave, !corrText.trim() && s.btnOff]}>
-                  <Text style={s.btnSaveText}>Save</Text>
+                  <Text style={s.btnSaveText}>Speichern</Text>
                 </View>
               </ScalePressable>
             </View>
@@ -367,102 +464,167 @@ export default function ChatScreen() {
 }
 
 const s = StyleSheet.create({
-  root:       { flex: 1, backgroundColor: C.bg },
-  flex:       { flex: 1 },
+  root:  { flex: 1, backgroundColor: C.bg },
+  flex:  { flex: 1 },
 
-  header:     {
+  // Header
+  header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: S.md + 2, paddingVertical: S.sm + 2,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border,
+    paddingHorizontal: S.md, paddingVertical: S.sm + 2,
+    backgroundColor: C.card,
+    borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  logo:       { fontSize: F.lg, fontWeight: W.heavy, color: C.accent, letterSpacing: 3 },
-  statusRow:  { flexDirection: "row", alignItems: "center", gap: 6 },
-  dotWrap:    { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
-  statusHalo: {
-    position: "absolute",
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: C.green,
+  headerLeft:  { flexDirection: "row", alignItems: "center", gap: S.sm },
+  logoBox:     {
+    width: 36, height: 36, borderRadius: R.sm,
+    backgroundColor: C.primary, alignItems: "center", justifyContent: "center",
   },
-  statusDot:  { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: F.xs, color: C.mid, letterSpacing: 0.5 },
+  logoText:    { color: C.card, fontSize: F.md, fontWeight: W.heavy, letterSpacing: 1 },
+  title:       { fontSize: F.lg, fontWeight: W.heavy, color: C.text, letterSpacing: 0.5 },
+  subtitle:    { fontSize: 10, color: C.dim, letterSpacing: 0.8, marginTop: 1 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: S.sm },
+  statusPill:  {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: C.s2, borderRadius: R.full,
+    paddingHorizontal: S.sm + 2, paddingVertical: 5,
+    borderWidth: 1, borderColor: C.border,
+  },
+  statusDot:   { width: 6, height: 6, borderRadius: 3 },
+  statusLabel: { fontSize: F.xs, color: C.mid, fontWeight: W.semi },
+  gearBtn:     { width: 34, height: 34, borderRadius: R.sm, alignItems: "center", justifyContent: "center", backgroundColor: C.s2, borderWidth: 1, borderColor: C.border },
 
-  list:          { paddingHorizontal: S.md, paddingTop: S.sm, paddingBottom: S.sm },
-  emptyContainer:{ flex: 1 },
-  empty:         { flex: 1, alignItems: "center", justifyContent: "center", padding: S.lg },
-  emptyTitle:    { fontSize: F.xl, fontWeight: W.bold, color: C.text, marginBottom: S.xs },
-  emptySub:      { fontSize: F.xs, color: C.dim, letterSpacing: 0.8, marginBottom: S.lg },
-  chipsWrap:     { gap: S.sm, alignSelf: "stretch" },
-  chip:          {
-    backgroundColor: C.s2, borderRadius: R.sm,
+  // List
+  listContent:    { paddingHorizontal: S.md, paddingVertical: S.md, gap: S.md },
+  emptyContainer: { flex: 1 },
+
+  // Empty state
+  empty:       { flex: 1, alignItems: "center", justifyContent: "center", padding: S.xl },
+  emptyIcon:   {
+    width: 60, height: 60, borderRadius: R.md,
+    backgroundColor: C.primaryDim, alignItems: "center", justifyContent: "center",
+    marginBottom: S.md,
+  },
+  emptyTitle:  { fontSize: F.xl, fontWeight: W.bold, color: C.text, marginBottom: S.xs },
+  emptySub:    { fontSize: F.xs, color: C.dim, letterSpacing: 0.5, textAlign: "center" },
+  divider:     { width: 40, height: 1, backgroundColor: C.border, marginVertical: S.md },
+  quickLabel:  { fontSize: 10, fontWeight: W.bold, color: C.dim, letterSpacing: 1.4, marginBottom: S.sm },
+  chipsGrid:   { gap: S.sm, alignSelf: "stretch" },
+  chip:        {
+    flexDirection: "row", alignItems: "center", gap: S.xs,
+    backgroundColor: C.card, borderRadius: R.sm,
     borderWidth: 1, borderColor: C.border,
     paddingHorizontal: S.md, paddingVertical: S.sm + 2,
+    shadowColor: "#001F6B", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
-  chipText:      { fontSize: F.sm, color: C.mid, lineHeight: 18 },
+  chipText:    { fontSize: F.sm, color: C.mid, flex: 1 },
 
-  msgWrap:    { flexDirection: "row", marginBottom: S.lg, alignItems: "flex-start" },
-  msgWrapUser:{ justifyContent: "flex-end" },
-  msgCol:     { alignItems: "center", marginRight: S.sm, width: 18 },
-  lTag:       { width: 18, height: 18, borderRadius: R.xs, backgroundColor: C.accent, alignItems: "center", justifyContent: "center" },
-  lTagText:   { color: C.bg, fontSize: 10, fontWeight: W.heavy },
-  msgLine:    { flex: 1, width: 1, backgroundColor: C.border, marginTop: 3 },
-  msgBodyAI:  {
-    flex: 1, backgroundColor: C.s2, borderRadius: R.md,
-    paddingHorizontal: S.md, paddingVertical: S.sm,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
-    borderLeftWidth: 3, borderLeftColor: C.accent,
-  },
-  msgBodyUser:{
-    backgroundColor: C.userMsg, borderRadius: R.md,
-    paddingHorizontal: S.md, paddingVertical: S.sm,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: C.accentPress,
+  // Messages — user
+  userRow:    { flexDirection: "row", justifyContent: "flex-end" },
+  userBubble: {
+    backgroundColor: C.primary, borderRadius: R.md,
+    borderBottomRightRadius: R.xs,
+    paddingHorizontal: S.md, paddingVertical: S.sm + 2,
     maxWidth: "78%",
   },
-  msgText:    { color: C.text, fontSize: F.md, lineHeight: F.md * 1.55 },
-  msgTextUser:{ color: C.userText },
-  tsUser:     { fontSize: 10, color: C.dim, marginTop: 4, textAlign: "right" },
+  userText:   { color: C.card, fontSize: F.md, lineHeight: F.md * 1.55 },
+  userTs:     { fontSize: 10, color: "rgba(255,255,255,0.55)", marginTop: 4, textAlign: "right" },
 
-  metaRow:    { flexDirection: "row", alignItems: "center", marginTop: S.sm, gap: 5 },
-  metaDot:    { width: 5, height: 5, borderRadius: 3 },
-  metaText:   { fontSize: F.xs, color: C.dim, letterSpacing: 0.5 },
+  // Messages — AI
+  aiRow:      { flexDirection: "row", alignItems: "flex-start", gap: S.sm },
+  aiAvatar:   {
+    width: 30, height: 30, borderRadius: R.sm,
+    backgroundColor: C.primary, alignItems: "center", justifyContent: "center",
+    marginTop: 2, flexShrink: 0,
+  },
+  aiAvatarText: { color: C.card, fontSize: F.xs, fontWeight: W.heavy },
+  aiBubble:   {
+    flex: 1, backgroundColor: C.card, borderRadius: R.md,
+    borderBottomLeftRadius: R.xs,
+    paddingHorizontal: S.md, paddingVertical: S.sm + 2,
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: "#001F6B", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 3, elevation: 2,
+  },
+  aiText:     { color: C.text, fontSize: F.md, lineHeight: F.md * 1.6 },
+  aiTs:       { fontSize: 10, color: C.dim, marginLeft: "auto" as any },
+
+  metaRow:    { flexDirection: "row", alignItems: "center", marginTop: S.sm, gap: S.xs, flexWrap: "wrap" },
+  confBadge:  {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    borderRadius: R.xs, paddingHorizontal: 7, paddingVertical: 3,
+  },
+  confDot:    { width: 5, height: 5, borderRadius: 3 },
+  confText:   { fontSize: 10, fontWeight: W.semi, letterSpacing: 0.3 },
+  brainBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: C.primaryDim, borderRadius: R.xs,
+    paddingHorizontal: 6, paddingVertical: 3,
+  },
+  brainBadgeText: { fontSize: 10, color: C.primary, fontWeight: W.semi },
 
   fbRow:      { flexDirection: "row", marginTop: S.sm, gap: S.xs },
-  fbGood:     { paddingHorizontal: S.sm, paddingVertical: 4, borderWidth: 1, borderColor: C.green, borderRadius: R.sm, alignItems: "center", justifyContent: "center" },
-  fbBad:      { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: S.sm, paddingVertical: 4, borderWidth: 1, borderColor: C.border, borderRadius: R.sm },
-  fbBadText:  { color: C.mid, fontSize: F.xs },
+  fbBtn:      {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: S.sm, paddingVertical: 4,
+    borderWidth: 1, borderColor: C.border, borderRadius: R.xs,
+    backgroundColor: C.bg,
+  },
+  fbBtnText:  { fontSize: 10, color: C.mid, fontWeight: W.medium },
   fbDone:     { marginTop: S.sm, fontSize: F.xs, color: C.dim },
 
-  thinking:   { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: S.md + 2, paddingVertical: S.xs },
-  dot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent },
-  thinkingText:{ fontSize: F.xs, color: C.dim, letterSpacing: 0.8, marginLeft: 4 },
-
-  bar:        {
+  // Input bar
+  inputBar:   {
     flexDirection: "row", alignItems: "flex-end", gap: S.sm,
     paddingHorizontal: S.sm, paddingVertical: S.sm,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border, backgroundColor: C.bg,
+    borderTopWidth: 1, borderTopColor: C.border,
+    backgroundColor: C.card,
   },
   input:      {
-    flex: 1, backgroundColor: C.s1, borderRadius: R.lg,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
+    flex: 1, backgroundColor: C.bg, borderRadius: R.lg,
+    borderWidth: 1, borderColor: C.border,
     paddingHorizontal: S.md, paddingTop: 10, paddingBottom: 10,
     color: C.text, fontSize: F.md, maxHeight: 110,
   },
-  inputFocused:{ borderColor: C.borderBright },
-  send:       { width: 40, height: 40, borderRadius: R.full, backgroundColor: C.accent, alignItems: "center", justifyContent: "center" },
-  sendOff:    { backgroundColor: C.s2 },
+  inputFocused: { borderColor: C.primary },
+  sendBtn:    {
+    width: 40, height: 40, borderRadius: R.full,
+    backgroundColor: C.primary, alignItems: "center", justifyContent: "center",
+  },
+  sendBtnOff: { backgroundColor: C.s2 },
 
-  overlay:    { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
-  sheet:      { backgroundColor: C.s3, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg, padding: S.lg, paddingBottom: 40, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
-  sheetBar:   { width: 32, height: 3, backgroundColor: C.border, borderRadius: 2, alignSelf: "center", marginBottom: S.md + 2 },
-  sheetTitle: { fontSize: F.md, fontWeight: W.bold, color: C.text, marginBottom: S.sm },
-  corrInput:  { backgroundColor: C.s2, borderRadius: R.md, padding: S.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border, color: C.text, fontSize: F.md, minHeight: 80, marginBottom: S.sm },
-  ruleRow:    { flexDirection: "row", alignItems: "center", gap: S.sm, marginBottom: S.lg },
-  checkbox:   { width: 18, height: 18, borderRadius: R.xs, borderWidth: 1.5, borderColor: C.border, alignItems: "center", justifyContent: "center" },
-  checkboxOn: { backgroundColor: C.accent, borderColor: C.accent },
-  ruleLabel:  { fontSize: F.sm, color: C.mid },
-  sheetBtns:  { flexDirection: "row", gap: S.sm },
-  btnCancel:  { padding: S.sm, borderRadius: R.md, backgroundColor: C.s2, alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
-  btnCancelText:{ color: C.mid, fontWeight: W.semi, fontSize: F.sm },
-  btnSave:    { padding: S.sm, borderRadius: R.md, backgroundColor: C.accent, alignItems: "center" },
-  btnOff:     { opacity: 0.35 },
-  btnSaveText:{ color: C.bg, fontWeight: W.bold, fontSize: F.sm },
+  sheetSubtitle: { fontSize: F.sm, fontWeight: W.bold, color: C.mid, marginBottom: S.xs },
+  sectionDivider: { height: 1, backgroundColor: C.border, marginVertical: S.sm },
+  statusSection: { backgroundColor: C.s2, borderRadius: R.sm, padding: S.sm, gap: S.xs, marginBottom: S.xs },
+  statusRow:    { flexDirection: "row", alignItems: "center", gap: S.sm },
+  statusSectionText: { fontSize: F.sm, color: C.mid, flex: 1 },
+  brainToggle:  { paddingHorizontal: S.sm, paddingVertical: 3, borderRadius: R.xs, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
+  brainToggleOn: { backgroundColor: C.primaryDim, borderColor: C.primary },
+  brainToggleText: { fontSize: F.xs, color: C.dim, fontWeight: W.semi },
+  brainToggleTextOn: { color: C.primary },
+
+  // Correction sheet
+  overlay:    { flex: 1, backgroundColor: "rgba(15,28,51,0.45)", justifyContent: "flex-end" },
+  sheet:      {
+    backgroundColor: C.card, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg,
+    padding: S.lg, paddingBottom: 40,
+    borderTopWidth: 1, borderTopColor: C.border,
+  },
+  sheetHandle: { width: 36, height: 3, backgroundColor: C.border, borderRadius: 2, alignSelf: "center", marginBottom: S.md },
+  sheetTitle:  { fontSize: F.lg, fontWeight: W.bold, color: C.text, marginBottom: S.sm },
+  corrInput:   {
+    backgroundColor: C.bg, borderRadius: R.md, padding: S.md,
+    borderWidth: 1, borderColor: C.border,
+    color: C.text, fontSize: F.md, minHeight: 80, marginBottom: S.sm,
+  },
+  ruleRow:     { flexDirection: "row", alignItems: "center", gap: S.sm, marginBottom: S.lg },
+  checkbox:    { width: 18, height: 18, borderRadius: R.xs, borderWidth: 1.5, borderColor: C.border, alignItems: "center", justifyContent: "center" },
+  checkboxOn:  { backgroundColor: C.primary, borderColor: C.primary },
+  ruleLabel:   { fontSize: F.sm, color: C.mid },
+  sheetBtns:   { flexDirection: "row", gap: S.sm },
+  btnCancel:   { padding: S.sm + 2, borderRadius: R.md, backgroundColor: C.bg, alignItems: "center", borderWidth: 1, borderColor: C.border },
+  btnCancelText: { color: C.mid, fontWeight: W.semi, fontSize: F.sm },
+  btnSave:     { padding: S.sm + 2, borderRadius: R.md, backgroundColor: C.primary, alignItems: "center" },
+  btnOff:      { opacity: 0.35 },
+  btnSaveText: { color: C.card, fontWeight: W.bold, fontSize: F.sm },
 });

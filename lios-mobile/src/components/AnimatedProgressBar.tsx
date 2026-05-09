@@ -3,7 +3,7 @@ import { Animated, StyleSheet, View } from "react-native";
 import { C, R } from "../theme";
 
 interface Props {
-  value: number;   // 0-100
+  value: number;
   color?: string;
   height?: number;
   bgColor?: string;
@@ -12,8 +12,8 @@ interface Props {
 
 export default function AnimatedProgressBar({
   value,
-  color = C.accent,
-  height = 5,
+  color = C.primary,
+  height = 6,
   bgColor = C.s2,
   duration = 600,
 }: Props) {
@@ -35,15 +35,7 @@ export default function AnimatedProgressBar({
   return (
     <View style={[styles.track, { height, backgroundColor: bgColor, borderRadius: height / 2 }]}>
       <Animated.View
-        style={[
-          styles.fill,
-          {
-            width: animatedWidth,
-            height,
-            backgroundColor: color,
-            borderRadius: height / 2,
-          },
-        ]}
+        style={[styles.fill, { width: animatedWidth, height, backgroundColor: color, borderRadius: height / 2 }]}
       />
     </View>
   );
@@ -51,5 +43,5 @@ export default function AnimatedProgressBar({
 
 const styles = StyleSheet.create({
   track: { overflow: "hidden" },
-  fill: {},
+  fill:  {},
 });

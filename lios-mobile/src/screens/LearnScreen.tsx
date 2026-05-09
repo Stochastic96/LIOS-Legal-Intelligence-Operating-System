@@ -2,488 +2,574 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { api, LearnNext } from "../api/client";
-import AnimatedProgressBar from "../components/AnimatedProgressBar";
-import Card from "../components/Card";
-import ScalePressable from "../components/ScalePressable";
-import { C, F, R, S, W } from "../theme";
+import { api, KnowledgeMap, KnowledgeMapTopic } from "../api/client";
+import TypingIndicator from "../components/TypingIndicator";
+import { C, F, R, S, W, pctColor, pctBgColor } from "../theme";
 
-const STATUS_ICON: Record<string, string> = {
-  mastered:   "🏆",
-  functional: "✅",
-  connected:  "🧩",
-  learning:   "📖",
-  seed:       "🌱",
-  unknown:    "🔲",
+// ── Message model ──────────────────────────────────────────────────────────────
+
+type LearnMsg =
+  | { kind: "dashboard"; id: string; map: KnowledgeMap }
+  | {
+      kind: "question";
+      id: string;
+      topicId: string;
+      topic: string;
+      category: string;
+      topicPct: number;
+      topicStatus: string;
+      text: string;
+    }
+  | { kind: "user"; id: string; text: string }
+  | {
+      kind: "result";
+      id: string;
+      newPct: number;
+      status: string;
+      nextTopic: string | null;
+    }
+  | { kind: "mastered"; id: string };
+
+const STATUS_LABEL: Record<string, string> = {
+  mastered:   "Beherrscht",
+  functional: "Funktional",
+  connected:  "Vernetzt",
+  learning:   "In Bearbeitung",
+  seed:       "Einführung",
+  unknown:    "Unbekannt",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  mastered:   C.green,
-  functional: C.accent,
-  connected:  C.accent,
-  learning:   C.amber,
-  seed:       C.mid,
-  unknown:    C.dim,
-};
+// ── Animated progress bar (inline, lightweight) ────────────────────────────────
+
+function ProgressBar({ value, color, height = 4 }: { value: number; color: string; height?: number }) {
+  const anim = useRef(new Animated.Value(value)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: value, duration: 500, useNativeDriver: false }).start();
+  }, [value]);
+  return (
+    <View style={[st.pbTrack, { height }]}>
+      <Animated.View
+        style={[
+          st.pbFill,
+          { height, backgroundColor: color, width: anim.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] }) },
+        ]}
+      />
+    </View>
+  );
+}
+
+// ── Dashboard card (from KnowledgeMapScreen) ──────────────────────────────────
+
+function DashboardCard({ map: m, readyPct, isReady, cats }: {
+  map: KnowledgeMap;
+  readyPct: number;
+  isReady: boolean;
+  cats: [string, KnowledgeMapTopic[]][];
+}) {
+  const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
+  const toggle = (cat: string) => setExpanded((p) => ({ ...p, [cat]: !p[cat] }));
+
+  return (
+    <View style={st.dashCard}>
+      <View style={st.dashAccent} />
+      <View style={st.dashBody}>
+        <View style={st.dashHeaderRow}>
+          <View style={st.dashIconBox}>
+            <Feather name="cpu" size={16} color={C.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.dashTitle}>LIOS Wissensprofil</Text>
+            <Text style={st.dashSub}>EU-Recht · EuGH-Rechtsprechung · Deutsches Recht</Text>
+          </View>
+          <View style={[st.readyBadge, { backgroundColor: isReady ? C.greenBg : C.amberBg }]}>
+            <Text style={[st.readyText, { color: isReady ? C.green : C.amber }]}>
+              {isReady ? "Mandatsbereit" : "In Ausbildung"}
+            </Text>
+          </View>
+        </View>
+
+        {/* Overall progress bar */}
+        <View style={st.dashOverallRow}>
+          <Text style={st.dashPctLarge}>{readyPct}%</Text>
+          <View style={{ flex: 1 }}>
+            <ProgressBar value={readyPct} color={pctColor(readyPct)} height={8} />
+          </View>
+        </View>
+
+        {/* Stat tiles */}
+        <View style={st.statRow}>
+          {[
+            { label: "Beherrscht", count: m.mastered,   color: C.green,   bg: C.greenBg },
+            { label: "Funktional", count: m.functional, color: C.primary, bg: C.primaryDim },
+            { label: "In Bearb.",  count: m.learning,   color: C.amber,   bg: C.amberBg },
+            { label: "Unbekannt",  count: m.unknown,    color: C.dim,     bg: C.s2 },
+          ].map(({ label, count, color, bg }) => (
+            <View key={label} style={[st.statTile, { backgroundColor: bg }]}>
+              <Text style={[st.statCount, { color }]}>{count}</Text>
+              <Text style={[st.statLabel, { color }]}>{label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={st.dashDivider} />
+
+        {/* Category sections — expandable */}
+        {cats.map(([cat, topics]) => {
+          const catPct = Math.round(topics.reduce((s, t) => s + (t as any).pct, 0) / topics.length);
+          const open   = !!expanded[cat];
+          return (
+            <View key={cat}>
+              <TouchableOpacity style={st.catHeaderRow} onPress={() => toggle(cat)} activeOpacity={0.7}>
+                <View style={st.dashCatBar}>
+                  <Text style={st.dashCatName} numberOfLines={1}>{cat}</Text>
+                  <ProgressBar value={catPct} color={pctColor(catPct)} height={4} />
+                </View>
+                <Text style={[st.dashCatPct, { color: pctColor(catPct) }]}>{catPct}%</Text>
+                <Feather name={open ? "chevron-up" : "chevron-down"} size={13} color={C.dim} />
+              </TouchableOpacity>
+              {open && topics.map((t) => (
+                <View key={t.id} style={st.topicRow}>
+                  <View style={[st.topicDot, { backgroundColor: pctColor(t.pct) }]} />
+                  <Text style={st.topicRowName} numberOfLines={1}>{t.name}</Text>
+                  <View style={st.topicBarWrap}>
+                    <ProgressBar value={t.pct} color={pctColor(t.pct)} height={3} />
+                  </View>
+                  <View style={[st.topicStatusBadge, { backgroundColor: pctBgColor(t.pct) }]}>
+                    <Text style={[st.topicStatusText, { color: pctColor(t.pct) }]}>
+                      {STATUS_LABEL[t.status] ?? t.status}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ── Main screen ────────────────────────────────────────────────────────────────
 
 export default function LearnScreen() {
-  const [learnData, setLearnData] = useState<LearnNext | null>(null);
-  const [answer, setAnswer] = useState("");
-  const [reference, setReference] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [messages, setMessages]     = useState<LearnMsg[]>([]);
+  const [answer, setAnswer]         = useState("");
+  const [refText, setRefText]       = useState("");
+  const [showRef, setShowRef]       = useState(false);
+  const [loading, setLoading]       = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [awaitingNext, setAwaitingNext] = useState(false); // result shown, waiting for Weiter
   const [overallPct, setOverallPct] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [answerFocused, setAnswerFocused] = useState(false);
-  const [result, setResult] = useState<{
-    name: string;
-    pct: number;
-    status: string;
-    nextTopic: string | null;
-  } | null>(null);
+  const [streak, setStreak]         = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
 
-  const mountAnim  = useRef(new Animated.Value(0)).current;
-  const streakAnim = useRef(new Animated.Value(1)).current;
-  const resultAnim = useRef(new Animated.Value(0)).current;
-  const prevStreak = useRef(streak);
+  const listRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    Animated.timing(mountAnim, {
-      toValue: 1,
-      duration: 320,
-      useNativeDriver: true,
-    }).start();
+  const toBottom = useCallback(() => {
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
   }, []);
 
-  useEffect(() => {
-    if (streak > prevStreak.current) {
-      Animated.sequence([
-        Animated.timing(streakAnim, { toValue: 1.35, duration: 120, useNativeDriver: true }),
-        Animated.spring(streakAnim, { toValue: 1, speed: 20, bounciness: 8, useNativeDriver: true }),
-      ]).start();
-    }
-    prevStreak.current = streak;
-  }, [streak]);
+  const pushMsg = useCallback((msg: LearnMsg) => {
+    setMessages((prev) => [...prev, msg]);
+  }, []);
 
-  const loadNext = useCallback(async (resetStreak = false) => {
+  const loadNext = useCallback(async () => {
     setLoading(true);
-    setResult(null);
     setAnswer("");
-    setReference("");
-    if (resetStreak) setStreak(0);
+    setRefText("");
+    setShowRef(false);
+    setAwaitingNext(false);
     try {
       const data = await api.learn.next();
-      setLearnData(data);
-      const map = await api.learn.map();
-      setOverallPct(map.overall_pct);
+      if (data.all_mastered || !data.topic || !data.question) {
+        pushMsg({ kind: "mastered", id: `m${Date.now()}` });
+      } else {
+        setCurrentTopicId(data.topic.id);
+        setOverallPct((p) => data.topic ? data.topic.pct : p);
+        pushMsg({
+          kind:        "question",
+          id:          `q${Date.now()}`,
+          topicId:     data.topic.id,
+          topic:       data.topic.name,
+          category:    data.topic.category,
+          topicPct:    data.topic.pct,
+          topicStatus: data.topic.status,
+          text:        data.question,
+        });
+      }
     } catch {
-      setLearnData(null);
+      pushMsg({
+        kind: "result", id: `err${Date.now()}`,
+        newPct: 0, status: "unknown", nextTopic: null,
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pushMsg]);
 
   useEffect(() => {
-    loadNext(false);
-  }, [loadNext]);
+    (async () => {
+      const map = await api.learn.map().catch(() => null);
+      if (map) pushMsg({ kind: "dashboard", id: "dash", map });
+      await loadNext();
+    })();
+  }, [loadNext, pushMsg]);
 
   const submitAnswer = useCallback(async () => {
-    if (!learnData?.topic || !answer.trim()) return;
+    if (!answer.trim() || submitting || awaitingNext || !currentTopicId) return;
+    const text = answer.trim();
+    const ref  = refText.trim();
+    pushMsg({ kind: "user", id: `u${Date.now()}`, text });
+    setAnswer("");
+    setRefText("");
+    setShowRef(false);
     setSubmitting(true);
     try {
-      const res = await api.learn.answer(learnData.topic.id, answer.trim(), reference.trim());
+      const res = await api.learn.answer(currentTopicId, text, ref);
+      setOverallPct(res.overall_pct);
       setStreak((s) => s + 1);
-      resultAnim.setValue(0);
-      setResult({
-        name:      res.topic_updated.name,
-        pct:       res.topic_updated.pct,
+      pushMsg({
+        kind:      "result",
+        id:        `r${Date.now()}`,
+        newPct:    res.topic_updated.pct,
         status:    res.topic_updated.status,
         nextTopic: res.next_topic,
       });
-      Animated.spring(resultAnim, {
-        toValue: 1, speed: 14, bounciness: 10, useNativeDriver: true,
-      }).start();
-      setOverallPct(res.overall_pct);
+      setAwaitingNext(true);
     } catch {
-      // ignore
+      pushMsg({ kind: "result", id: `err${Date.now()}`, newPct: 0, status: "error", nextTopic: null });
     } finally {
       setSubmitting(false);
     }
-  }, [learnData, answer, reference]);
+  }, [answer, refText, submitting, awaitingNext, currentTopicId, pushMsg]);
 
-  const fadeStyle = {
-    opacity: mountAnim,
-    transform: [
-      {
-        translateY: mountAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [16, 0],
-        }),
-      },
-    ],
+  // ── Render a single message ─────────────────────────────────────────────────
+
+  const renderItem = ({ item }: { item: LearnMsg }) => {
+    if (item.kind === "dashboard") {
+      const m = item.map;
+      const readyPct = m.overall_pct;
+      const isReady  = readyPct >= 70;
+      const cats = Object.entries(m.categories);
+      return (
+        <DashboardCard
+          map={m}
+          readyPct={readyPct}
+          isReady={isReady}
+          cats={cats}
+        />
+      );
+    }
+
+    if (item.kind === "question") {
+      return (
+        <View style={st.questionCard}>
+          <View style={st.questionAccent} />
+          <View style={st.questionBody}>
+            <View style={st.questionMeta}>
+              <View style={st.fragenLabel}>
+                <Feather name="help-circle" size={11} color={C.primary} />
+                <Text style={st.fragenText}>FRAGE</Text>
+              </View>
+              <View style={st.catPill}>
+                <Text style={st.catText}>{item.category}</Text>
+              </View>
+            </View>
+            <Text style={st.topicName}>{item.topic}</Text>
+            <View style={st.topicPctRow}>
+              <ProgressBar value={item.topicPct} color={pctColor(item.topicPct)} height={4} />
+              <Text style={[st.topicPctText, { color: pctColor(item.topicPct) }]}>{item.topicPct}%</Text>
+            </View>
+            <View style={st.qDivider} />
+            <Text style={st.questionText}>{item.text}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.kind === "user") {
+      return (
+        <View style={st.userRow}>
+          <View style={st.userBubble}>
+            <Text style={st.userText}>{item.text}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.kind === "result") {
+      if (item.status === "error") {
+        return (
+          <View style={st.errorBubble}>
+            <Feather name="alert-circle" size={14} color={C.red} />
+            <Text style={st.errorText}>Verbindungsfehler — bitte erneut versuchen.</Text>
+          </View>
+        );
+      }
+      const col = pctColor(item.newPct);
+      return (
+        <View style={st.resultCard}>
+          <View style={[st.resultAccent, { backgroundColor: col }]} />
+          <View style={st.resultBody}>
+            <View style={st.resultTop}>
+              <View>
+                <Text style={st.resultLabel}>ERGEBNIS</Text>
+                <Text style={[st.resultStatus, { color: col }]}>
+                  {STATUS_LABEL[item.status] ?? item.status}
+                </Text>
+              </View>
+              <Text style={[st.resultPct, { color: col }]}>{item.newPct}%</Text>
+            </View>
+            <ProgressBar value={item.newPct} color={col} height={6} />
+            {item.nextTopic && (
+              <Text style={st.nextHint}>Nächstes: {item.nextTopic}</Text>
+            )}
+            <TouchableOpacity style={st.weiterBtn} onPress={loadNext} activeOpacity={0.75}>
+              <Text style={st.weiterText}>Weiter</Text>
+              <Feather name="arrow-right" size={14} color={C.card} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.kind === "mastered") {
+      return (
+        <View style={st.masteredCard}>
+          <View style={[st.masteredIcon]}>
+            <Feather name="award" size={28} color={C.green} />
+          </View>
+          <Text style={st.masteredTitle}>Alle Themen beherrscht!</Text>
+          <Text style={st.masteredSub}>Sie haben alle EU-Compliance-Themen abgeschlossen.</Text>
+          <TouchableOpacity style={st.weiterBtn} onPress={loadNext} activeOpacity={0.75}>
+            <Feather name="refresh-cw" size={14} color={C.card} />
+            <Text style={st.weiterText}>Neu starten</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return null;
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.accent} />
-          <Text style={styles.loadingText}>LIOS is deciding what to ask you…</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!learnData || learnData.all_mastered) {
-    return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.center}>
-          <Text style={styles.masteredEmoji}>🏆</Text>
-          <Text style={styles.masteredTitle}>All topics mastered!</Text>
-          <Text style={styles.masteredSub}>
-            LIOS has learned everything in the current knowledge map.
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const topic = learnData.topic!;
-  const topicStatusColor = STATUS_COLOR[topic.status] ?? C.accent;
+  const canSend = answer.trim().length > 0 && !submitting && !awaitingNext && !loading;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={st.root} edges={["top"]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Learn Mode</Text>
-        <View style={styles.headerRight}>
+      <View style={st.header}>
+        <Text style={st.headerTitle}>Lernen</Text>
+        <View style={st.headerRight}>
           {streak > 0 && (
-            <Animated.View
-              style={[styles.streakBadge, { transform: [{ scale: streakAnim }] }]}
-            >
-              <Text style={styles.streakText}>🔥 {streak}</Text>
-            </Animated.View>
+            <View style={st.streakBadge}>
+              <Feather name="zap" size={11} color={C.amber} />
+              <Text style={st.streakText}>{streak}</Text>
+            </View>
           )}
-          <View style={styles.progressBadge}>
-            <Text style={styles.progressText}>{overallPct}% mapped</Text>
+          <View style={st.pctBadge}>
+            <Text style={st.pctText}>{overallPct}%</Text>
           </View>
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
+      {/* Thin overall progress bar */}
+      <ProgressBar value={overallPct} color={C.primary} height={3} />
+
+      <KeyboardAvoidingView
+        style={st.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 56 : 0}
       >
-        <Animated.View style={fadeStyle}>
-          {/* Topic chip */}
-          <Card surface="s2" style={[styles.topicChip, { borderLeftColor: topicStatusColor }]}>
-            <View style={styles.topicRow}>
-              <Text style={styles.topicIcon}>{STATUS_ICON[topic.status] ?? "📖"}</Text>
-              <View style={styles.topicMeta}>
-                <Text style={[styles.topicName, { color: topicStatusColor }]}>
-                  {topic.name}
-                </Text>
-                <Text style={styles.topicCategory}>{topic.category}</Text>
+        <FlatList
+          ref={listRef}
+          data={messages}
+          keyExtractor={(m) => m.id}
+          renderItem={renderItem}
+          style={st.flex}
+          contentContainerStyle={messages.length === 0 ? st.emptyContainer : st.listContent}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={toBottom}
+          ListEmptyComponent={
+            <View style={st.emptyState}>
+              <View style={st.emptyIcon}>
+                <Feather name="book-open" size={26} color={C.primary} />
               </View>
-              <View style={styles.topicPctBadge}>
-                <Text style={[styles.topicPctText, { color: topicStatusColor }]}>
-                  {topic.pct}%
-                </Text>
-              </View>
+              <Text style={st.emptyTitle}>EU-Compliance Lernmodus</Text>
+              <Text style={st.emptySub}>CSRD · ESRS · EU-Taxonomie · SFDR · DSGVO</Text>
             </View>
-            <AnimatedProgressBar
-              value={topic.pct}
-              color={topicStatusColor}
-              height={4}
-              bgColor={C.s1}
-              duration={600}
+          }
+        />
+
+        {(loading || submitting) && <TypingIndicator />}
+
+        {/* Input bar */}
+        <View style={st.inputArea}>
+          {showRef && (
+            <TextInput
+              style={st.refInput}
+              value={refText}
+              onChangeText={setRefText}
+              placeholder="Quelle (z.B. CSRD Art. 19a) — optional"
+              placeholderTextColor={C.dim}
             />
-          </Card>
-
-          {/* Question card */}
-          <Card surface="s2" style={styles.questionCard}>
-            <Text style={styles.questionLabel}>LIOS wants to know</Text>
-            <Text style={styles.questionText}>{learnData.question}</Text>
-          </Card>
-
-          {result ? (
-            /* Result card — spring entrance */
-            <Animated.View
-              style={{
-                opacity: resultAnim,
-                transform: [
-                  { scale: resultAnim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
-                  { translateY: resultAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
-                ],
-              }}
-            >
-              <View style={styles.resultCard}>
-                <View style={styles.resultHeader}>
-                  <Feather name="check-circle" size={22} color={C.green} />
-                  <Text style={styles.resultTitle}>Stored</Text>
-                  <View style={styles.resultXp}>
-                    <Text style={styles.resultXpText}>+XP</Text>
-                  </View>
-                </View>
-
-                <View style={styles.resultStat}>
-                  <Text style={styles.resultStatNum}>{result.pct}%</Text>
-                  <View>
-                    <Text style={styles.resultLine}>{result.name}</Text>
-                    <Text style={styles.resultStatus}>{result.status}</Text>
-                  </View>
-                </View>
-
-                {result.nextTopic && (
-                  <View style={styles.nextTopicRow}>
-                    <View style={styles.nextTopicLabelRow}>
-                      <Feather name="arrow-right" size={11} color={C.accent} />
-                      <Text style={styles.nextTopicLabel}>UP NEXT</Text>
-                    </View>
-                    <Text style={styles.resultNext}>{result.nextTopic}</Text>
-                  </View>
-                )}
-
-                <ScalePressable onPress={() => loadNext(false)}>
-                  <View style={styles.nextBtn}>
-                    <Text style={styles.nextBtnText}>Next Question</Text>
-                    <Feather name="chevron-right" size={16} color={C.accent} />
-                  </View>
-                </ScalePressable>
-              </View>
-            </Animated.View>
-          ) : (
-            /* Answer form */
-            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-              <Text style={styles.fieldLabel}>Your answer</Text>
-              <TextInput
-                style={[
-                  styles.answerInput,
-                  answerFocused && styles.inputFocused,
-                ]}
-                value={answer}
-                onChangeText={setAnswer}
-                onFocus={() => setAnswerFocused(true)}
-                onBlur={() => setAnswerFocused(false)}
-                placeholder="Explain what you know…"
-                placeholderTextColor={C.dim}
-                multiline
-                textAlignVertical="top"
-              />
-              <Text style={styles.fieldLabel}>Reference (optional)</Text>
-              <TextInput
-                style={styles.refInput}
-                value={reference}
-                onChangeText={setReference}
-                placeholder="e.g. EUR-Lex, IFRS Foundation, ESMA"
-                placeholderTextColor={C.dim}
-              />
-
-              <View style={styles.actionRow}>
-                <ScalePressable onPress={() => loadNext(true)} style={{ flex: 1 }}>
-                  <View style={styles.skipBtn}>
-                    <Feather name="skip-forward" size={15} color={C.mid} />
-                    <Text style={styles.skipBtnText}>Skip</Text>
-                  </View>
-                </ScalePressable>
-
-                <ScalePressable
-                  onPress={submitAnswer}
-                  disabled={!answer.trim() || submitting}
-                  style={{ flex: 2 }}
-                >
-                  <View style={[styles.teachBtn, (!answer.trim() || submitting) && styles.btnDisabled]}>
-                    {submitting ? (
-                      <ActivityIndicator size="small" color={C.bg} />
-                    ) : (
-                      <>
-                        <Text style={styles.teachBtnText}>Teach LIOS</Text>
-                        <Feather name="send" size={15} color={C.bg} />
-                      </>
-                    )}
-                  </View>
-                </ScalePressable>
-              </View>
-            </KeyboardAvoidingView>
           )}
-        </Animated.View>
-      </ScrollView>
+          <View style={st.inputRow}>
+            <TouchableOpacity
+              style={[st.refToggle, showRef && st.refToggleOn]}
+              onPress={() => setShowRef((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Feather name="link" size={14} color={showRef ? C.primary : C.dim} />
+            </TouchableOpacity>
+            <TextInput
+              style={[st.input, inputFocused && st.inputFocused]}
+              value={answer}
+              onChangeText={setAnswer}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
+              placeholder={awaitingNext ? "Tippen Sie auf Weiter…" : "Ihre Antwort eingeben…"}
+              placeholderTextColor={C.dim}
+              multiline
+              maxLength={800}
+              editable={!awaitingNext && !loading}
+            />
+            <TouchableOpacity
+              style={[st.sendBtn, !canSend && st.sendBtnOff]}
+              onPress={submitAnswer}
+              disabled={!canSend}
+              activeOpacity={0.75}
+            >
+              <Feather name="send" size={15} color={canSend ? C.card : C.dim} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: C.bg },
-  center:         { flex: 1, alignItems: "center", justifyContent: "center", padding: S.xl },
-  loadingText:    { color: C.mid, marginTop: S.sm, fontSize: F.sm },
-  masteredEmoji:  { fontSize: 52, marginBottom: S.md },
-  masteredTitle:  { fontSize: F.xl, fontWeight: W.bold, color: C.text, marginBottom: S.sm },
-  masteredSub:    { fontSize: F.sm, color: C.mid, textAlign: "center" },
+// ── Styles ─────────────────────────────────────────────────────────────────────
 
-  header:         {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: S.md,
-    paddingVertical: S.sm + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  headerTitle:    { fontSize: F.lg, fontWeight: W.bold, color: C.text },
-  headerRight:    { flexDirection: "row", alignItems: "center", gap: S.sm },
-  streakBadge:    {
-    backgroundColor: C.redDim,
-    borderRadius: R.full,
-    paddingHorizontal: S.sm + 2,
-    paddingVertical: 3,
-  },
-  streakText:     { fontSize: F.xs, fontWeight: W.bold, color: C.amber },
-  progressBadge:  {
-    backgroundColor: C.accentDim,
-    borderRadius: R.full,
-    paddingHorizontal: S.sm + 4,
-    paddingVertical: 3,
-  },
-  progressText:   { fontSize: F.xs, fontWeight: W.semi, color: C.accent },
+const st = StyleSheet.create({
+  root:  { flex: 1, backgroundColor: C.bg },
+  flex:  { flex: 1 },
 
-  scroll:         { padding: S.md, paddingBottom: S.xxl },
+  // Header
+  header:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: S.md, paddingVertical: S.sm + 2, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+  headerTitle: { fontSize: F.xl, fontWeight: W.bold, color: C.text },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: S.sm },
+  streakBadge: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: C.amberBg, borderRadius: R.full, paddingHorizontal: S.sm, paddingVertical: 4, borderWidth: 1, borderColor: C.amber + "44" },
+  streakText:  { fontSize: F.xs, fontWeight: W.bold, color: C.amber },
+  pctBadge:    { backgroundColor: C.primaryDim, borderRadius: R.full, paddingHorizontal: S.sm, paddingVertical: 4 },
+  pctText:     { fontSize: F.xs, fontWeight: W.bold, color: C.primary },
 
-  topicChip:      { marginBottom: S.md, borderLeftWidth: 3, gap: S.sm },
-  topicRow:       { flexDirection: "row", alignItems: "center", gap: S.sm, marginBottom: S.sm },
-  topicIcon:      { fontSize: 24 },
-  topicMeta:      { flex: 1 },
-  topicName:      { fontSize: F.md, fontWeight: W.bold },
-  topicCategory:  { fontSize: F.xs, color: C.mid, marginTop: 2 },
-  topicPctBadge:  {
-    backgroundColor: C.s3,
-    borderRadius: R.sm,
-    paddingHorizontal: S.sm,
-    paddingVertical: 3,
-  },
-  topicPctText:   { fontSize: F.sm, fontWeight: W.bold },
+  // Progress bar
+  pbTrack: { backgroundColor: C.border, borderRadius: 2, overflow: "hidden", width: "100%" },
+  pbFill:  { borderRadius: 2 },
 
-  questionCard:   { marginBottom: S.md, borderLeftWidth: 3, borderLeftColor: C.accent },
-  questionLabel:  {
-    fontSize: F.xs,
-    fontWeight: W.bold,
-    color: C.accent,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginBottom: S.sm,
-  },
-  questionText:   { fontSize: F.md, color: C.text, lineHeight: F.md * 1.6 },
+  // List
+  listContent:    { paddingHorizontal: S.md, paddingVertical: S.md, gap: S.md },
+  emptyContainer: { flex: 1 },
+  emptyState:     { flex: 1, alignItems: "center", justifyContent: "center", padding: S.xl, gap: S.sm },
+  emptyIcon:      { width: 56, height: 56, borderRadius: R.md, backgroundColor: C.primaryDim, alignItems: "center", justifyContent: "center", marginBottom: S.sm },
+  emptyTitle:     { fontSize: F.lg, fontWeight: W.bold, color: C.text },
+  emptySub:       { fontSize: F.xs, color: C.dim, letterSpacing: 0.5, textAlign: "center" },
 
-  fieldLabel:     {
-    fontSize: F.xs,
-    fontWeight: W.semi,
-    color: C.mid,
-    marginBottom: S.xs,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  answerInput:    {
-    backgroundColor: C.s2,
-    borderRadius: R.sm,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: S.sm + 4,
-    color: C.text,
-    fontSize: F.md,
-    minHeight: 110,
-    marginBottom: S.sm,
-  },
-  inputFocused:   { borderColor: C.borderBright },
-  refInput:       {
-    backgroundColor: C.s2,
-    borderRadius: R.sm,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: S.sm + 4,
-    color: C.text,
-    fontSize: F.sm,
-    marginBottom: S.lg,
-  },
+  // Question bubble
+  questionCard: { flexDirection: "row", backgroundColor: C.card, borderRadius: R.md, borderWidth: 1, borderColor: C.border, overflow: "hidden", shadowColor: "#001F6B", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  questionAccent: { width: 3, backgroundColor: C.primary },
+  questionBody: { flex: 1, padding: S.md, gap: S.xs },
+  questionMeta: { flexDirection: "row", alignItems: "center", gap: S.sm },
+  fragenLabel:  { flexDirection: "row", alignItems: "center", gap: 3 },
+  fragenText:   { fontSize: 10, fontWeight: W.bold, color: C.primary, letterSpacing: 1.2 },
+  catPill:      { backgroundColor: C.primaryDim, borderRadius: R.xs, paddingHorizontal: 7, paddingVertical: 2 },
+  catText:      { fontSize: 10, color: C.primary, fontWeight: W.semi },
+  topicName:    { fontSize: F.md, fontWeight: W.bold, color: C.text },
+  topicPctRow:  { flexDirection: "row", alignItems: "center", gap: S.sm },
+  topicPctText: { fontSize: F.xs, fontWeight: W.bold, minWidth: 32, textAlign: "right" },
+  qDivider:     { height: 1, backgroundColor: C.border, marginVertical: S.xs },
+  questionText: { fontSize: F.md, color: C.text, lineHeight: F.md * 1.65 },
 
-  actionRow:      { flexDirection: "row", gap: S.sm },
-  skipBtn:        {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: S.xs,
-    padding: S.sm + 4,
-    borderRadius: R.sm,
-    backgroundColor: C.s2,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  skipBtnText:    { color: C.mid, fontWeight: W.semi, fontSize: F.sm },
-  teachBtn:       {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: S.xs,
-    padding: S.sm + 4,
-    borderRadius: R.sm,
-    backgroundColor: C.accent,
-  },
-  btnDisabled:    { opacity: 0.35 },
-  teachBtnText:   { color: C.bg, fontWeight: W.bold, fontSize: F.sm },
+  // User bubble (mirrors ChatScreen)
+  userRow:    { flexDirection: "row", justifyContent: "flex-end" },
+  userBubble: { backgroundColor: C.primary, borderRadius: R.md, borderBottomRightRadius: R.xs, paddingHorizontal: S.md, paddingVertical: S.sm + 2, maxWidth: "78%" },
+  userText:   { color: C.card, fontSize: F.md, lineHeight: F.md * 1.55 },
 
-  resultCard:     {
-    backgroundColor: C.greenDim,
-    borderRadius: R.md,
-    borderWidth: 1,
-    borderColor: C.green,
-    padding: S.md,
-    gap: S.sm,
-  },
-  resultHeader:   { flexDirection: "row", alignItems: "center", gap: S.sm, marginBottom: S.sm },
-  resultTitle:    { fontSize: F.lg, fontWeight: W.bold, color: C.green },
-  resultXp:       { marginLeft: "auto" as any, backgroundColor: C.accent, borderRadius: R.full, paddingHorizontal: 8, paddingVertical: 2 },
-  resultXpText:   { fontSize: F.xs, fontWeight: W.bold, color: C.bg },
-  resultStat:     { flexDirection: "row", alignItems: "center", gap: S.md, marginBottom: S.sm },
-  resultStatNum:  { fontSize: 40, fontWeight: W.heavy, color: C.green, lineHeight: 44 },
-  resultLine:     { fontSize: F.md, color: C.text, fontWeight: W.semi },
-  resultStatus:   { fontSize: F.xs, color: C.mid, marginTop: 2 },
+  // Error bubble
+  errorBubble: { flexDirection: "row", alignItems: "center", gap: S.sm, backgroundColor: C.redBg, borderRadius: R.md, paddingHorizontal: S.md, paddingVertical: S.sm + 2, borderWidth: 1, borderColor: C.red + "33" },
+  errorText:   { fontSize: F.sm, color: C.red, flex: 1 },
 
-  nextTopicRow:   {
-    backgroundColor: C.accentDim,
-    borderRadius: R.sm,
-    padding: S.sm,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  nextTopicLabelRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
-  nextTopicLabel: {
-    fontSize: 10,
-    fontWeight: W.bold,
-    color: C.accent,
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-  },
-  resultNext:     { fontSize: F.sm, color: C.text, fontWeight: W.semi },
+  // Result bubble
+  resultCard:   { flexDirection: "row", backgroundColor: C.card, borderRadius: R.md, borderWidth: 1, borderColor: C.border, overflow: "hidden", shadowColor: "#001F6B", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  resultAccent: { width: 3 },
+  resultBody:   { flex: 1, padding: S.md, gap: S.sm },
+  resultTop:    { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  resultLabel:  { fontSize: 10, fontWeight: W.bold, color: C.dim, letterSpacing: 1.2 },
+  resultStatus: { fontSize: F.sm, fontWeight: W.bold, marginTop: 2 },
+  resultPct:    { fontSize: F.xxl, fontWeight: W.heavy },
+  nextHint:     { fontSize: F.xs, color: C.mid },
 
-  nextBtn:        {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: S.xs,
-    backgroundColor: C.accentDim,
-    borderRadius: R.sm,
-    borderWidth: 1,
-    borderColor: C.accent,
-    padding: S.sm + 4,
-    marginTop: S.xs,
-  },
-  nextBtnText:    { color: C.accent, fontWeight: W.bold, fontSize: F.sm },
+  // Mastered
+  masteredCard:  { backgroundColor: C.card, borderRadius: R.md, borderWidth: 1, borderColor: C.border, padding: S.lg, alignItems: "center", gap: S.sm },
+  masteredIcon:  { width: 56, height: 56, borderRadius: R.xl, backgroundColor: C.greenBg, alignItems: "center", justifyContent: "center" },
+  masteredTitle: { fontSize: F.lg, fontWeight: W.bold, color: C.text },
+  masteredSub:   { fontSize: F.sm, color: C.mid, textAlign: "center", lineHeight: 20 },
+
+  // Weiter button
+  weiterBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: S.sm, backgroundColor: C.primary, borderRadius: R.md, paddingVertical: S.sm + 4, marginTop: S.xs },
+  weiterText: { color: C.card, fontWeight: W.bold, fontSize: F.md },
+
+  // Dashboard card
+  dashCard:        { flexDirection: "row", backgroundColor: C.card, borderRadius: R.md, borderWidth: 1, borderColor: C.border, overflow: "hidden", shadowColor: "#001F6B", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 3 },
+  dashAccent:      { width: 3, backgroundColor: C.primary },
+  dashBody:        { flex: 1, padding: S.md, gap: S.sm },
+  dashHeaderRow:   { flexDirection: "row", alignItems: "flex-start", gap: S.sm },
+  dashIconBox:     { width: 32, height: 32, borderRadius: R.sm, backgroundColor: C.primaryDim, alignItems: "center", justifyContent: "center" },
+  dashTitle:       { fontSize: F.md, fontWeight: W.bold, color: C.text },
+  dashSub:         { fontSize: 10, color: C.dim, marginTop: 1 },
+  readyBadge:      { borderRadius: R.xs, paddingHorizontal: 7, paddingVertical: 3, alignSelf: "flex-start" },
+  readyText:       { fontSize: 10, fontWeight: W.bold },
+  dashOverallRow:  { flexDirection: "row", alignItems: "center", gap: S.sm },
+  dashPctLarge:    { fontSize: F.xxl, fontWeight: W.heavy, color: C.primary, minWidth: 52 },
+  dashDivider:     { height: 1, backgroundColor: C.border },
+  // Stat tiles
+  statRow:         { flexDirection: "row", gap: S.xs },
+  statTile:        { flex: 1, borderRadius: R.xs, padding: S.xs + 2, alignItems: "center" },
+  statCount:       { fontSize: F.lg, fontWeight: W.heavy },
+  statLabel:       { fontSize: 9, fontWeight: W.semi, marginTop: 1 },
+  // Category rows
+  catHeaderRow:    { flexDirection: "row", alignItems: "center", gap: S.xs, paddingVertical: S.xs },
+  dashCatName:     { fontSize: F.xs, color: C.mid, fontWeight: W.semi, marginBottom: 3 },
+  dashCatBar:      { flex: 1 },
+  dashCatPct:      { fontSize: F.xs, fontWeight: W.bold, minWidth: 30, textAlign: "right" },
+  // Topic rows (expanded)
+  topicRow:        { flexDirection: "row", alignItems: "center", gap: S.xs, paddingVertical: 5, paddingLeft: S.sm, borderLeftWidth: 2, borderLeftColor: C.border, marginLeft: 4, marginBottom: 2 },
+  topicDot:        { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  topicRowName:    { fontSize: F.xs, color: C.text, fontWeight: W.medium, width: 110 },
+  topicBarWrap:    { flex: 1 },
+  topicStatusBadge:{ borderRadius: R.xs, paddingHorizontal: 5, paddingVertical: 2 },
+  topicStatusText: { fontSize: 9, fontWeight: W.bold },
+
+  // Input area
+  inputArea:   { borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.card, paddingHorizontal: S.sm, paddingVertical: S.sm, gap: S.xs },
+  refInput:    { backgroundColor: C.bg, borderRadius: R.sm, borderWidth: 1, borderColor: C.border, paddingHorizontal: S.md, paddingVertical: S.sm, color: C.text, fontSize: F.sm },
+  inputRow:    { flexDirection: "row", alignItems: "flex-end", gap: S.xs },
+  refToggle:   { width: 36, height: 36, borderRadius: R.sm, alignItems: "center", justifyContent: "center", backgroundColor: C.bg, borderWidth: 1, borderColor: C.border },
+  refToggleOn: { backgroundColor: C.primaryDim, borderColor: C.primary },
+  input:       { flex: 1, backgroundColor: C.bg, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, paddingHorizontal: S.md, paddingTop: 10, paddingBottom: 10, color: C.text, fontSize: F.md, maxHeight: 110 },
+  inputFocused:{ borderColor: C.primary },
+  sendBtn:     { width: 40, height: 40, borderRadius: R.full, backgroundColor: C.primary, alignItems: "center", justifyContent: "center" },
+  sendBtnOff:  { backgroundColor: C.s2 },
 });

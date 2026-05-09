@@ -8,266 +8,397 @@ from pathlib import Path
 from threading import Lock
 
 _MAP_FILE = Path("data/memory/knowledge_map.json")
+_ANSWER_HISTORY_FILE = Path("data/memory/answer_history.jsonl")
 _lock = Lock()
 
 _STATUS_ORDER = ["unknown", "seed", "learning", "connected", "functional", "mastered"]
 
-# ── Topic seed map — EU + German law only ─────────────────────────────────────
+# ── Topic seed map ─────────────────────────────────────────────────────────────
 
 _SEED_MAP: list[dict] = [
-    # EU Sustainability Reporting
-    {"id": "csrd", "name": "CSRD", "category": "EU Sustainability Law",
-     "status": "functional", "pct": 80, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Corporate Sustainability Reporting Directive 2022/2464 — mandatory sustainability reporting for large EU undertakings"},
-    {"id": "esrs", "name": "ESRS Standards", "category": "EU Sustainability Law",
-     "status": "functional", "pct": 70, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "European Sustainability Reporting Standards — 12 standards covering environment, social, governance disclosures"},
-    {"id": "eu_taxonomy", "name": "EU Taxonomy", "category": "EU Sustainability Law",
-     "status": "learning", "pct": 50, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "EU Taxonomy Regulation 2020/852 — classification of environmentally sustainable economic activities"},
-    {"id": "sfdr", "name": "SFDR", "category": "EU Sustainability Law",
+    # EU-Nachhaltigkeitsrecht
+    {"id": "csrd", "name": "CSRD", "category": "EU-Nachhaltigkeitsrecht",
+     "status": "functional", "pct": 85, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Corporate Sustainability Reporting Directive 2022/2464 — Pflicht zur Nachhaltigkeitsberichterstattung für große EU-Unternehmen"},
+    {"id": "esrs", "name": "ESRS-Standards", "category": "EU-Nachhaltigkeitsrecht",
+     "status": "functional", "pct": 75, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "European Sustainability Reporting Standards — 12 Standards für Umwelt-, Sozial- und Governance-Berichterstattung"},
+    {"id": "eu_taxonomy", "name": "EU-Taxonomie", "category": "EU-Nachhaltigkeitsrecht",
+     "status": "connected", "pct": 55, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "EU-Taxonomieverordnung 2020/852 — Klassifizierung ökologisch nachhaltiger Wirtschaftstätigkeiten"},
+    {"id": "sfdr", "name": "SFDR", "category": "EU-Nachhaltigkeitsrecht",
      "status": "learning", "pct": 40, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Sustainable Finance Disclosure Regulation 2019/2088 — Article 6, 8, 9 fund classification"},
-    {"id": "cs3d", "name": "CS3D / CSDDD", "category": "EU Sustainability Law",
+     "description": "Sustainable Finance Disclosure Regulation 2019/2088 — Artikel-6-, 8- und 9-Fondsklassifizierung"},
+    {"id": "cs3d", "name": "CS3D / CSDDD", "category": "EU-Nachhaltigkeitsrecht",
      "status": "seed", "pct": 10, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Corporate Sustainability Due Diligence Directive — human rights and environmental due diligence obligations"},
-    {"id": "eudr", "name": "EUDR", "category": "EU Sustainability Law",
+     "description": "Corporate Sustainability Due Diligence Directive — Menschenrechts- und Umweltsorgfaltspflichten"},
+    {"id": "eudr", "name": "EUDR", "category": "EU-Nachhaltigkeitsrecht",
      "status": "seed", "pct": 5, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "EU Deforestation Regulation 2023/1115 — no-deforestation supply chain obligations"},
-    {"id": "green_deal", "name": "European Green Deal", "category": "EU Sustainability Law",
+     "description": "EU-Entwaldungsverordnung 2023/1115 — Entwaldungsfreie Lieferkettenpflichten"},
+    {"id": "green_deal", "name": "Europäischer Green Deal", "category": "EU-Nachhaltigkeitsrecht",
      "status": "seed", "pct": 10, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "EU policy framework targeting climate neutrality by 2050 — Fit for 55, REPowerEU"},
-    {"id": "ied", "name": "Industrial Emissions Directive", "category": "EU Sustainability Law",
+     "description": "EU-Politikrahmen für Klimaneutralität bis 2050 — Fit for 55, REPowerEU"},
+    {"id": "ied", "name": "Industrieemissionsrichtlinie", "category": "EU-Nachhaltigkeitsrecht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "IED 2010/75/EU — integrated pollution prevention and control for industrial installations"},
-    {"id": "reach", "name": "REACH Regulation", "category": "EU Sustainability Law",
+     "description": "IED 2010/75/EU — Integrierte Vermeidung und Verminderung der Umweltverschmutzung"},
+    {"id": "reach", "name": "REACH-Verordnung", "category": "EU-Nachhaltigkeitsrecht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "REACH 1907/2006 — Registration, Evaluation, Authorisation of Chemicals"},
+     "description": "REACH 1907/2006 — Registrierung, Bewertung, Zulassung und Beschränkung chemischer Stoffe"},
 
-    # EU Financial & Corporate Law
-    {"id": "mifid2", "name": "MiFID II", "category": "EU Financial Law",
+    # EU-Finanzrecht
+    {"id": "mifid2", "name": "MiFID II", "category": "EU-Finanzrecht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Markets in Financial Instruments Directive II — investment services, ESG integration requirements"},
-    {"id": "srd2", "name": "Shareholder Rights Directive II", "category": "EU Financial Law",
+     "description": "Richtlinie über Märkte für Finanzinstrumente II — Anlageberatung, ESG-Integrationsanforderungen"},
+    {"id": "srd2", "name": "Aktionärsrechterichtlinie II", "category": "EU-Finanzrecht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "SRD II 2017/828 — shareholder engagement, say-on-pay, related party transactions"},
-    {"id": "eu_whistleblower", "name": "EU Whistleblower Directive", "category": "EU Financial Law",
+     "description": "SRD II 2017/828 — Aktionärsengagement, Say-on-Pay, Transaktionen mit nahestehenden Parteien"},
+    {"id": "eu_whistleblower", "name": "EU-Hinweisgeberschutzrichtlinie", "category": "EU-Finanzrecht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Directive 2019/1937 — protection of persons reporting breaches of EU law"},
-    {"id": "gdpr", "name": "GDPR", "category": "EU Financial Law",
+     "description": "Richtlinie 2019/1937 — Schutz von Personen, die EU-Rechtsverstöße melden"},
+    {"id": "gdpr", "name": "DSGVO", "category": "EU-Finanzrecht",
+     "status": "connected", "pct": 65, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Datenschutz-Grundverordnung 2016/679 — Rechte betroffener Personen und Unternehmenspflichten"},
+    {"id": "eu_competition", "name": "EU-Wettbewerbsrecht", "category": "EU-Finanzrecht",
+     "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "AEUV Artikel 101–102 — Kartelle, Missbrauch marktbeherrschender Stellung, Fusionskontrolle"},
+
+    # Deutsches Recht
+    {"id": "lksg", "name": "LkSG — Lieferkettensorgfaltspflichtengesetz", "category": "Deutsches Recht",
      "status": "learning", "pct": 35, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "General Data Protection Regulation 2016/679 — personal data rights and corporate obligations"},
-    {"id": "eu_competition", "name": "EU Competition Law", "category": "EU Financial Law",
+     "description": "Lieferkettensorgfaltspflichtengesetz — Menschenrechts- und Umweltsorgfaltspflichten für deutsche Unternehmen"},
+    {"id": "behg", "name": "BEHG — Brennstoffemissionshandel", "category": "Deutsches Recht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "TFEU Articles 101-102 — cartels, abuse of dominant position, merger control"},
-
-    # German National Law
-    {"id": "lksg", "name": "LkSG — Supply Chain Act", "category": "German Law",
-     "status": "learning", "pct": 30, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Lieferkettensorgfaltspflichtengesetz — human rights and environmental due diligence for German companies"},
-    {"id": "behg", "name": "BEHG — Carbon Pricing", "category": "German Law",
+     "description": "Brennstoffemissionshandelsgesetz — Nationale CO₂-Bepreisung für Wärme und Verkehr"},
+    {"id": "ksg", "name": "KSG — Klimaschutzgesetz", "category": "Deutsches Recht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Brennstoffemissionshandelsgesetz — German national carbon pricing for heating and transport fuels"},
-    {"id": "ksg", "name": "KSG — Climate Protection Act", "category": "German Law",
+     "description": "Klimaschutzgesetz — Verbindliche jährliche CO₂-Minderungsziele Deutschlands nach Sektoren"},
+    {"id": "german_corporate", "name": "GmbHG / AktG", "category": "Deutsches Recht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Klimaschutzgesetz — Germany's legally binding annual CO2 reduction targets by sector"},
-    {"id": "german_corporate", "name": "GmbHG / AktG", "category": "German Law",
+     "description": "GmbH-Gesetz und Aktiengesetz — Deutsches Gesellschaftsrecht, Vorstandspflichten, Aufsichtsrat"},
+    {"id": "hgb", "name": "HGB — Handelsgesetzbuch", "category": "Deutsches Recht",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "GmbH-Gesetz and Aktiengesetz — German corporate law, director duties, Aufsichtsrat, Vorstand"},
-    {"id": "hgb", "name": "HGB — Commercial Code", "category": "German Law",
-     "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Handelsgesetzbuch — German commercial code, accounting obligations, financial reporting"},
-    {"id": "bgb_contracts", "name": "BGB — Contract Law", "category": "German Law",
+     "description": "Handelsgesetzbuch — Rechnungslegungspflichten, Jahresabschluss, Lagebericht"},
+    {"id": "bgb_contracts", "name": "BGB — Vertragsrecht", "category": "Deutsches Recht",
      "status": "seed", "pct": 15, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Bürgerliches Gesetzbuch — German civil code, contract formation, liability, damages (Schadensersatz)"},
+     "description": "Bürgerliches Gesetzbuch — Vertragsschluss, Haftung, Schadensersatz"},
 
-    # Legal Foundations (EU-wide)
-    {"id": "eu_legal_terms", "name": "EU Legal Vocabulary", "category": "Legal Foundations",
-     "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Core EU legal terms: Richtlinie vs Verordnung, subsidiarity, proportionality, preliminary ruling (CJEU)"},
-    {"id": "cjeu_cases", "name": "CJEU Environmental Cases", "category": "Legal Foundations",
-     "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Court of Justice of the EU landmark rulings on environmental and corporate sustainability law"},
-    {"id": "greenwashing_law", "name": "Greenwashing Law", "category": "Legal Foundations",
+    # Rechtsgrundlagen
+    {"id": "eu_legal_terms", "name": "EU-Rechtsvokabular", "category": "Rechtsgrundlagen",
+     "status": "connected", "pct": 62, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Grundbegriffe des EU-Rechts: Richtlinie vs. Verordnung, Subsidiarität, Verhältnismäßigkeit, Vorabentscheidungsverfahren"},
+    {"id": "cjeu_cases", "name": "EuGH-Umweltentscheidungen", "category": "Rechtsgrundlagen",
      "status": "learning", "pct": 40, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "EU Green Claims Directive, UWG §5 misleading claims, FTC analogues — legal standard for environmental claims"},
-    {"id": "double_materiality", "name": "Double Materiality", "category": "Legal Foundations",
-     "status": "learning", "pct": 55, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "CSRD/ESRS requirement — impact materiality + financial materiality assessment"},
-
-    # Global Frameworks (kept only where EU-relevant)
-    {"id": "gri", "name": "GRI Standards", "category": "Global Frameworks",
+     "description": "Leitentscheidungen des Gerichtshofs der EU zu Umwelt- und Nachhaltigkeitsrecht"},
+    {"id": "greenwashing_law", "name": "Greenwashing-Recht", "category": "Rechtsgrundlagen",
      "status": "learning", "pct": 45, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Global Reporting Initiative — voluntary sustainability reporting, compatible with ESRS"},
-    {"id": "tcfd", "name": "TCFD", "category": "Global Frameworks",
+     "description": "EU-Richtlinie über Umweltaussagen, UWG §5 irreführende Angaben — Rechtsstandard für Umweltbehauptungen"},
+    {"id": "double_materiality", "name": "Doppelte Wesentlichkeit", "category": "Rechtsgrundlagen",
+     "status": "connected", "pct": 58, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "CSRD/ESRS-Anforderung — Auswirkungs- und finanzielle Wesentlichkeitsbewertung"},
+
+    # Globale Rahmenwerke
+    {"id": "gri", "name": "GRI-Standards", "category": "Globale Rahmenwerke",
+     "status": "learning", "pct": 45, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Global Reporting Initiative — Freiwillige Nachhaltigkeitsberichterstattung, kompatibel mit ESRS"},
+    {"id": "tcfd", "name": "TCFD", "category": "Globale Rahmenwerke",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "Task Force on Climate-related Financial Disclosures — 4 pillars, baseline for ESRS E1"},
-    {"id": "issb", "name": "ISSB / IFRS S1 S2", "category": "Global Frameworks",
+     "description": "Task Force on Climate-related Financial Disclosures — 4 Säulen, Grundlage für ESRS E1"},
+    {"id": "issb", "name": "ISSB / IFRS S1 S2", "category": "Globale Rahmenwerke",
      "status": "unknown", "pct": 0, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
-     "description": "International Sustainability Standards Board — IFRS S1 general, IFRS S2 climate disclosures"},
+     "description": "International Sustainability Standards Board — IFRS S1 allgemein, IFRS S2 klimabezogen"},
+
+    # EU-Primärrecht
+    {"id": "teu", "name": "Vertrag über die EU (TEU)", "category": "EU-Primärrecht",
+     "status": "functional", "pct": 72, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Vertrag über die Europäische Union — institutioneller Rahmen, Werte, Grundsätze, Zuständigkeiten der EU"},
+    {"id": "tfeu", "name": "AEUV / TFEU", "category": "EU-Primärrecht",
+     "status": "functional", "pct": 70, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Vertrag über die Arbeitsweise der EU — Binnenmarkt, Grundfreiheiten, Wettbewerbsrecht, AEUV Art. 101–109"},
+    {"id": "eu_charter", "name": "EU-Grundrechtecharta", "category": "EU-Primärrecht",
+     "status": "connected", "pct": 62, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Charta der Grundrechte der EU — verbindliche Grundrechte beim Vollzug von EU-Recht, Art. 7 Datenschutz, Art. 17 Eigentum"},
+    {"id": "eu_legislative", "name": "EU-Gesetzgebungsverfahren", "category": "EU-Primärrecht",
+     "status": "connected", "pct": 58, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Ordentliches Gesetzgebungsverfahren — Initiativmonopol Kommission, Mitentscheidung Parlament/Rat, Trilog"},
+
+    # EuGH-Leitentscheidungen
+    {"id": "van_gend_loos", "name": "Van Gend en Loos (1963)", "category": "EuGH-Leitentscheidungen",
+     "status": "functional", "pct": 68, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Rs. 26/62 — Unmittelbare Wirkung des EU-Rechts: Einzelpersonen können sich vor nationalen Gerichten direkt auf EU-Recht berufen"},
+    {"id": "costa_enel", "name": "Costa v ENEL (1964)", "category": "EuGH-Leitentscheidungen",
+     "status": "functional", "pct": 68, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Rs. 6/64 — Vorrang des EU-Rechts: EU-Recht hat Vorrang vor nationalem Recht, auch vor späteren nationalen Gesetzen"},
+    {"id": "cassis_dijon", "name": "Cassis de Dijon (1979)", "category": "EuGH-Leitentscheidungen",
+     "status": "connected", "pct": 62, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Rs. 120/78 — Gegenseitige Anerkennung: In einem Mitgliedstaat rechtmäßig hergestellte Waren können im gesamten Binnenmarkt verkauft werden"},
+    {"id": "francovich", "name": "Francovich (1991)", "category": "EuGH-Leitentscheidungen",
+     "status": "connected", "pct": 58, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Rs. C-6/90 — Staatshaftung: Mitgliedstaaten haften für Schäden aus Verstößen gegen EU-Recht gegenüber Einzelpersonen"},
+    {"id": "schrems", "name": "Schrems I & II", "category": "EuGH-Leitentscheidungen",
+     "status": "connected", "pct": 55, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Rs. C-362/14 & C-311/18 — Transatlantischer Datentransfer: Safe Harbor und Privacy Shield für ungültig erklärt; Standardvertragsklauseln unter strengen Bedingungen"},
+    {"id": "google_spain", "name": "Google Spain (2014)", "category": "EuGH-Leitentscheidungen",
+     "status": "connected", "pct": 60, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Rs. C-131/12 — Recht auf Vergessenwerden: Suchmaschinen müssen auf Antrag veraltete oder irrelevante Einträge aus den Suchergebnissen löschen"},
+
+    # EU-Institutionen
+    {"id": "eu_commission", "name": "Europäische Kommission", "category": "EU-Institutionen",
+     "status": "functional", "pct": 70, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Hüterin der Verträge — Initiativmonopol, Wettbewerbskontrolle, Vertragsverletzungsverfahren, 27 Kommissare"},
+    {"id": "eu_parliament", "name": "Europäisches Parlament", "category": "EU-Institutionen",
+     "status": "connected", "pct": 62, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Direkt gewählte Volksvertretung — Mitgesetzgebung im ordentlichen Verfahren, Haushaltskontrolle, 705 Abgeordnete"},
+    {"id": "cjeu_court", "name": "EuGH — Gerichtshof der EU", "category": "EU-Institutionen",
+     "status": "connected", "pct": 62, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Oberster Gerichtshof der EU — Vorabentscheidungsverfahren, Nichtigkeitsklagen, Vertragsverletzungsverfahren"},
+
+    # EU-Digitalrecht
+    {"id": "ai_act", "name": "EU AI-Gesetz", "category": "EU-Digitalrecht",
+     "status": "learning", "pct": 30, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "KI-Verordnung (EU) 2024/1689 — risikobasierter Rahmen für KI-Systeme: verboten, hochriskant, allgemeinzweckfähig"},
+    {"id": "nis2", "name": "NIS2-Richtlinie", "category": "EU-Digitalrecht",
+     "status": "seed", "pct": 25, "questions_asked": 0, "questions_answered": 0, "last_updated": None,
+     "description": "Richtlinie 2022/2555 — Cybersicherheitspflichten für wesentliche und wichtige Einrichtungen in der EU"},
 ]
 
-# ── Question bank — 3 types per topic ─────────────────────────────────────────
-# Types: "definition" | "application" | "case"
+# ── Fragenbank — alle Fragen auf Deutsch ──────────────────────────────────────
 
 _QUESTION_BANK: dict[str, list[dict]] = {
     "csrd": [
-        {"type": "definition", "q": "What is the CSRD and what does it replace?"},
-        {"type": "application", "q": "A German AG has 400 employees, €80M turnover, €45M balance sheet. Does CSRD apply from 2025?"},
-        {"type": "application", "q": "A listed SME with 150 employees wants to opt out of CSRD until 2028. Is this allowed?"},
-        {"type": "definition", "q": "What is Article 19a of CSRD and what must it contain?"},
-        {"type": "case", "q": "A company publishes a sustainability statement but omits Scope 3 emissions because data is unavailable. Is this CSRD-compliant?"},
-        {"type": "definition", "q": "What are the three phased entry-into-force dates under CSRD?"},
-        {"type": "application", "q": "A non-EU parent company has a large EU subsidiary. From when does CSRD apply to the group?"},
+        {"type": "definition", "q": "Was ist die CSRD und welche Richtlinie ersetzt sie?"},
+        {"type": "application", "q": "Eine deutsche AG hat 400 Mitarbeiter, €80 Mio. Umsatz, €45 Mio. Bilanzsumme. Gilt CSRD ab 2025?"},
+        {"type": "application", "q": "Ein börsennotiertes KMU mit 150 Mitarbeitern möchte CSRD bis 2028 aussetzen. Ist dies zulässig?"},
+        {"type": "definition", "q": "Was regelt Artikel 19a der CSRD und welche Angaben muss er enthalten?"},
+        {"type": "case", "q": "Ein Unternehmen veröffentlicht einen Nachhaltigkeitsbericht, lässt Scope-3-Emissionen wegen fehlender Daten aus. Ist dies CSRD-konform?"},
+        {"type": "definition", "q": "Welche drei Phasentermine sieht das schrittweise Inkrafttreten der CSRD vor?"},
+        {"type": "application", "q": "Eine Nicht-EU-Muttergesellschaft hat eine große EU-Tochter. Ab wann gilt CSRD für die Gruppe?"},
     ],
     "esrs": [
-        {"type": "definition", "q": "What is the difference between ESRS 1 and ESRS 2?"},
-        {"type": "definition", "q": "Name the 5 environmental ESRS standards (E1–E5) and what each covers."},
-        {"type": "application", "q": "A company has no material climate risks. Must it still report under ESRS E1?"},
-        {"type": "case", "q": "An auditor finds a company reported only financial materiality but skipped impact materiality. Which ESRS is violated?"},
-        {"type": "definition", "q": "What does ESRS G1 cover and who does it apply to?"},
-        {"type": "application", "q": "Which ESRS standard covers a company's own workforce — pay equity, working conditions, trade unions?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen ESRS 1 und ESRS 2?"},
+        {"type": "definition", "q": "Nennen Sie die 5 Umwelt-ESRS-Standards (E1–E5) und deren Regelungsgegenstand."},
+        {"type": "application", "q": "Ein Unternehmen hat keine wesentlichen Klimarisiken. Muss es dennoch nach ESRS E1 berichten?"},
+        {"type": "case", "q": "Ein Prüfer stellt fest, dass ein Unternehmen nur finanzielle Wesentlichkeit bewertet, nicht aber die Auswirkungswesentlichkeit. Welcher ESRS wird verletzt?"},
+        {"type": "definition", "q": "Was deckt ESRS G1 ab und für wen gilt er?"},
+        {"type": "application", "q": "Welcher ESRS-Standard regelt die eigene Belegschaft — Lohngleichheit, Arbeitsbedingungen, Gewerkschaften?"},
     ],
     "eu_taxonomy": [
-        {"type": "definition", "q": "What are the 6 environmental objectives of the EU Taxonomy Regulation?"},
-        {"type": "definition", "q": "What does DNSH (Do No Significant Harm) mean in the EU Taxonomy?"},
-        {"type": "application", "q": "A wind energy company claims Taxonomy alignment. What three criteria must it satisfy?"},
-        {"type": "case", "q": "A bank finances a gas power plant and claims it is Taxonomy-aligned as a transition activity. What conditions apply?"},
-        {"type": "definition", "q": "What KPIs must non-financial undertakings under CSRD disclose for EU Taxonomy?"},
+        {"type": "definition", "q": "Welche 6 Umweltziele hat die EU-Taxonomieverordnung?"},
+        {"type": "definition", "q": "Was bedeutet DNSH (Do No Significant Harm) in der EU-Taxonomie?"},
+        {"type": "application", "q": "Ein Windenergieprojekt beansprucht Taxonomiekonformität. Welche drei Kriterien müssen erfüllt sein?"},
+        {"type": "case", "q": "Eine Bank finanziert ein Gaskraftwerk und erklärt es als taxonomiekonform als Übergangstätigkeit. Welche Bedingungen gelten?"},
+        {"type": "definition", "q": "Welche KPIs müssen Nicht-Finanzunternehmen unter CSRD zur EU-Taxonomie offenlegen?"},
     ],
     "sfdr": [
-        {"type": "definition", "q": "What is the difference between an Article 8 and an Article 9 fund under SFDR?"},
-        {"type": "definition", "q": "What are Principal Adverse Impact (PAI) indicators under SFDR?"},
-        {"type": "application", "q": "An Article 9 fund holds 5% in bonds with no sustainability objective. Does it remain Article 9?"},
-        {"type": "case", "q": "A fund manager markets a product as 'sustainable' without SFDR Article 8 classification. What is the legal risk?"},
-        {"type": "definition", "q": "Who does SFDR apply to — all EU companies or specific entities?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen einem Artikel-8- und einem Artikel-9-Fonds gemäß SFDR?"},
+        {"type": "definition", "q": "Was sind Principal Adverse Impact (PAI)-Indikatoren nach SFDR?"},
+        {"type": "application", "q": "Ein Artikel-9-Fonds hält 5 % in Anleihen ohne Nachhaltigkeitsziel. Bleibt er Artikel 9?"},
+        {"type": "case", "q": "Ein Fondsmanager vermarktet ein Produkt als 'nachhaltig' ohne SFDR-Artikel-8-Klassifizierung. Welches rechtliche Risiko besteht?"},
+        {"type": "definition", "q": "Für wen gilt SFDR — alle EU-Unternehmen oder nur bestimmte Einheiten?"},
     ],
     "lksg": [
-        {"type": "definition", "q": "What is the LkSG and which companies does it apply to?"},
-        {"type": "application", "q": "A German GmbH has 2,800 employees. From which year does LkSG apply?"},
-        {"type": "definition", "q": "Does LkSG cover only direct suppliers or the full supply chain?"},
-        {"type": "case", "q": "A company's supplier in Bangladesh violates child labour laws. What must the German parent company do under LkSG?"},
-        {"type": "application", "q": "What happens if a company fails to conduct the LkSG risk analysis? Name the penalty."},
-        {"type": "definition", "q": "What is a 'Beschwerdeverfahren' under LkSG and who must establish one?"},
+        {"type": "definition", "q": "Was ist das LkSG und für welche Unternehmen gilt es?"},
+        {"type": "application", "q": "Eine deutsche GmbH hat 2.800 Mitarbeiter. Ab welchem Jahr gilt das LkSG?"},
+        {"type": "definition", "q": "Erfasst das LkSG nur unmittelbare Zulieferer oder die gesamte Lieferkette?"},
+        {"type": "case", "q": "Ein Zulieferer in Bangladesch verstößt gegen Kinderarbeitsgesetze. Was muss das deutsche Mutterunternehmen nach LkSG tun?"},
+        {"type": "application", "q": "Was passiert, wenn ein Unternehmen die LkSG-Risikoanalyse unterlässt? Nennen Sie die Sanktion."},
+        {"type": "definition", "q": "Was ist ein Beschwerdeverfahren nach LkSG und wer muss es einrichten?"},
     ],
     "german_corporate": [
-        {"type": "definition", "q": "What is the difference between a GmbH and an AG under German law?"},
-        {"type": "definition", "q": "What is the Aufsichtsrat and how does it differ from the Vorstand?"},
-        {"type": "application", "q": "A GmbH wants to distribute profits without a shareholder resolution. Is this lawful under GmbHG?"},
-        {"type": "definition", "q": "What is Mitbestimmung (codetermination) and when does it apply to German companies?"},
-        {"type": "case", "q": "A Vorstand member enters a contract that personally benefits them without board approval. What is the legal consequence under AktG?"},
-        {"type": "definition", "q": "What is the minimum share capital for a GmbH vs an AG in Germany?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen einer GmbH und einer AG nach deutschem Recht?"},
+        {"type": "definition", "q": "Was ist der Aufsichtsrat und wie unterscheidet er sich vom Vorstand?"},
+        {"type": "application", "q": "Eine GmbH will Gewinne ohne Gesellschafterbeschluss ausschütten. Ist dies nach GmbHG zulässig?"},
+        {"type": "definition", "q": "Was ist Mitbestimmung und wann gilt sie für deutsche Unternehmen?"},
+        {"type": "case", "q": "Ein Vorstandsmitglied schließt einen persönlich vorteilhaften Vertrag ohne Genehmigung des Aufsichtsrats. Welche Rechtsfolge sieht das AktG vor?"},
+        {"type": "definition", "q": "Wie hoch ist das Mindeststammkapital einer GmbH bzw. das Grundkapital einer AG?"},
     ],
     "bgb_contracts": [
-        {"type": "definition", "q": "What are the three elements required to form a valid contract under BGB §145?"},
-        {"type": "definition", "q": "What is Schadensersatz and when does it arise under BGB §280?"},
-        {"type": "application", "q": "A company signs a contract under duress (Drohung). What remedy is available under BGB?"},
-        {"type": "case", "q": "A supplier delivers defective goods. The buyer wants to cancel the contract. What BGB provisions apply and in what order?"},
-        {"type": "definition", "q": "What is the difference between Anfechtung and Rücktritt under BGB?"},
+        {"type": "definition", "q": "Welche drei Elemente sind für einen wirksamen Vertragsschluss nach BGB § 145 erforderlich?"},
+        {"type": "definition", "q": "Was ist Schadensersatz und wann entsteht er nach BGB § 280?"},
+        {"type": "application", "q": "Ein Unternehmen unterzeichnet einen Vertrag unter Drohung (§ 123 BGB). Welcher Rechtsbehelf steht zur Verfügung?"},
+        {"type": "case", "q": "Ein Lieferant liefert mangelhafte Waren. Der Käufer möchte den Vertrag aufheben. Welche BGB-Vorschriften greifen in welcher Reihenfolge?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen Anfechtung und Rücktritt nach BGB?"},
     ],
     "gdpr": [
-        {"type": "definition", "q": "What are the 6 lawful bases for processing personal data under GDPR Article 6?"},
-        {"type": "application", "q": "A company processes employee health data for payroll. Which GDPR Article applies and what extra condition is needed?"},
-        {"type": "definition", "q": "What is the maximum GDPR fine and how is it calculated?"},
-        {"type": "case", "q": "An employee asks a company to delete all their data under GDPR Article 17. The company refuses citing legal obligations. Is this lawful?"},
-        {"type": "definition", "q": "What is a Data Protection Impact Assessment (DPIA) and when is it mandatory?"},
+        {"type": "definition", "q": "Was sind die 6 Rechtsgrundlagen für die Verarbeitung personenbezogener Daten nach Art. 6 DSGVO?"},
+        {"type": "application", "q": "Ein Unternehmen verarbeitet Gesundheitsdaten von Mitarbeitern für die Lohnbuchhaltung. Welcher DSGVO-Artikel gilt und welche zusätzliche Voraussetzung ist nötig?"},
+        {"type": "definition", "q": "Wie hoch ist die maximale DSGVO-Geldbuße und wie wird sie berechnet?"},
+        {"type": "case", "q": "Ein Mitarbeiter verlangt Löschung aller seiner Daten nach Art. 17 DSGVO. Das Unternehmen verweigert dies unter Berufung auf gesetzliche Aufbewahrungspflichten. Ist dies rechtmäßig?"},
+        {"type": "definition", "q": "Was ist eine Datenschutz-Folgenabschätzung (DSFA) und wann ist sie Pflicht?"},
     ],
     "greenwashing_law": [
-        {"type": "definition", "q": "What is greenwashing under EU consumer law and which directive addresses it?"},
-        {"type": "application", "q": "A company claims its product is 'carbon neutral' based on offsets alone. Under the EU Green Claims Directive, is this claim valid?"},
-        {"type": "case", "q": "An airline advertises 'sustainable flights' without substantiation. Which German law (UWG) provision could apply?"},
-        {"type": "definition", "q": "What must a company prove to make a valid environmental claim under the proposed EU Green Claims Directive?"},
-        {"type": "application", "q": "A retailer uses a private eco-label not approved under EU law. What is the legal risk post-2026?"},
+        {"type": "definition", "q": "Was ist Greenwashing nach EU-Verbraucherrecht und welche Richtlinie regelt es?"},
+        {"type": "application", "q": "Ein Unternehmen behauptet, sein Produkt sei 'klimaneutral', stützt dies aber allein auf Kompensationen. Ist diese Aussage nach der EU-Richtlinie über Umweltaussagen zulässig?"},
+        {"type": "case", "q": "Eine Fluggesellschaft wirbt für 'nachhaltige Flüge' ohne Belege. Welche Vorschrift des UWG könnte greifen?"},
+        {"type": "definition", "q": "Was muss ein Unternehmen nachweisen, um nach der vorgeschlagenen EU-Richtlinie über Umweltaussagen eine gültige Umweltbehauptung aufzustellen?"},
+        {"type": "application", "q": "Ein Händler verwendet ein nicht EU-zugelassenes privates Ökosiegel. Welches rechtliche Risiko besteht nach 2026?"},
     ],
     "eu_legal_terms": [
-        {"type": "definition", "q": "What is the difference between an EU Richtlinie (Directive) and a Verordnung (Regulation)?"},
-        {"type": "definition", "q": "What is the subsidiarity principle in EU law and where is it found in the Treaties?"},
-        {"type": "definition", "q": "What is a preliminary ruling (Vorabentscheidungsverfahren) and which court issues it?"},
-        {"type": "application", "q": "An EU Regulation is passed but Germany has not transposed it. Does it apply to German companies?"},
-        {"type": "definition", "q": "What is the proportionality principle in EU law and how does it limit EU action?"},
-        {"type": "definition", "q": "What is direct effect in EU law? Give one example of a provision with direct effect."},
-        {"type": "case", "q": "A German court disagrees with how to interpret an EU Directive. What must it do before ruling?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen einer EU-Richtlinie und einer EU-Verordnung?"},
+        {"type": "definition", "q": "Was ist das Subsidiaritätsprinzip im EU-Recht und wo ist es in den Verträgen verankert?"},
+        {"type": "definition", "q": "Was ist ein Vorabentscheidungsverfahren und welches Gericht entscheidet darüber?"},
+        {"type": "application", "q": "Eine EU-Verordnung ist in Kraft getreten, Deutschland hat sie aber nicht umgesetzt. Gilt sie für deutsche Unternehmen?"},
+        {"type": "definition", "q": "Was ist das Verhältnismäßigkeitsprinzip im EU-Recht und wie begrenzt es EU-Maßnahmen?"},
+        {"type": "definition", "q": "Was ist die unmittelbare Wirkung im EU-Recht? Nennen Sie ein Beispiel für eine Norm mit unmittelbarer Wirkung."},
+        {"type": "case", "q": "Ein deutsches Gericht ist unsicher, wie eine EU-Richtlinie auszulegen ist. Was muss es tun, bevor es entscheidet?"},
     ],
     "double_materiality": [
-        {"type": "definition", "q": "What are the two dimensions of double materiality under CSRD/ESRS?"},
-        {"type": "application", "q": "A company identifies that its factories pollute local rivers (impact) but this does not affect its financial results. Must it report this under ESRS?"},
-        {"type": "case", "q": "A company only conducts financial materiality assessment and omits impact materiality. Which ESRS standard does this violate?"},
-        {"type": "definition", "q": "What is IRO (Impact, Risk, Opportunity) analysis and how does it relate to double materiality?"},
+        {"type": "definition", "q": "Was sind die zwei Dimensionen der doppelten Wesentlichkeit nach CSRD/ESRS?"},
+        {"type": "application", "q": "Ein Unternehmen stellt fest, dass seine Fabriken lokale Flüsse verschmutzen (Auswirkung), dies sich aber nicht auf die Finanzlage auswirkt. Muss es darüber nach ESRS berichten?"},
+        {"type": "case", "q": "Ein Unternehmen führt nur eine finanzielle Wesentlichkeitsanalyse durch und lässt die Auswirkungswesentlichkeit aus. Welcher ESRS-Standard wird verletzt?"},
+        {"type": "definition", "q": "Was ist IRO (Impact, Risk, Opportunity) und in welchem Verhältnis steht es zur doppelten Wesentlichkeit?"},
     ],
     "tcfd": [
-        {"type": "definition", "q": "What are the 4 TCFD pillars — Governance, Strategy, Risk Management, and what is the fourth?"},
-        {"type": "application", "q": "A company uses TCFD as its climate disclosure framework. Is this sufficient to comply with ESRS E1?"},
-        {"type": "definition", "q": "What is the difference between physical climate risk and transition climate risk under TCFD?"},
-        {"type": "case", "q": "An investor asks a company for TCFD-aligned disclosures. The company has no climate strategy. What is the minimum it must disclose?"},
+        {"type": "definition", "q": "Was sind die 4 TCFD-Säulen — Governance, Strategie, Risikomanagement und welche ist die vierte?"},
+        {"type": "application", "q": "Ein Unternehmen nutzt TCFD als Rahmen für die Klimaberichterstattung. Reicht dies für die Einhaltung von ESRS E1 aus?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen physischen Klimarisiken und Übergangsklimakrisiken nach TCFD?"},
+        {"type": "case", "q": "Ein Investor fordert TCFD-konforme Offenlegungen. Das Unternehmen hat keine Klimastrategie. Was muss es mindestens offenlegen?"},
     ],
     "cjeu_cases": [
-        {"type": "definition", "q": "What was decided in Case C-237/07 (Janecek) regarding EU environmental law and individual rights?"},
-        {"type": "definition", "q": "What is the significance of the 'Urgenda' style cases for EU environmental law obligations?"},
-        {"type": "application", "q": "A Member State fails to implement an EU Environmental Directive. What can an individual company do under CJEU precedent?"},
-        {"type": "definition", "q": "What is the Francovich principle and when can a company claim damages from a Member State?"},
+        {"type": "definition", "q": "Was wurde in der Rs. C-237/07 (Janecek) zum Verhältnis von EU-Umweltrecht und individuellen Rechten entschieden?"},
+        {"type": "definition", "q": "Welche Bedeutung haben Klimaklagen im Stil von Urgenda für EU-Umweltrechtsverpflichtungen?"},
+        {"type": "application", "q": "Ein Mitgliedstaat setzt eine EU-Umweltrichtlinie nicht um. Was kann ein Unternehmen nach EuGH-Rechtsprechung tun?"},
+        {"type": "definition", "q": "Was ist das Francovich-Prinzip und wann kann ein Unternehmen Schadensersatz vom Staat verlangen?"},
     ],
     "cs3d": [
-        {"type": "definition", "q": "What is CS3D and how does it differ from LkSG?"},
-        {"type": "application", "q": "A company with 1,000 EU employees and €450M turnover — does CS3D apply?"},
-        {"type": "definition", "q": "Does CS3D require companies to monitor only direct suppliers or the entire value chain?"},
-        {"type": "case", "q": "A company's Tier 2 supplier violates ILO conventions. What must the company do under CS3D?"},
+        {"type": "definition", "q": "Was ist die CS3D und wie unterscheidet sie sich vom LkSG?"},
+        {"type": "application", "q": "Ein Unternehmen mit 1.000 EU-Mitarbeitern und €450 Mio. Umsatz — gilt CS3D?"},
+        {"type": "definition", "q": "Verpflichtet die CS3D Unternehmen nur zur Überwachung unmittelbarer Lieferanten oder der gesamten Wertschöpfungskette?"},
+        {"type": "case", "q": "Ein Tier-2-Lieferant eines Unternehmens verstößt gegen ILO-Übereinkommen. Was muss das Unternehmen nach CS3D tun?"},
     ],
     "hgb": [
-        {"type": "definition", "q": "What is the Lagebericht under HGB and who must prepare it?"},
-        {"type": "application", "q": "A German GmbH has €6M turnover, 25 employees. Which HGB size class applies?"},
-        {"type": "definition", "q": "What is the Grundsatz der Vorsicht (prudence principle) in HGB accounting?"},
-        {"type": "case", "q": "A company switches accounting policy from HGB to IFRS. What HGB disclosure obligations apply?"},
+        {"type": "definition", "q": "Was ist der Lagebericht nach HGB und wer ist zur Erstellung verpflichtet?"},
+        {"type": "application", "q": "Eine deutsche GmbH hat €6 Mio. Umsatz und 25 Mitarbeiter. Welche HGB-Größenklasse gilt?"},
+        {"type": "definition", "q": "Was ist der Grundsatz der Vorsicht in der HGB-Rechnungslegung?"},
+        {"type": "case", "q": "Ein Unternehmen wechselt von HGB zu IFRS. Welche HGB-Offenlegungspflichten gelten?"},
     ],
     "ksg": [
-        {"type": "definition", "q": "What annual CO2 reduction targets does the KSG set and for which sectors?"},
-        {"type": "application", "q": "The German transport sector exceeds its KSG annual emissions budget. What legal consequence follows?"},
-        {"type": "definition", "q": "What is the Klimaschutzprogramm and which government body is responsible?"},
+        {"type": "definition", "q": "Welche jährlichen CO₂-Minderungsziele setzt das KSG und für welche Sektoren?"},
+        {"type": "application", "q": "Der deutsche Verkehrssektor überschreitet sein KSG-Jahresemissionsbudget. Welche Rechtsfolge tritt ein?"},
+        {"type": "definition", "q": "Was ist das Klimaschutzprogramm und welche Bundesbehörde ist dafür verantwortlich?"},
     ],
     "behg": [
-        {"type": "definition", "q": "What fuels does the BEHG cover and from what year did national CO2 pricing start?"},
-        {"type": "application", "q": "A heating oil supplier sells 500,000 tonnes CO2-equivalent. What is its BEHG obligation?"},
-        {"type": "definition", "q": "How does BEHG interact with the EU ETS — can emissions be counted twice?"},
+        {"type": "definition", "q": "Welche Brennstoffe erfasst das BEHG und ab welchem Jahr begann die nationale CO₂-Bepreisung?"},
+        {"type": "application", "q": "Ein Heizöllieferant vertreibt 500.000 Tonnen CO₂-Äquivalent. Was sind seine BEHG-Pflichten?"},
+        {"type": "definition", "q": "Wie verhält sich das BEHG zum EU-ETS — können Emissionen doppelt angerechnet werden?"},
     ],
     "gri": [
-        {"type": "definition", "q": "What are the GRI Universal Standards and how do they relate to topic-specific standards?"},
-        {"type": "application", "q": "A company uses GRI Standards for its sustainability report. Is this sufficient for CSRD compliance?"},
-        {"type": "definition", "q": "What is the GRI materiality principle and how does it differ from ESRS double materiality?"},
+        {"type": "definition", "q": "Was sind die GRI Universal Standards und in welchem Verhältnis stehen sie zu den themenbezogenen Standards?"},
+        {"type": "application", "q": "Ein Unternehmen verwendet GRI-Standards für seinen Nachhaltigkeitsbericht. Reicht dies für die CSRD-Konformität aus?"},
+        {"type": "definition", "q": "Was ist das GRI-Wesentlichkeitsprinzip und wie unterscheidet es sich von der ESRS-doppelten Wesentlichkeit?"},
     ],
     "issb": [
-        {"type": "definition", "q": "What is the difference between IFRS S1 and IFRS S2?"},
-        {"type": "application", "q": "An EU-listed company already reports under ISSB. Does this satisfy ESRS requirements?"},
-        {"type": "definition", "q": "Which jurisdiction first made ISSB-aligned reporting mandatory and from when?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen IFRS S1 und IFRS S2?"},
+        {"type": "application", "q": "Ein EU-börsennotiertes Unternehmen berichtet bereits nach ISSB. Erfüllt dies die ESRS-Anforderungen?"},
+        {"type": "definition", "q": "Welche Jurisdiktion hat als erste ISSB-konforme Berichterstattung verpflichtend eingeführt und ab wann?"},
     ],
     "eu_whistleblower": [
-        {"type": "definition", "q": "Which companies must establish internal whistleblower channels under the EU Whistleblower Directive?"},
-        {"type": "application", "q": "An employee reports CSRD fraud internally but faces retaliation. What protection does the Directive provide?"},
-        {"type": "definition", "q": "What is the deadline for Member States to implement the EU Whistleblower Directive?"},
+        {"type": "definition", "q": "Welche Unternehmen müssen nach der EU-Hinweisgeberschutzrichtlinie interne Meldekanäle einrichten?"},
+        {"type": "application", "q": "Ein Mitarbeiter meldet CSRD-Betrug intern und wird anschließend benachteiligt. Welchen Schutz bietet die Richtlinie?"},
+        {"type": "definition", "q": "Bis wann mussten die Mitgliedstaaten die EU-Hinweisgeberschutzrichtlinie umsetzen?"},
     ],
     "reach": [
-        {"type": "definition", "q": "What does REACH require companies to do with chemical substances above 1 tonne/year?"},
-        {"type": "application", "q": "A company imports a product containing SVHC above 0.1% weight. What REACH obligation applies?"},
-        {"type": "definition", "q": "What is the difference between REACH Registration, Authorisation, and Restriction?"},
+        {"type": "definition", "q": "Was verpflichtet REACH Unternehmen bei chemischen Stoffen ab 1 Tonne pro Jahr zu tun?"},
+        {"type": "application", "q": "Ein Unternehmen importiert ein Produkt mit SVHC-Anteilen über 0,1 Gewichtsprozent. Welche REACH-Pflicht gilt?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen REACH-Registrierung, -Zulassung und -Beschränkung?"},
     ],
     "eu_competition": [
-        {"type": "definition", "q": "What does TFEU Article 101 prohibit and what is the exception under Article 101(3)?"},
-        {"type": "application", "q": "Two competing companies agree to share sustainability cost data. Could this violate Article 101?"},
-        {"type": "definition", "q": "What is the dominance threshold under EU competition law and what does Article 102 prohibit?"},
-        {"type": "case", "q": "A large tech company refuses to grant access to its platform to a sustainability data provider. Which TFEU article applies?"},
+        {"type": "definition", "q": "Was verbietet AEUV Art. 101 und was ist die Ausnahme nach Art. 101 Abs. 3?"},
+        {"type": "application", "q": "Zwei Wettbewerber vereinbaren den Austausch von Nachhaltigkeitskostendaten. Könnte dies Art. 101 verletzen?"},
+        {"type": "definition", "q": "Was ist die Marktbeherrschungsschwelle im EU-Wettbewerbsrecht und was verbietet Art. 102?"},
+        {"type": "case", "q": "Ein großes Technologieunternehmen verweigert einem Nachhaltigkeitsdatenanbieter den Plattformzugang. Welcher AEUV-Artikel greift?"},
     ],
     "mifid2": [
-        {"type": "definition", "q": "What sustainability-related amendments did MiFID II receive and from when?"},
-        {"type": "application", "q": "An investment advisor does not ask clients about ESG preferences. Does this comply with MiFID II post-2022?"},
-        {"type": "definition", "q": "What is a sustainability preference under MiFID II and what three options can a client choose?"},
+        {"type": "definition", "q": "Welche Nachhaltigkeitsänderungen hat MiFID II erhalten und ab wann gelten sie?"},
+        {"type": "application", "q": "Ein Anlageberater fragt Kunden nicht nach ESG-Präferenzen. Ist das ab 2022 MiFID-II-konform?"},
+        {"type": "definition", "q": "Was ist eine Nachhaltigkeitspräferenz nach MiFID II und welche drei Optionen hat ein Kunde?"},
     ],
     "ied": [
-        {"type": "definition", "q": "What is a Best Available Technique (BAT) under the IED and who sets it?"},
-        {"type": "application", "q": "A factory exceeds its IED emission limit values. What is the competent authority's response?"},
-        {"type": "definition", "q": "Which industrial installations require an IED permit in Germany?"},
+        {"type": "definition", "q": "Was ist eine Beste Verfügbare Technik (BVT) nach der Industrieemissionsrichtlinie und wer legt sie fest?"},
+        {"type": "application", "q": "Eine Anlage überschreitet die IED-Emissionsgrenzwerte. Wie reagiert die zuständige Behörde?"},
+        {"type": "definition", "q": "Welche Industrieanlagen benötigen in Deutschland eine IED-Genehmigung?"},
     ],
     "srd2": [
-        {"type": "definition", "q": "What shareholder engagement obligations does SRD II impose on institutional investors?"},
-        {"type": "application", "q": "A company pays its CEO 300x the median employee wage. What SRD II disclosure is required?"},
-        {"type": "definition", "q": "What is a related party transaction under SRD II and when does shareholder approval apply?"},
+        {"type": "definition", "q": "Welche Aktionärsengagementverpflichtungen legt SRD II institutionellen Investoren auf?"},
+        {"type": "application", "q": "Ein Unternehmen vergütet seinen CEO mit dem 300-fachen des Medianlohns der Mitarbeiter. Welche SRD-II-Offenlegung ist erforderlich?"},
+        {"type": "definition", "q": "Was ist eine Transaktion mit nahestehenden Parteien nach SRD II und wann ist Aktionärsgenehmigung erforderlich?"},
+    ],
+    # Neue Themen
+    "teu": [
+        {"type": "definition", "q": "Was sind die fünf Grundwerte der EU nach Art. 2 TEU?"},
+        {"type": "definition", "q": "Was regelt Art. 50 TEU und was sind seine Voraussetzungen?"},
+        {"type": "application", "q": "Die Kommission leitet ein Vertragsverletzungsverfahren ein. Auf welcher TEU/AEUV-Grundlage?"},
+        {"type": "definition", "q": "Was ist das Prinzip der begrenzten Einzelermächtigung nach Art. 5 TEU?"},
+    ],
+    "tfeu": [
+        {"type": "definition", "q": "Was sind die vier Grundfreiheiten des AEUV?"},
+        {"type": "application", "q": "Deutschland verbietet Importe eines in Frankreich zugelassenen Lebensmittels. Welcher AEUV-Artikel ist betroffen?"},
+        {"type": "definition", "q": "Was regeln AEUV Art. 101 und 102 und wer überwacht ihre Einhaltung?"},
+        {"type": "definition", "q": "Was ist das ordentliche Gesetzgebungsverfahren nach Art. 294 AEUV?"},
+    ],
+    "eu_charter": [
+        {"type": "definition", "q": "Wann wurde die EU-Grundrechtecharta rechtlich verbindlich und in welchem Verhältnis steht sie zur EMRK?"},
+        {"type": "application", "q": "Ein Unternehmen verarbeitet personenbezogene Daten im Auftrag einer Behörde. Welches Chartagrundrecht ist berührt?"},
+        {"type": "definition", "q": "Was unterscheidet Rechte von Grundsätzen in der EU-Grundrechtecharta?"},
+    ],
+    "eu_legislative": [
+        {"type": "definition", "q": "Was ist der Trilog und welche drei Institutionen nehmen daran teil?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen einem EU-Beschluss und einer EU-Empfehlung?"},
+        {"type": "application", "q": "Die Kommission schlägt eine Richtlinie vor. Parlament lehnt sie ab. Was kann die Kommission tun?"},
+    ],
+    "van_gend_loos": [
+        {"type": "definition", "q": "Was entschied der EuGH in Van Gend en Loos (1963) zur unmittelbaren Wirkung des EU-Rechts?"},
+        {"type": "application", "q": "Ein Unternehmen beruft sich direkt auf eine EU-Verordnung vor einem deutschen Gericht. Ist dies möglich? Welches Urteil begründet das?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen unmittelbarer Wirkung und Vorrang des EU-Rechts?"},
+    ],
+    "costa_enel": [
+        {"type": "definition", "q": "Warum begründete das Costa-v-ENEL-Urteil (1964) den Vorrang des EU-Rechts vor nationalem Recht?"},
+        {"type": "application", "q": "Ein nationales Gesetz widerspricht einer EU-Verordnung. Welches Recht hat Vorrang und auf welches Urteil stützt sich dies?"},
+        {"type": "case", "q": "Deutschland erlässt ein Gesetz, das einer bereits geltenden EU-Richtlinie widerspricht. Was muss ein deutsches Gericht tun?"},
+    ],
+    "cassis_dijon": [
+        {"type": "definition", "q": "Was ist das Prinzip der gegenseitigen Anerkennung nach Cassis de Dijon (1979)?"},
+        {"type": "application", "q": "Frankreich verbietet den Verkauf eines in Deutschland zugelassenen Produkts. Welche Cassis-Grundsätze greifen?"},
+        {"type": "definition", "q": "Welche vier zwingenden Erfordernisse erkannte der EuGH in Cassis de Dijon als Ausnahme vom freien Warenverkehr an?"},
+    ],
+    "francovich": [
+        {"type": "definition", "q": "Was ist das Francovich-Prinzip (1991) und unter welchen drei Voraussetzungen haftet ein Mitgliedstaat?"},
+        {"type": "application", "q": "Deutschland setzt eine Insolvenzschutzrichtlinie nicht um und ein Arbeitnehmer erleidet einen Schaden. Was kann er verlangen?"},
+        {"type": "case", "q": "Ein Unternehmen erleidet Schäden, weil ein Mitgliedstaat eine EU-Richtlinie falsch umgesetzt hat. Welche Ansprüche hat es?"},
+    ],
+    "schrems": [
+        {"type": "definition", "q": "Was haben Schrems I (2015) und Schrems II (2020) für den Datentransfer in die USA bedeutet?"},
+        {"type": "application", "q": "Ein Unternehmen überträgt EU-Kundendaten in die USA auf Basis von Standardvertragsklauseln. Welche Zusatzmaßnahmen verlangt Schrems II?"},
+        {"type": "definition", "q": "Was ist das EU-US-Datenschutzrahmenwerk (Data Privacy Framework) und warum wurde es nach Schrems II eingeführt?"},
+    ],
+    "google_spain": [
+        {"type": "definition", "q": "Was entschied der EuGH in Google Spain (2014) zum Recht auf Vergessenwerden?"},
+        {"type": "application", "q": "Eine Person beantragt bei Google die Entfernung veralteter Suchergebnisse. Unter welchen Voraussetzungen muss Google nachkommen?"},
+        {"type": "definition", "q": "Wie verhält sich das Recht auf Vergessenwerden aus Google Spain zum DSGVO Art. 17?"},
+    ],
+    "eu_commission": [
+        {"type": "definition", "q": "Was ist das Initiativmonopol der Kommission und warum hat sie es?"},
+        {"type": "application", "q": "Die Kommission vermutet staatliche Beihilfen durch Deutschland. Welches Verfahren leitet sie ein?"},
+        {"type": "definition", "q": "Welche drei Hauptaufgaben hat die Europäische Kommission nach den Verträgen?"},
+    ],
+    "eu_parliament": [
+        {"type": "definition", "q": "Wie viele Abgeordnete hat das Europäische Parlament und wie werden sie gewählt?"},
+        {"type": "application", "q": "Rat und Parlament sind sich über einen Richtlinientext uneinig. Was passiert im ordentlichen Gesetzgebungsverfahren?"},
+        {"type": "definition", "q": "Welche Haushaltsbefugnisse hat das Europäische Parlament?"},
+    ],
+    "cjeu_court": [
+        {"type": "definition", "q": "Was ist ein Vorabentscheidungsverfahren nach Art. 267 AEUV und wer kann es einleiten?"},
+        {"type": "application", "q": "Ein deutsches Gericht zweifelt an der Auslegung einer EU-Richtlinie. Muss es den EuGH anrufen?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen EuGH (Gerichtshof) und EuG (Gericht) bei EU-Streitigkeiten?"},
+    ],
+    "ai_act": [
+        {"type": "definition", "q": "Welche vier Risikostufen unterscheidet das EU AI-Gesetz für KI-Systeme?"},
+        {"type": "application", "q": "Ein Unternehmen setzt KI zur Kreditwürdigkeitsprüfung ein. Welche Risikostufe gilt nach dem AI-Gesetz?"},
+        {"type": "definition", "q": "Was sind Allzweck-KI-Modelle (GPAI) nach dem EU AI-Gesetz und welche Pflichten treffen ihre Anbieter?"},
+    ],
+    "nis2": [
+        {"type": "definition", "q": "Welche Unternehmen gelten als 'wesentliche Einrichtungen' nach NIS2 und welche Sektoren sind erfasst?"},
+        {"type": "application", "q": "Ein mittelgroßes Energieunternehmen erleidet einen Cyberangriff. Welche NIS2-Meldepflichten gelten?"},
+        {"type": "definition", "q": "Was ist der Unterschied zwischen wesentlichen und wichtigen Einrichtungen nach NIS2?"},
     ],
 }
 
@@ -276,7 +407,6 @@ def _load() -> list[dict]:
     if _MAP_FILE.exists():
         try:
             data = json.loads(_MAP_FILE.read_text())
-            # Migrate: add any new seed topics not yet in saved map
             saved_ids = {t["id"] for t in data}
             for seed in _SEED_MAP:
                 if seed["id"] not in saved_ids:
@@ -314,7 +444,7 @@ def get_next_learn_topic() -> dict | None:
 
 
 def get_next_question(topic_id: str) -> dict | None:
-    """Return next unanswered question dict {type, q} for a topic."""
+    """Return next question dict {type, q} for a topic."""
     questions = _QUESTION_BANK.get(topic_id, [])
     if not questions:
         return None
@@ -328,23 +458,65 @@ def get_next_question(topic_id: str) -> dict | None:
 
 
 def get_all_questions(topic_id: str) -> list[dict]:
-    """Return all questions for a topic — used by bootstrap learner."""
+    """Return all questions for a topic."""
     return _QUESTION_BANK.get(topic_id, [])
+
+
+def _get_next_learnable(topics: list[dict]) -> dict | None:
+    learnable = [t for t in topics if t["status"] not in ("functional", "mastered")]
+    if not learnable:
+        return None
+    learnable.sort(key=lambda t: (_STATUS_ORDER.index(t.get("status", "unknown")), t["pct"]))
+    return learnable[0]
 
 
 def record_answer(topic_id: str, answer_text: str, reference: str = "") -> dict:
     with _lock:
         topics = _load()
-        for topic in topics:
-            if topic["id"] == topic_id:
-                topic["questions_asked"] = topic.get("questions_asked", 0) + 1
-                topic["questions_answered"] = topic.get("questions_answered", 0) + 1
-                topic["last_updated"] = datetime.now(timezone.utc).isoformat()
-                topic["pct"] = min(100, topic["pct"] + 12)
-                topic["status"] = _compute_status(topic["pct"])
-                _save(topics)
-                return topic
-        return {}
+        topic = next((t for t in topics if t["id"] == topic_id), None)
+        if topic is None:
+            return {"topic": {}, "overall_pct": 0, "next_topic": None}
+
+        pct_before = topic["pct"]
+        q_entry = _QUESTION_BANK.get(topic_id, [])
+        asked_idx = topic.get("questions_asked", 0) % len(q_entry) if q_entry else 0
+        question_text = q_entry[asked_idx]["q"] if q_entry else ""
+
+        valid = len(answer_text.strip()) >= 20
+        topic["questions_asked"] = topic.get("questions_asked", 0) + 1
+        if valid:
+            topic["questions_answered"] = topic.get("questions_answered", 0) + 1
+            topic["last_updated"] = datetime.now(timezone.utc).isoformat()
+            topic["pct"] = min(100, topic["pct"] + 12)
+            topic["status"] = _compute_status(topic["pct"])
+        _save(topics)
+
+        ts = datetime.now(timezone.utc).isoformat()
+        _ANSWER_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with _ANSWER_HISTORY_FILE.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "id":          f"ans-{int(datetime.now(timezone.utc).timestamp()*1000)}",
+                "ts":          ts,
+                "topic_id":    topic_id,
+                "topic_name":  topic["name"],
+                "category":    topic.get("category", ""),
+                "question":    question_text,
+                "user_answer": answer_text,
+                "reference":   reference,
+                "pct_before":  pct_before,
+                "pct_after":   topic["pct"],
+                "status_after": topic["status"],
+                "answer_len":  len(answer_text),
+                "valid":       valid,
+            }, ensure_ascii=False) + "\n")
+
+        overall = round(sum(t["pct"] for t in topics) / len(topics)) if topics else 0
+        next_t  = _get_next_learnable(topics)
+        return {
+            "topic":       topic,
+            "overall_pct": overall,
+            "next_topic":  next_t["name"] if next_t else None,
+        }
 
 
 def _compute_status(pct: int) -> str:

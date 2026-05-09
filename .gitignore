@@ -22,3 +22,9 @@ ENV/
 htmlcov/
 logs/
 data/vectordb/
+data/memory/brain_state.json
+data/memory/corrections.json
+data/memory/rules.json
+data/memory/knowledge_map.json
+data/pdfs/
+data/raw/
