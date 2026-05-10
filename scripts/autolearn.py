@@ -12,6 +12,7 @@ Usage:
   python3 scripts/autolearn.py --agent api            # Anthropic API (ANTHROPIC_API_KEY)
   python3 scripts/autolearn.py --url http://IP:8000   # remote server
   python3 scripts/autolearn.py --depth 5              # deeper pipeline
+  python3 scripts/autolearn.py --include-mastered --target 1000000
 """
 
 import argparse
@@ -91,23 +92,32 @@ async def _anthropic_api(question: str, topic: str, category: str,
 
 # ── LIOS API ───────────────────────────────────────────────────────────────────
 
-async def lios_next(client: httpx.AsyncClient, base: str) -> dict | None:
+async def lios_next(client: httpx.AsyncClient, base: str, include_mastered: bool = False) -> dict | None:
     try:
-        r = await client.get(f"{base}/learn/next", timeout=15)
+        r = await client.get(
+            f"{base}/learn/next",
+            params={"include_mastered": str(include_mastered).lower()},
+            timeout=15,
+        )
         d = r.json()
     except Exception as e:
         print(f"  [!] /learn/next failed: {e}")
         return None
-    if d.get("all_mastered") or not d.get("topic") or not d.get("question"):
+    if (not include_mastered and d.get("all_mastered")) or not d.get("topic") or not d.get("question"):
         return None
     return d
 
 
 async def lios_submit(client: httpx.AsyncClient, base: str,
-                       topic_id: str, answer: str) -> dict:
+                       topic_id: str, answer: str, question_text: str = "") -> dict:
     r = await client.post(
         f"{base}/learn/answer",
-        json={"topic_id": topic_id, "answer_text": answer, "reference": "auto"},
+        json={
+            "topic_id": topic_id,
+            "answer_text": answer,
+            "reference": "auto",
+            "question_text": question_text,
+        },
         timeout=15,
     )
     return r.json()
@@ -115,11 +125,11 @@ async def lios_submit(client: httpx.AsyncClient, base: str,
 # ── Pipeline ───────────────────────────────────────────────────────────────────
 
 async def producer(client: httpx.AsyncClient, base: str,
-                   queue: asyncio.Queue, done: asyncio.Event, depth: int):
+                   queue: asyncio.Queue, done: asyncio.Event, depth: int, include_mastered: bool):
     """LIOS: keeps the queue `depth` questions ahead of the agent."""
     while not done.is_set():
         if queue.qsize() < depth:
-            data = await lios_next(client, base)
+            data = await lios_next(client, base, include_mastered=include_mastered)
             if data is None:
                 done.set()
                 return
@@ -130,7 +140,7 @@ async def producer(client: httpx.AsyncClient, base: str,
 
 async def consumer(client: httpx.AsyncClient, base: str,
                    queue: asyncio.Queue, done: asyncio.Event,
-                   agent: str, stats: dict):
+                   agent: str, stats: dict, target: int):
     """Agent: drains the queue, answers each question, submits back."""
     loop = asyncio.get_event_loop()
 
@@ -166,7 +176,7 @@ async def consumer(client: httpx.AsyncClient, base: str,
         elapsed = time.perf_counter() - t0
 
         try:
-            result = await lios_submit(client, base, t["id"], answer)
+            result = await lios_submit(client, base, t["id"], answer, question_text=q)
             upd    = result["topic_updated"]
             stats["answered"] += 1
             print(f"  A: {textwrap.shorten(answer, width=90)}")
@@ -174,6 +184,8 @@ async def consumer(client: httpx.AsyncClient, base: str,
                   f"  overall={result['overall_pct']}%"
                   f"  next={result.get('next_topic', '—')}"
                   f"  ({elapsed:.1f}s)")
+            if target > 0 and stats["answered"] >= target:
+                done.set()
         except Exception as e:
             print(f"  [!] submit failed: {e}")
 
@@ -201,11 +213,14 @@ async def status_ticker(base: str, done: asyncio.Event):
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 
-async def run(base: str, agent: str, depth: int):
+async def run(base: str, agent: str, depth: int, target: int, include_mastered: bool):
     print("━" * 60)
     print("  LIOS Auto-Trainer  —  pipeline mode")
     print(f"  Server : {base}")
     print(f"  Agent  : {agent}   Queue depth : {depth}")
+    if target > 0:
+        print(f"  Target : {target} answers")
+    print(f"  Include mastered topics: {include_mastered}")
     print("  LIOS stays ahead · agent never waits")
     print("━" * 60)
 
@@ -215,8 +230,8 @@ async def run(base: str, agent: str, depth: int):
 
     async with httpx.AsyncClient() as client:
         await asyncio.gather(
-            producer(client, base, queue, done, depth),
-            consumer(client, base, queue, done, agent, stats),
+            producer(client, base, queue, done, depth, include_mastered),
+            consumer(client, base, queue, done, agent, stats, target),
             status_ticker(base, done),
         )
 
@@ -234,8 +249,12 @@ def main():
                    help="Answering backend")
     p.add_argument("--depth", type=int, default=DEFAULT_QUEUE_DEPTH,
                    help="How many questions LIOS pre-fetches ahead (default 3)")
+    p.add_argument("--target", type=int, default=0,
+                   help="Stop after N submitted answers (0 = unlimited)")
+    p.add_argument("--include-mastered", action="store_true",
+                   help="Keep generating from all topics even after mastery")
     args = p.parse_args()
-    asyncio.run(run(args.url, args.agent, args.depth))
+    asyncio.run(run(args.url, args.agent, args.depth, args.target, args.include_mastered))
 
 
 if __name__ == "__main__":

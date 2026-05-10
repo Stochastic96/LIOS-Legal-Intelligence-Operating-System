@@ -90,15 +90,17 @@ class LIOSClient:
         r.raise_for_status()
         return r.json()
 
-    def learn_next(self, topic_id: str | None = None) -> dict:
+    def learn_next(self, topic_id: str | None = None, include_mastered: bool = False) -> dict:
         params = {"topic_id": topic_id} if topic_id else {}
+        params["include_mastered"] = str(include_mastered).lower()
         return self._get("/learn/next", **params)
 
-    def learn_answer(self, topic_id: str, answer: str, reference: str = "") -> dict:
+    def learn_answer(self, topic_id: str, answer: str, reference: str = "", question_text: str = "") -> dict:
         return self._post("/learn/answer", {
             "topic_id": topic_id,
             "answer_text": answer,
             "reference": reference,
+            "question_text": question_text,
         })
 
     def learn_map(self) -> dict:
@@ -210,6 +212,7 @@ def run(args: argparse.Namespace):
     delay    = args.delay
     min_len  = args.min_answer
     pin_topic = args.topic
+    include_mastered = args.include_mastered
 
     _header()
 
@@ -243,7 +246,7 @@ def run(args: argparse.Namespace):
 
         # 1. Get next question
         try:
-            data = client.learn_next(topic_id=pin_topic)
+            data = client.learn_next(topic_id=pin_topic, include_mastered=include_mastered)
         except Exception as exc:
             print(_c(RED, f"  ERROR fetching question: {exc}"))
             break
@@ -328,6 +331,7 @@ def run(args: argparse.Namespace):
                 topic_id=topic["id"],
                 answer=answer,
                 reference="LIOS corpus (auto-synthesized)",
+                question_text=question,
             )
             _print_result(result)
             submitted += 1
@@ -369,6 +373,8 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Min answer length to submit  [default: 60]")
     p.add_argument("--topic",      default=None,
                    help="Pin to a specific topic ID (optional)")
+    p.add_argument("--include-mastered", action="store_true",
+                   help="Keep generating questions even when topics are mastered")
     return p
 
 if __name__ == "__main__":

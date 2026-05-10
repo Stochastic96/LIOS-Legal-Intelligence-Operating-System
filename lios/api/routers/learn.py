@@ -28,21 +28,24 @@ class AnswerSubmitRequest(BaseModel):
     topic_id: str
     answer_text: str
     reference: str = ""
+    question_text: str = ""
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/next")
-async def get_next_question() -> dict[str, Any]:
+async def get_next_question(include_mastered: bool = False) -> dict[str, Any]:
     """Nächste Lernfrage aus der persistenten Wissenskarte abrufen."""
-    topic = km.get_next_learn_topic()
+    topic = km.get_next_learn_topic(include_mastered=include_mastered)
     if topic is None:
         return {"all_mastered": True, "topic": None, "question": None}
     q = km.get_next_question(topic["id"])
     return {
-        "all_mastered": False,
+        "all_mastered": (not include_mastered) and topic.get("status") in ("functional", "mastered"),
         "topic": dict(topic),
         "question": q["q"] if q else None,
+        "question_type": q.get("type") if q else None,
+        "question_source": q.get("source") if q else None,
     }
 
 
@@ -54,7 +57,12 @@ async def submit_answer(payload: AnswerSubmitRequest) -> dict[str, Any]:
     if topic is None:
         raise HTTPException(status_code=404, detail=f"Thema {payload.topic_id} nicht gefunden")
 
-    result  = km.record_answer(payload.topic_id, payload.answer_text, payload.reference)
+    result  = km.record_answer(
+        payload.topic_id,
+        payload.answer_text,
+        payload.reference,
+        payload.question_text,
+    )
     updated = result["topic"]
 
     logger.info(

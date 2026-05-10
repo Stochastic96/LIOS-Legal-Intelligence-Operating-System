@@ -3,15 +3,48 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 
 _MAP_FILE = Path("data/memory/knowledge_map.json")
 _ANSWER_HISTORY_FILE = Path("data/memory/answer_history.jsonl")
+_CORPUS_FILE = Path("data/corpus/legal_chunks.jsonl")
 _lock = Lock()
 
 _STATUS_ORDER = ["unknown", "seed", "learning", "connected", "functional", "mastered"]
+_QUESTION_TEMPLATES = [
+    "Was regelt {regulation} {article} ({title}) und welche Pflichten entstehen für Unternehmen?",
+    "Wann ist {regulation} {article} ({title}) anwendbar und auf wen?",
+    "Welche Risiken oder Sanktionen ergeben sich aus {regulation} {article} ({title}) bei Verstößen?",
+    "Wie setzt man die Anforderungen aus {regulation} {article} ({title}) praktisch um?",
+    "Welche Nachweise oder Dokumentation verlangt {regulation} {article} ({title}) konkret?",
+]
+_STOP_WORDS = {
+    "der", "die", "das", "den", "dem", "des", "und", "oder", "mit", "auf", "für", "von", "aus",
+    "ein", "eine", "einer", "eines", "einem", "zu", "im", "in", "an", "is", "are", "this", "that",
+    "shall", "must", "under", "nach", "what", "which", "when", "where", "wer", "wie", "was",
+}
+_TOPIC_CORPUS_HINTS: dict[str, list[str]] = {
+    "csrd": ["csrd"],
+    "esrs": ["esrs"],
+    "eu_taxonomy": ["taxonomy", "taxonom", "eu_taxonomy"],
+    "sfdr": ["sfdr"],
+    "cs3d": ["cs3d", "csddd", "due diligence"],
+    "eudr": ["eudr", "deforestation"],
+    "lksg": ["lksg"],
+    "gdpr": ["gdpr", "dsgvo"],
+    "behg": ["behg"],
+    "ksg": ["ksg"],
+    "hgb": ["hgb"],
+    "reach": ["reach"],
+    "mifid2": ["mifid"],
+    "srd2": ["srd", "aktionär"],
+    "ai_act": ["ai act", "ai"],
+    "nis2": ["nis2"],
+}
+_CORPUS_CHUNKS_CACHE: list[dict] | None = None
 
 # ── Topic seed map ─────────────────────────────────────────────────────────────
 
@@ -931,6 +964,98 @@ _QUESTION_BANK["nis2"].extend([
 ])
 
 
+def _load_corpus_chunks() -> list[dict]:
+    global _CORPUS_CHUNKS_CACHE
+    if _CORPUS_CHUNKS_CACHE is not None:
+        return _CORPUS_CHUNKS_CACHE
+
+    chunks: list[dict] = []
+    if not _CORPUS_FILE.exists():
+        _CORPUS_CHUNKS_CACHE = chunks
+        return chunks
+
+    try:
+        with _CORPUS_FILE.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                if not obj.get("text"):
+                    continue
+                chunks.append(obj)
+    except Exception:
+        chunks = []
+
+    _CORPUS_CHUNKS_CACHE = chunks
+    return chunks
+
+
+def _extract_keywords(text: str, limit: int = 3) -> list[str]:
+    words = re.findall(r"[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-]{3,}", text)
+    out: list[str] = []
+    seen: set[str] = set()
+    for w in words:
+        wl = w.lower()
+        if wl in _STOP_WORDS:
+            continue
+        if wl in seen:
+            continue
+        seen.add(wl)
+        out.append(w)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _chunk_matches_topic(chunk: dict, topic_id: str, topic_name: str) -> bool:
+    reg = str(chunk.get("regulation", "")).lower()
+    title = str(chunk.get("title", "")).lower()
+    text = str(chunk.get("text", "")).lower()
+    hints = _TOPIC_CORPUS_HINTS.get(topic_id, [])
+
+    if topic_id and topic_id.replace("_", "") in reg.replace("_", ""):
+        return True
+    if topic_name and topic_name.lower() in title:
+        return True
+    for h in hints:
+        if h in reg or h in title or h in text:
+            return True
+    return False
+
+
+def _build_corpus_question(topic_id: str, topic_name: str, asked: int) -> dict | None:
+    chunks = _load_corpus_chunks()
+    if not chunks:
+        return None
+
+    filtered = [c for c in chunks if _chunk_matches_topic(c, topic_id, topic_name)]
+    if not filtered:
+        filtered = chunks
+
+    chunk = filtered[asked % len(filtered)]
+    regulation = chunk.get("regulation") or topic_name or "EU-Recht"
+    article = chunk.get("article") or "Artikel"
+    title = chunk.get("title") or "Kernanforderung"
+    text = chunk.get("text") or ""
+    template = _QUESTION_TEMPLATES[asked % len(_QUESTION_TEMPLATES)]
+    question = template.format(regulation=regulation, article=article, title=title)
+    kws = _extract_keywords(text, limit=3)
+    if kws:
+        question += f" Bitte berücksichtige: {', '.join(kws)}."
+    return {
+        "type": "corpus",
+        "q": question,
+        "source": "pdf_corpus",
+        "regulation": regulation,
+        "article": article,
+        "title": title,
+    }
+
+
 def _load() -> list[dict]:
     if _MAP_FILE.exists():
         try:
@@ -962,8 +1087,14 @@ def get_overall_pct() -> int:
     return round(sum(t["pct"] for t in topics) / len(topics))
 
 
-def get_next_learn_topic() -> dict | None:
+def get_next_learn_topic(include_mastered: bool = False) -> dict | None:
     topics = get_map()
+    if not topics:
+        return None
+    if include_mastered:
+        topics.sort(key=lambda t: (t.get("questions_asked", 0), t.get("pct", 0)))
+        return topics[0]
+
     learnable = [t for t in topics if t["status"] not in ("functional", "mastered")]
     if not learnable:
         return None
@@ -973,14 +1104,19 @@ def get_next_learn_topic() -> dict | None:
 
 def get_next_question(topic_id: str) -> dict | None:
     """Return next question dict {type, q} for a topic."""
-    questions = _QUESTION_BANK.get(topic_id, [])
-    if not questions:
-        return None
     topics = get_map()
     topic = next((t for t in topics if t["id"] == topic_id), None)
     if not topic:
         return None
     asked = topic.get("questions_asked", 0)
+
+    corpus_q = _build_corpus_question(topic_id=topic_id, topic_name=topic.get("name", ""), asked=asked)
+    if corpus_q:
+        return corpus_q
+
+    questions = _QUESTION_BANK.get(topic_id, [])
+    if not questions:
+        return None
     idx = asked % len(questions)
     return questions[idx]
 
@@ -998,7 +1134,7 @@ def _get_next_learnable(topics: list[dict]) -> dict | None:
     return learnable[0]
 
 
-def record_answer(topic_id: str, answer_text: str, reference: str = "") -> dict:
+def record_answer(topic_id: str, answer_text: str, reference: str = "", question_text: str = "") -> dict:
     with _lock:
         topics = _load()
         topic = next((t for t in topics if t["id"] == topic_id), None)
@@ -1008,7 +1144,7 @@ def record_answer(topic_id: str, answer_text: str, reference: str = "") -> dict:
         pct_before = topic["pct"]
         q_entry = _QUESTION_BANK.get(topic_id, [])
         asked_idx = topic.get("questions_asked", 0) % len(q_entry) if q_entry else 0
-        question_text = q_entry[asked_idx]["q"] if q_entry else ""
+        question_text = question_text or (q_entry[asked_idx]["q"] if q_entry else "")
 
         valid = len(answer_text.strip()) >= 20
         topic["questions_asked"] = topic.get("questions_asked", 0) + 1
