@@ -52,6 +52,17 @@ def _load_answers() -> list[dict]:
     return _read_jsonl(_ANSWER_HISTORY_FILE)
 
 
+def _chunk_filename(chunk: dict[str, Any]) -> str:
+    for key in ("filename", "file_name", "source_filename", "source_file", "document_name", "title"):
+        value = str(chunk.get(key, "") or "").strip()
+        if value:
+            return value
+    source_url = str(chunk.get("source_url", "") or "").strip()
+    if source_url:
+        return source_url.rstrip("/").split("/")[-1] or source_url
+    return "unknown"
+
+
 # ── Question bank size (imported lazily to avoid circular imports) ─────────────
 
 def _total_questions_in_bank() -> int:
@@ -73,6 +84,7 @@ def intelligence_stats() -> dict[str, Any]:
     corrections = _read_json(_CORRECTIONS_FILE, [])
 
     regs = {c.get("regulation", "") for c in chunks if c.get("regulation")}
+    files = {_chunk_filename(c) for c in chunks if _chunk_filename(c) != "unknown"}
     total_q = _total_questions_in_bank()
 
     now = datetime.now(timezone.utc)
@@ -94,6 +106,7 @@ def intelligence_stats() -> dict[str, Any]:
         "total_chunks":                  len(chunks),
         "total_regulations":             len(regs),
         "total_official_docs":           len(regs),
+        "consumed_files":                len(files),
         "total_topics":                  len(topics),
         "total_questions_in_bank":       total_q,
         "total_answers_submitted":       len(answers),
@@ -240,3 +253,56 @@ def intelligence_answers(limit: int = 20) -> dict[str, Any]:
         })
 
     return {"answers": enriched, "total": len(_read_jsonl(_ANSWER_HISTORY_FILE))}
+
+
+@router.get("/files")
+def intelligence_files(query: str = "", limit: int = 50) -> dict[str, Any]:
+    """Return corpus filenames with optional case-insensitive name-only search."""
+    chunks = _load_chunks()
+    normalized_query = query.strip().lower()
+    file_map: dict[str, dict[str, Any]] = {}
+
+    for chunk in chunks:
+        filename = _chunk_filename(chunk)
+        if normalized_query and normalized_query not in filename.lower():
+            continue
+
+        row = file_map.setdefault(
+            filename,
+            {
+                "filename": filename,
+                "regulation": chunk.get("regulation", "UNKNOWN"),
+                "chunk_count": 0,
+                "article_count": 0,
+                "articles": set(),
+                "source_url": chunk.get("source_url", ""),
+                "last_indexed": chunk.get("ingestion_timestamp", ""),
+                "published_date": chunk.get("published_date", ""),
+            },
+        )
+        row["chunk_count"] += 1
+        article = chunk.get("article", "")
+        if article:
+            row["articles"].add(article)
+        if not row["source_url"]:
+            row["source_url"] = chunk.get("source_url", "")
+        if not row["last_indexed"]:
+            row["last_indexed"] = chunk.get("ingestion_timestamp", "")
+        if not row["published_date"]:
+            row["published_date"] = chunk.get("published_date", "")
+
+    rows = [
+        {
+            "filename": row["filename"],
+            "regulation": row["regulation"],
+            "chunk_count": row["chunk_count"],
+            "article_count": len(row["articles"]),
+            "source_url": row["source_url"],
+            "last_indexed": row["last_indexed"],
+            "published_date": row["published_date"],
+        }
+        for row in file_map.values()
+    ]
+    rows.sort(key=lambda item: (-item["chunk_count"], item["filename"].lower()))
+    bounded_limit = max(1, min(limit, 500))
+    return {"files": rows[:bounded_limit], "total": len(rows), "query": query}

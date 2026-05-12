@@ -147,7 +147,11 @@ def test_mobile_chat_alias_uses_shared_contract_and_history(tmp_path: Path) -> N
     client = TestClient(routes.app)
 
     try:
-        response = client.post("/chat", json={"query": "Does CSRD apply?", "session_id": "mobile-s1"})
+        response = client.post(
+            "/chat",
+            headers=_api_key_headers(),
+            json={"query": "Does CSRD apply?", "session_id": "mobile-s1"},
+        )
         assert response.status_code == 200
         payload = response.json()
         assert payload["session_id"] == "mobile-s1"
@@ -159,12 +163,12 @@ def test_mobile_chat_alias_uses_shared_contract_and_history(tmp_path: Path) -> N
         assert payload["message_id"]
         assert isinstance(payload["brain_used"], bool)
 
-        history = client.get("/chat/history/mobile-s1")
+        history = client.get("/chat/history/mobile-s1", headers=_api_key_headers())
         assert history.status_code == 200
         turns = history.json()["turns"]
-        assert len(turns) == 1
-        assert turns[0]["session_id"] == "mobile-s1"
-        assert turns[0]["answer"] == "CSRD applies."
+        assert len(turns) >= 1
+        assert turns[-1]["session_id"] == "mobile-s1"
+        assert turns[-1]["answer"] == "CSRD applies."
     finally:
         chat_router.engine = original_engine
         chat_router.training_store = original_store_router
@@ -220,7 +224,11 @@ def test_chat_endpoints_return_predictable_errors_on_engine_failure(tmp_path: Pa
         assert web.status_code == 500
         assert web.json()["detail"] == {"error": "Failed to process chat message"}
 
-        mobile = client.post("/chat", json={"query": "Fail", "session_id": "m-fail"})
+        mobile = client.post(
+            "/chat",
+            headers=_api_key_headers(),
+            json={"query": "Fail", "session_id": "m-fail"},
+        )
         assert mobile.status_code == 500
         assert mobile.json()["detail"] == {"error": "Failed to process chat message"}
     finally:

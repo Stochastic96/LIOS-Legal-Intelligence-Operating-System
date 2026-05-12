@@ -1,6 +1,35 @@
 # LIOS-Legal-Intelligence-Operating-System
 Legal Intelligence Operating System for EU sustainability compliance. Instant answers on CSRD, ESRS, EU Taxonomy. Every answer cites exact law articles.
 
+## Source Of Truth
+
+- Main mobile app: `lios-mobile`
+- Legacy mobile app: `archive/mobile-expo` (kept for reference, not supported for daily use)
+- Corpus artifacts: `data/corpus/legal_chunks.jsonl`, `data/corpus/legal_chunks.embeddings.npy`, `data/corpus/legal_chunks.faiss`
+- Corpus recovery order: verify for Git LFS pointers, run `git lfs pull`, then confirm the retriever loads non-zero chunks
+
+## One-Command Startup
+
+Use the supported Mac + Expo Go flow:
+
+```bash
+bash start.sh
+```
+
+`start.sh` launches the backend on `0.0.0.0:8000`, prints both local and LAN URLs, checks `/health`, and then starts Expo from `lios-mobile`.
+
+### Expo Go runbook for `stochastic96`
+
+1. Sign in to Expo Go with the `stochastic96` account.
+2. Keep the phone on the same Wi-Fi network as the Mac.
+3. Run `bash start.sh` and scan the QR code from Expo.
+4. In the LIOS app open `Assistent -> System`.
+5. Set `Server-Adresse` to `http://<your-mac-lan-ip>:8000`.
+6. Set `API-Key` to your `LIOS_API_KEY` value if backend auth is enabled.
+7. If LAN mode fails, switch Expo to tunnel mode with `s` in the Expo terminal and retry.
+
+`localhost` only works on the Mac itself or a simulator, not on a physical iPhone.
+
 ## Local Chat Studio (UI + training capture)
 
 Use LIOS fully local from your PC browser. No cloud account is required.
@@ -36,21 +65,9 @@ Open:
 
 ### Mac + iPhone daily LAN workflow
 
-Use the one-command startup for local backend + mobile flow:
+Use `bash start.sh`.
 
-```bash
-bash start.sh
-```
-
-`start.sh` launches canonical backend `lios.main:app` on `0.0.0.0:8000`, prints:
-
-- browser URL (`http://localhost:8000`)
-- iPhone URL (`http://<your-mac-lan-ip>:8000`)
-- backend health check (`/health`)
-- Ollama reachability check (`http://localhost:11434/api/tags`)
-
-For iPhone in Expo app, set **System → Server-Adresse** to `http://<your-mac-lan-ip>:8000`.
-This value is persisted in AsyncStorage (`lios_server_url`). Do not use `localhost` on iPhone.
+The supported mobile client is `lios-mobile`. In app settings, `Server-Adresse` and `API-Key` are persisted locally, so stochastic96 only needs to set them once per backend/API-key change.
 
 To verify prerequisites before starting:
 
@@ -101,6 +118,14 @@ Provenance chunk fields include:
 Bootstrap corpus file:
 
 - `data/corpus/legal_chunks.jsonl`
+
+If any corpus artifact contains text like `version https://git-lfs.github.com/spec/v1`, the corpus is not restored yet. Recover it with:
+
+```bash
+git lfs pull
+```
+
+Then verify that the retriever sees real data instead of pointer files.
 
 Rebuild corpus from built-in regulation modules:
 

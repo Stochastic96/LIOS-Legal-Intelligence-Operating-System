@@ -7,7 +7,6 @@ import { StatusBar } from "expo-status-bar";
 import ChatScreen from "./src/screens/ChatScreen";
 import LearnScreen from "./src/screens/LearnScreen";
 import IntelligenceScreen from "./src/screens/IntelligenceScreen";
-import UploadScreen from "./src/screens/UploadScreen";
 import { C, F, S, W } from "./src/theme";
 
 const Tab = createBottomTabNavigator();
@@ -16,9 +15,8 @@ type FeatherName = React.ComponentProps<typeof Feather>["name"];
 
 const TAB_ICONS: Record<string, FeatherName> = {
   Assistent:   "message-square",
-  Lernen:      "book-open",
+  Lernchat:    "book-open",
   Intelligenz: "activity",
-  Hochladen:   "upload",
 };
 
 export default function App() {
@@ -58,9 +56,8 @@ export default function App() {
           })}
         >
           <Tab.Screen name="Assistent"   component={ChatScreen} />
-          <Tab.Screen name="Lernen"      component={LearnScreen} />
+          <Tab.Screen name="Lernchat"    component={LearnScreen} />
           <Tab.Screen name="Intelligenz" component={IntelligenceScreen} />
-          <Tab.Screen name="Hochladen"   component={UploadScreen} />
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

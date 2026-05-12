@@ -71,5 +71,14 @@ fi
 
 # Start Expo in foreground
 cd "$SCRIPT_DIR/lios-mobile"
+echo ""
+echo "Expo Go setup for stochastic96"
+echo "1. Log in to Expo Go with account: stochastic96"
+echo "2. Scan the QR code on the same Wi-Fi network"
+echo "3. In LIOS app → Assistent → Einstellungen"
+echo "   - Server-Adresse: ${LAN_URL}"
+echo "   - API-Key: set your LIOS_API_KEY value if backend auth is enabled"
+echo "4. If LAN fails, press 's' in Expo and switch to tunnel mode"
+echo ""
 echo "Starting Expo..."
 npx expo start

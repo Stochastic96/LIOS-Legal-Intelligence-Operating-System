@@ -9,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const DEFAULT_URL = "http://localhost:8000";
 const URL_KEY = "lios_server_url";
+const API_KEY_KEY = "lios_api_key";
 
 export async function getServerUrl(): Promise<string> {
   const stored = await AsyncStorage.getItem(URL_KEY);
@@ -19,10 +20,37 @@ export async function setServerUrl(url: string): Promise<void> {
   await AsyncStorage.setItem(URL_KEY, url.trim().replace(/\/$/, ""));
 }
 
+export async function getApiKey(): Promise<string> {
+  return (await AsyncStorage.getItem(API_KEY_KEY)) || "";
+}
+
+export async function setApiKey(apiKey: string): Promise<void> {
+  const normalized = apiKey.trim();
+  if (!normalized) {
+    await AsyncStorage.removeItem(API_KEY_KEY);
+    return;
+  }
+  await AsyncStorage.setItem(API_KEY_KEY, normalized);
+}
+
+async function buildHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  const apiKey = await getApiKey();
+  return {
+    ...extra,
+    ...(apiKey ? { "X-API-Key": apiKey } : {}),
+  };
+}
+
+async function parseError(res: Response, method: string, path: string): Promise<never> {
+  const text = await res.text().catch(() => "");
+  const detail = text || `${res.status}`;
+  throw new Error(`${method} ${path} -> ${res.status}${detail ? `: ${detail}` : ""}`);
+}
+
 async function get<T>(path: string): Promise<T> {
   const base = await getServerUrl();
-  const res = await fetch(`${base}${path}`);
-  if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
+  const res = await fetch(`${base}${path}`, { headers: await buildHeaders() });
+  if (!res.ok) return parseError(res, "GET", path);
   return res.json();
 }
 
@@ -30,27 +58,31 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   const base = await getServerUrl();
   const res = await fetch(`${base}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await buildHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
+  if (!res.ok) return parseError(res, "POST", path);
   return res.json();
 }
 
 async function del<T>(path: string): Promise<T> {
   const base = await getServerUrl();
-  const res = await fetch(`${base}${path}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}`);
+  const res = await fetch(`${base}${path}`, {
+    method: "DELETE",
+    headers: await buildHeaders(),
+  });
+  if (!res.ok) return parseError(res, "DELETE", path);
   return res.json();
 }
 
 async function postForm<T>(path: string, form: FormData): Promise<T> {
   const base = await getServerUrl();
-  const res = await fetch(`${base}${path}`, { method: "POST", body: form });
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.status.toString());
-    throw new Error(`UPLOAD ${path} → ${res.status}: ${text}`);
-  }
+  const res = await fetch(`${base}${path}`, {
+    method: "POST",
+    headers: await buildHeaders(),
+    body: form,
+  });
+  if (!res.ok) return parseError(res, "UPLOAD", path);
   return res.json();
 }
 
@@ -143,6 +175,7 @@ export interface IntelligenceStats {
   total_chunks: number;
   total_regulations: number;
   total_official_docs: number;
+  consumed_files: number;
   total_topics: number;
   total_questions_in_bank: number;
   total_answers_submitted: number;
@@ -194,6 +227,16 @@ export interface AnswerRecord {
   pct_after: number;
   valid: boolean;
   corpus_hint: string;
+}
+
+export interface CorpusFileRecord {
+  filename: string;
+  regulation: string;
+  chunk_count: number;
+  article_count: number;
+  source_url: string;
+  last_indexed: string;
+  published_date: string;
 }
 
 export interface LLMModeStatus {
@@ -272,5 +315,9 @@ export const api = {
     topics:  () => get<TopicCoverage[]>("/intelligence/topics"),
     answers: (limit = 20) =>
       get<{ answers: AnswerRecord[]; total: number }>(`/intelligence/answers?limit=${limit}`),
+    files: (query = "", limit = 50) =>
+      get<{ files: CorpusFileRecord[]; total: number; query: string }>(
+        `/intelligence/files?query=${encodeURIComponent(query)}&limit=${limit}`
+      ),
   },
 };

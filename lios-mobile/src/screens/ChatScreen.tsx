@@ -13,7 +13,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { api, BrainStatus, ChatResponse, getServerUrl, LLMModeStatus, setServerUrl } from "../api/client";
+import {
+  api,
+  BrainStatus,
+  ChatResponse,
+  getApiKey,
+  getServerUrl,
+  LLMModeStatus,
+  setApiKey,
+  setServerUrl,
+} from "../api/client";
 import ScalePressable from "../components/ScalePressable";
 import TypingIndicator from "../components/TypingIndicator";
 import UploadScreen from "./UploadScreen";
@@ -70,6 +79,7 @@ export default function ChatScreen() {
   const [makeRule, setMakeRule]     = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [serverUrl, setServerUrlState] = useState("");
+  const [apiKey, setApiKeyState] = useState("");
   const [uploadOpen, setUploadOpen]     = useState(false);
   const [brainStatus, setBrainStatus]   = useState<BrainStatus | null>(null);
   const [llmMode, setLlmMode]           = useState<LLMModeStatus | null>(null);
@@ -80,6 +90,7 @@ export default function ChatScreen() {
   useEffect(() => {
     api.health().then(() => setOnline(true)).catch(() => setOnline(false));
     getServerUrl().then(setServerUrlState);
+    getApiKey().then(setApiKeyState);
     Animated.timing(mountAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, []);
 
@@ -95,14 +106,16 @@ export default function ChatScreen() {
 
   const openSettings = useCallback(() => {
     setSettingsOpen(true);
+    getApiKey().then(setApiKeyState).catch(() => {});
     loadBrainStatus();
   }, [loadBrainStatus]);
 
   const saveServerUrl = useCallback(async () => {
     await setServerUrl(serverUrl);
+    await setApiKey(apiKey);
     setSettingsOpen(false);
     api.health().then(() => setOnline(true)).catch(() => setOnline(false));
-  }, [serverUrl]);
+  }, [apiKey, serverUrl]);
 
   const toBottom = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
@@ -401,6 +414,20 @@ export default function ChatScreen() {
             />
             <Text style={s.statusSectionText}>
               iPhone im selben WLAN: http://&lt;Mac-LAN-IP&gt;:8000 · localhost nur für Mac/Simulator.
+            </Text>
+            <View style={s.sectionDivider} />
+            <Text style={s.sheetSubtitle}>API-Key</Text>
+            <TextInput
+              style={s.corrInput}
+              value={apiKey}
+              onChangeText={setApiKeyState}
+              placeholder="Optional: LIOS API key"
+              placeholderTextColor={C.dim}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={s.statusSectionText}>
+              Wird lokal gespeichert und als X-API-Key an Chat, Lernen, Upload und Intelligenz gesendet.
             </Text>
             <View style={s.sheetBtns}>
               <ScalePressable onPress={() => setSettingsOpen(false)} style={{ flex: 1 }}>

@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -15,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   api,
   AnswerRecord,
+  CorpusFileRecord,
   CorpusRegulation,
   IntelligenceStats,
   TopicCoverage,
@@ -191,6 +193,24 @@ function AnswerCard({ a }: { a: AnswerRecord }) {
   );
 }
 
+function FileRow({ file }: { file: CorpusFileRecord }) {
+  return (
+    <View style={s.fileRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.fileName}>{file.filename}</Text>
+        <Text style={s.fileMeta}>
+          {file.regulation} · {file.chunk_count} Chunks · {file.article_count} Artikel
+        </Text>
+      </View>
+      {file.source_url ? (
+        <Pressable onPress={() => Linking.openURL(file.source_url)}>
+          <Feather name="external-link" size={14} color={C.primary} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 // ── Main screen ────────────────────────────────────────────────────────────────
 
 export default function IntelligenceScreen() {
@@ -202,22 +222,26 @@ export default function IntelligenceScreen() {
   const [corpus, setCorpus]     = useState<CorpusRegulation[]>([]);
   const [topics, setTopics]     = useState<TopicCoverage[]>([]);
   const [answers, setAnswers]   = useState<AnswerRecord[]>([]);
+  const [files, setFiles]       = useState<CorpusFileRecord[]>([]);
+  const [fileQuery, setFileQuery] = useState("");
   const [error, setError]       = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefresh(true); else setLoading(true);
     setError(null);
     try {
-      const [st, co, to, an] = await Promise.all([
+      const [st, co, to, an, fi] = await Promise.all([
         api.intelligence.stats(),
         api.intelligence.corpus(),
         api.intelligence.topics(),
         api.intelligence.answers(20),
+        api.intelligence.files("", 20),
       ]);
       setStats(st);
       setCorpus(co);
       setTopics(to);
       setAnswers(an.answers);
+      setFiles(fi.files);
     } catch (e: any) {
       setError(e?.message ?? "Verbindungsfehler");
     } finally {
@@ -227,6 +251,15 @@ export default function IntelligenceScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      api.intelligence.files(fileQuery, 30)
+        .then((response) => setFiles(response.files))
+        .catch(() => setFiles([]));
+    }, 180);
+    return () => clearTimeout(handle);
+  }, [fileQuery]);
 
   // Group topics by category
   const byCategory = topics.reduce<Record<string, TopicCoverage[]>>((acc, t) => {
@@ -274,8 +307,8 @@ export default function IntelligenceScreen() {
         <View style={s.kpiRow}>
           <KpiTile label="Chunks" value={stats.total_chunks.toLocaleString()} />
           <KpiTile label="Regelwerke" value={stats.total_regulations} />
+          <KpiTile label="Dateien" value={stats.consumed_files} />
           <KpiTile label="Themen" value={stats.total_topics} />
-          <KpiTile label="Fragen" value={stats.total_questions_in_bank} />
         </View>
       )}
 
@@ -307,6 +340,31 @@ export default function IntelligenceScreen() {
           </View>
         </>
       )}
+
+      <SectionHdr title="KONSUMIERTE INFORMATION" />
+      <View style={s.card}>
+        <View style={s.searchWrap}>
+          <Feather name="search" size={15} color={C.dim} />
+          <TextInput
+            style={s.searchInput}
+            value={fileQuery}
+            onChangeText={setFileQuery}
+            placeholder="Dateiname suchen, z. B. CSRD oder Francovich"
+            placeholderTextColor={C.dim}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        {files.length > 0 ? (
+          files.map((file) => (
+            <FileRow key={`${file.filename}-${file.regulation}`} file={file} />
+          ))
+        ) : (
+          <Text style={s.fileEmpty}>
+            {fileQuery.trim() ? "Keine Dateinamen passend zur Suche gefunden." : "Noch keine Corpus-Dateien sichtbar."}
+          </Text>
+        )}
+      </View>
 
       {/* Topic coverage */}
       {Object.keys(byCategory).length > 0 && (
@@ -412,6 +470,12 @@ const s = StyleSheet.create({
   sectionLine:    { flex: 1, height: 1, backgroundColor: C.border },
 
   card:          { backgroundColor: C.card, borderRadius: R.md, borderWidth: 1, borderColor: C.border, overflow: "hidden", marginBottom: S.sm },
+  searchWrap:    { flexDirection: "row", alignItems: "center", gap: S.xs, paddingHorizontal: S.md, paddingVertical: S.sm, borderBottomWidth: 1, borderBottomColor: C.border },
+  searchInput:   { flex: 1, color: C.text, fontSize: F.sm, paddingVertical: 0 },
+  fileRow:       { flexDirection: "row", alignItems: "center", gap: S.sm, paddingHorizontal: S.md, paddingVertical: S.sm, borderBottomWidth: 1, borderBottomColor: C.border },
+  fileName:      { fontSize: F.sm, fontWeight: W.semi, color: C.text },
+  fileMeta:      { fontSize: F.xs, color: C.mid, marginTop: 2 },
+  fileEmpty:     { padding: S.md, color: C.mid, fontSize: F.sm },
 
   // Corpus rows
   corpusRow:      { borderBottomWidth: 1, borderBottomColor: C.border },
