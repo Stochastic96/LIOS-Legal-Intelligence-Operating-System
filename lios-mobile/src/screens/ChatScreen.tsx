@@ -130,7 +130,7 @@ export default function ChatScreen() {
         ...p,
         {
           id: `e${Date.now()}`, role: "assistant", feedback: null, timestamp: Date.now(),
-          text: "Server nicht erreichbar.\n\nBitte starten: bash start.sh\nDann IP unter System → Server einstellen.",
+          text: "Server nicht erreichbar.\n\nBitte starten: bash start.sh\niPhone: System → Server-Adresse = http://<Mac-LAN-IP>:8000\n(localhost funktioniert nur auf Mac/Simulator).",
         },
       ]);
     } finally {
@@ -393,12 +393,15 @@ export default function ChatScreen() {
               style={s.corrInput}
               value={serverUrl}
               onChangeText={setServerUrlState}
-              placeholder="http://..."
+              placeholder="http://192.168.x.x:8000"
               placeholderTextColor={C.dim}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
             />
+            <Text style={s.statusSectionText}>
+              iPhone im selben WLAN: http://&lt;Mac-LAN-IP&gt;:8000 · localhost nur für Mac/Simulator.
+            </Text>
             <View style={s.sheetBtns}>
               <ScalePressable onPress={() => setSettingsOpen(false)} style={{ flex: 1 }}>
                 <View style={s.btnCancel}><Text style={s.btnCancelText}>Abbrechen</Text></View>

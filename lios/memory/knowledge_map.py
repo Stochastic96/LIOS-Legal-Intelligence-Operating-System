@@ -967,22 +967,17 @@ def get_next_learn_topic() -> dict | None:
     learnable = [t for t in topics if t["status"] not in ("functional", "mastered")]
     if not learnable:
         return None
-    learnable.sort(key=lambda t: (_STATUS_ORDER.index(t.get("status", "unknown")), t["pct"]))
+    learnable.sort(key=lambda t: (_status_rank(t.get("status")), t["pct"]))
     return learnable[0]
 
 
 def get_next_question(topic_id: str) -> dict | None:
     """Return next question dict {type, q} for a topic."""
-    questions = _QUESTION_BANK.get(topic_id, [])
-    if not questions:
-        return None
     topics = get_map()
     topic = next((t for t in topics if t["id"] == topic_id), None)
     if not topic:
         return None
-    asked = topic.get("questions_asked", 0)
-    idx = asked % len(questions)
-    return questions[idx]
+    return _next_question_for_topic(topic)
 
 
 def get_all_questions(topic_id: str) -> list[dict]:
@@ -994,7 +989,7 @@ def _get_next_learnable(topics: list[dict]) -> dict | None:
     learnable = [t for t in topics if t["status"] not in ("functional", "mastered")]
     if not learnable:
         return None
-    learnable.sort(key=lambda t: (_STATUS_ORDER.index(t.get("status", "unknown")), t["pct"]))
+    learnable.sort(key=lambda t: (_status_rank(t.get("status")), t["pct"]))
     return learnable[0]
 
 
@@ -1006,9 +1001,8 @@ def record_answer(topic_id: str, answer_text: str, reference: str = "") -> dict:
             return {"topic": {}, "overall_pct": 0, "next_topic": None}
 
         pct_before = topic["pct"]
-        q_entry = _QUESTION_BANK.get(topic_id, [])
-        asked_idx = topic.get("questions_asked", 0) % len(q_entry) if q_entry else 0
-        question_text = q_entry[asked_idx]["q"] if q_entry else ""
+        question_entry = _next_question_for_topic(topic)
+        question_text = question_entry.get("q", "")
 
         valid = len(answer_text.strip()) >= 20
         topic["questions_asked"] = topic.get("questions_asked", 0) + 1
@@ -1059,3 +1053,28 @@ def _compute_status(pct: int) -> str:
     if pct < 90:
         return "functional"
     return "mastered"
+
+
+def _status_rank(status: str | None) -> int:
+    try:
+        return _STATUS_ORDER.index(status or "unknown")
+    except ValueError:
+        return 0
+
+
+def _fallback_question(topic: dict) -> dict:
+    topic_name = topic.get("name", "dieses Thema")
+    return {
+        "type": "fallback",
+        "q": f"Erkläre die zentralen Pflichten, Ausnahmen und Praxisfolgen von {topic_name} für Unternehmen.",
+    }
+
+
+def _next_question_for_topic(topic: dict) -> dict:
+    topic_id = topic.get("id", "")
+    questions = _QUESTION_BANK.get(topic_id, [])
+    if not questions:
+        return _fallback_question(topic)
+    asked = topic.get("questions_asked", 0)
+    idx = asked % len(questions)
+    return questions[idx]

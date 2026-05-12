@@ -11,15 +11,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from lios.api.dependencies import require_api_key
 from lios.logging_setup import get_logger
 from lios.memory import knowledge_map as km
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/learn", tags=["learning"])
+router = APIRouter(prefix="/learn", tags=["learning"], dependencies=[Depends(require_api_key)])
 
 
 # ── Request / Response Models ─────────────────────────────────────────────────

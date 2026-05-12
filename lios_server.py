@@ -1,7 +1,12 @@
 """
-LIOS Server — clean standalone FastAPI backend.
+LIOS legacy compatibility server.
 
-Start: uvicorn lios_server:app --host 0.0.0.0 --port 8000 --reload
+This module is kept for transition compatibility only.
+Canonical runtime entrypoint is `lios.main:app`:
+    uvicorn lios.main:app --host 0.0.0.0 --port 8000 --reload
+
+Legacy compatibility target (not default):
+    uvicorn lios_server:app --host 0.0.0.0 --port 8000 --reload
 
 Endpoints:
   GET  /health

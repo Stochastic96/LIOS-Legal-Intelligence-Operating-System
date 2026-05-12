@@ -34,6 +34,30 @@ Open:
 - `http://<your-machine-ip>:8000/chat` (another device on your network)
 - Alias URL: `http://localhost:8000/chat-ui`
 
+### Mac + iPhone daily LAN workflow
+
+Use the one-command startup for local backend + mobile flow:
+
+```bash
+bash start.sh
+```
+
+`start.sh` launches canonical backend `lios.main:app` on `0.0.0.0:8000`, prints:
+
+- browser URL (`http://localhost:8000`)
+- iPhone URL (`http://<your-mac-lan-ip>:8000`)
+- backend health check (`/health`)
+- Ollama reachability check (`http://localhost:11434/api/tags`)
+
+For iPhone in Expo app, set **System → Server-Adresse** to `http://<your-mac-lan-ip>:8000`.
+This value is persisted in AsyncStorage (`lios_server_url`). Do not use `localhost` on iPhone.
+
+To verify prerequisites before starting:
+
+```bash
+bash verify_startup.sh
+```
+
 By default, the chat starts in single-agent mode so the first conversation stays focused and does not fan out to the other specialist agents. To enable the full three-agent consensus path, set `LIOS_CHAT_MODE=consensus` before launching.
 
 ### 2) Start chat-based training workflow
@@ -88,6 +112,22 @@ Install data pipeline dependencies (optional group):
 
 ```bash
 pip install -e .[data]
+```
+
+### Upload API formats
+
+`POST /api/upload` supports these document types for ingestion into `data/corpus/legal_chunks.jsonl`:
+
+- `.pdf`
+- `.docx`
+- `.txt`
+- `.pptx`
+- `.xlsx`
+
+Office-format extractors require optional libraries:
+
+```bash
+pip install python-docx python-pptx openpyxl
 ```
 
 ### Troubleshooting quick checks

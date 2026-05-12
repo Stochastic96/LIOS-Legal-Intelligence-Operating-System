@@ -5,13 +5,14 @@ from __future__ import annotations
 import uuid
 from typing import Any, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from lios.api.routers import carbon, chat, core, dashboard, impact, intelligence, learn, supply_chain
+from lios.api.dependencies import require_api_key
 from lios.config import settings
 from lios.logging_setup import get_logger
 from lios.models.validation import ErrorResponse
@@ -79,8 +80,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.get("/health")
 def health_check() -> dict[str, str]:
-    """Simple liveness probe for the mobile app."""
-    return {"status": "ok"}
+    """Simple liveness probe delegated to the canonical core health check."""
+    return {"status": core.health().status}
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +186,7 @@ class _RagQueryRequest(BaseModel):
     query: str
 
 
-@app.post("/api/query")
+@app.post("/api/query", dependencies=[Depends(require_api_key)])
 async def rag_query(request: _RagQueryRequest) -> dict[str, Any]:
     """Process a legal query using BM25 retrieval and Ollama LLM.
 
@@ -253,7 +254,7 @@ class _SynthesizeRequest(BaseModel):
     query: str
 
 
-@app.post("/api/synthesize")
+@app.post("/api/synthesize", dependencies=[Depends(require_api_key)])
 def synthesize_answer(request: _SynthesizeRequest) -> dict[str, Any]:
     """Synthesize a dynamic IRAC answer using the retrieval corpus (no Ollama required).
 
@@ -311,7 +312,55 @@ class _FeedbackRequest(BaseModel):
     session_id: str = ""
 
 
-@app.post("/api/feedback")
+def _store_feedback_entry(
+    *,
+    session_id: str,
+    query: str,
+    original_answer: str,
+    feedback_type: str,
+    correction_text: str = "",
+) -> dict[str, Any]:
+    corrections = _read_json(_CORRECTIONS_PATH, [])
+    new_id = f"corr-{len(corrections) + 1:04d}"
+    entry = {
+        "id": new_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id or "mobile",
+        "user_query": query,
+        "original_answer": original_answer,
+        "feedback_type": feedback_type,
+        "correction_text": correction_text,
+        "made_rule": False,
+        "source": "mobile_app",
+    }
+    corrections.append(entry)
+    _write_json(_CORRECTIONS_PATH, corrections)
+    logger.info("Feedback saved: %s (%s)", new_id, feedback_type)
+    return entry
+
+
+def _create_rule_from_feedback(
+    *,
+    source: str,
+    topic: str,
+    rule_text: str,
+) -> dict[str, Any]:
+    rules = _read_json(_RULES_PATH, [])
+    rule_id = f"rule-{len(rules) + 1:04d}"
+    rule = {
+        "id": rule_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "topic": topic,
+        "rule_text": rule_text.strip(),
+        "active": True,
+    }
+    rules.append(rule)
+    _write_json(_RULES_PATH, rules)
+    return rule
+
+
+@app.post("/api/feedback", dependencies=[Depends(require_api_key)])
 def submit_feedback(request: _FeedbackRequest) -> dict[str, Any]:
     """Accept a feedback/correction from the mobile app and persist it.
 
@@ -321,35 +370,14 @@ def submit_feedback(request: _FeedbackRequest) -> dict[str, Any]:
 
     Returns JSON with ``status`` and the assigned correction ``id``.
     """
-    import json
-    from datetime import datetime, timezone
-    from pathlib import Path
-
-    corrections_path = Path(__file__).parent.parent.parent / "data" / "memory" / "corrections.json"
-
-    try:
-        existing = json.loads(corrections_path.read_text(encoding="utf-8")) if corrections_path.exists() else []
-    except Exception:
-        existing = []
-
-    new_id = f"corr-{len(existing) + 1:04d}"
-    entry = {
-        "id": new_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "session_id": request.session_id or "mobile",
-        "user_query": request.query,
-        "original_answer": request.answer,
-        "feedback_type": request.feedback_type,
-        "correction_text": request.correction_text,
-        "made_rule": False,
-        "source": "mobile_app",
-    }
-
-    existing.append(entry)
-    corrections_path.write_text(json.dumps(existing, ensure_ascii=False, indent=4), encoding="utf-8")
-    logger.info("Mobile feedback saved: %s (%s)", new_id, request.feedback_type)
-
-    return {"status": "saved", "id": new_id}
+    entry = _store_feedback_entry(
+        session_id=request.session_id or "mobile",
+        query=request.query,
+        original_answer=request.answer,
+        feedback_type=request.feedback_type,
+        correction_text=request.correction_text,
+    )
+    return {"status": "saved", "id": entry["id"]}
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +390,7 @@ class _EvaluateRequest(BaseModel):
     answer: str
 
 
-@app.post("/api/evaluate")
+@app.post("/api/evaluate", dependencies=[Depends(require_api_key)])
 def evaluate_answer(request: _EvaluateRequest) -> dict[str, Any]:
     """Evaluate the quality of a generated answer against the knowledge corpus.
 
@@ -403,14 +431,14 @@ def evaluate_answer(request: _EvaluateRequest) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@app.post("/api/upload")
+@app.post("/api/upload", dependencies=[Depends(require_api_key)])
 async def upload_document(
     file: UploadFile = File(...),
     title: str = Form(default=""),
     regulation: str = Form(default="CUSTOM"),
     source_description: str = Form(default=""),
 ) -> dict[str, Any]:
-    """Upload a document (PDF, DOCX, or TXT) and index it into the retrieval corpus.
+    """Upload a document (PDF, DOCX, TXT, PPTX, or XLSX) and index it.
 
     The document is chunked, persisted to ``data/corpus/legal_chunks.jsonl``, and
     the HybridRetriever index is refreshed so new content is immediately searchable.
@@ -424,20 +452,43 @@ async def upload_document(
     Returns:
         JSON with ``status``, ``chunks_added``, and ``filename``.
     """
-    from lios.ingestion.document_indexer import index_uploaded_document
+    from lios.ingestion.document_indexer import (
+        UnsupportedDocumentFormatError,
+        detect_upload_format,
+        index_uploaded_document,
+        supported_upload_extensions,
+    )
 
     content = await file.read()
     filename = file.filename or "upload"
     content_type = file.content_type or ""
 
-    result = index_uploaded_document(
-        content=content,
-        filename=filename,
-        content_type=content_type,
-        title=title or filename,
-        regulation=regulation,
-        source_description=source_description,
-    )
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    try:
+        detect_upload_format(filename=filename, content_type=content_type)
+    except UnsupportedDocumentFormatError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+
+    try:
+        result = index_uploaded_document(
+            content=content,
+            filename=filename,
+            content_type=content_type,
+            title=title or filename,
+            regulation=regulation,
+            source_description=source_description,
+        )
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message", "Upload indexing failed."))
+
+    result["supported_formats"] = supported_upload_extensions()
     return result
 
 
@@ -509,7 +560,7 @@ def _build_brain_status(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@app.get("/brain/status")
+@app.get("/brain/status", dependencies=[Depends(require_api_key)])
 def brain_status() -> dict[str, Any]:
     """Brain status for the mobile app — LLM on/off, model, knowledge chunk count."""
     return _build_brain_status(_brain_state())
@@ -519,7 +570,7 @@ class _BrainToggleRequest(BaseModel):
     enabled: bool
 
 
-@app.post("/brain/toggle")
+@app.post("/brain/toggle", dependencies=[Depends(require_api_key)])
 def brain_toggle(request: _BrainToggleRequest) -> dict[str, Any]:
     """Enable or disable the LLM brain from the mobile app."""
     state = _brain_state()
@@ -536,50 +587,49 @@ def brain_toggle(request: _BrainToggleRequest) -> dict[str, Any]:
 class _MobileChatRequest(BaseModel):
     query: str
     session_id: str = "mobile-session"
-    messages: list[dict[str, str]] = []
+    messages: list[dict[str, str]] = Field(default_factory=list)
 
 
-@app.post("/chat")
-def mobile_chat(request: _MobileChatRequest) -> dict[str, Any]:
-    """Chat endpoint for the mobile app. Returns a mobile-shaped ChatResponse."""
-    from lios.api.dependencies import engine as _engine
-    import uuid as _uuid
+@app.post("/chat", dependencies=[Depends(require_api_key)])
+async def mobile_chat(request: _MobileChatRequest) -> dict[str, Any]:
+    """Chat endpoint for the mobile app with compatibility fields."""
+    from lios.api.routers.chat import process_chat_message
+    from lios.models.validation import ChatMessageRequest
 
     try:
-        result = _engine.route_query(request.query)
-        grounding = getattr(result, "grounding_score", 0.8)
-        confidence_label = "high" if grounding >= 0.75 else "medium" if grounding >= 0.5 else "low"
-        brain_state = _brain_state()
+        contract = await process_chat_message(
+            ChatMessageRequest(query=request.query, session_id=request.session_id)
+        )
+        confidence_label = contract.get("grounding", "low")
+        confidence_score = contract.get("confidence", 0.0)
         return {
-            "message_id": str(_uuid.uuid4()),
-            "answer": result.answer,
+            **contract,
+            "message_id": str(uuid.uuid4()),
+            "confidence_score": confidence_score,
+            "confidence_label": confidence_label,
             "confidence": confidence_label,
-            "source": result.intent,
-            "brain_used": brain_state.get("enabled", True),
+            "source": contract.get("intent", "GENERAL"),
+            "brain_used": _brain_state().get("enabled", True),
         }
-    except Exception as exc:
-        logger.warning("mobile_chat error: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("mobile_chat error", exc_info=True)
+        raise HTTPException(status_code=500, detail={"error": "Failed to process chat message"})
 
 
-@app.get("/chat/history/{session_id}")
+@app.get("/chat/history/{session_id}", dependencies=[Depends(require_api_key)])
 def mobile_chat_history(session_id: str, limit: int = 20) -> dict[str, Any]:
-    """Return recent chat turns for a session (read from JSONL log)."""
-    turns: list[dict[str, Any]] = []
-    if _LOGS_PATH.exists():
-        try:
-            lines = _LOGS_PATH.read_text(encoding="utf-8").strip().splitlines()
-            for line in reversed(lines):
-                if not line.strip():
-                    continue
-                entry = _json.loads(line)
-                if entry.get("session_id") == session_id:
-                    turns.append(entry)
-                if len(turns) >= limit:
-                    break
-        except Exception:
-            pass
-    return {"session_id": session_id, "turns": list(reversed(turns))}
+    """Return recent chat turns for a session from the shared training store."""
+    from lios.api.routers.chat import chat_history
+
+    if not session_id.strip():
+        raise HTTPException(status_code=400, detail={"error": "session_id is required"})
+    bounded_limit = max(1, min(limit, 200))
+    return {
+        "session_id": session_id,
+        "turns": chat_history(session_id=session_id).get("turns", [])[-bounded_limit:],
+    }
 
 
 # Feedback alias — mobile posts to /feedback (without /api/ prefix)
@@ -594,38 +644,24 @@ class _MobileFeedbackRequest(BaseModel):
     make_rule: bool = False
 
 
-@app.post("/feedback")
+@app.post("/feedback", dependencies=[Depends(require_api_key)])
 def mobile_feedback(request: _MobileFeedbackRequest) -> dict[str, Any]:
     """Accept mobile feedback and persist it to corrections.json."""
-    corrections = _read_json(_CORRECTIONS_PATH, [])
-    new_id = f"corr-{len(corrections) + 1:04d}"
-    entry = {
-        "id": new_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "session_id": request.session_id,
-        "user_query": request.query,
-        "original_answer": request.original_answer,
-        "feedback_type": request.feedback_type,
-        "correction_text": request.correction_text,
-        "made_rule": False,
-        "source": "mobile_app",
-    }
-    corrections.append(entry)
-    _write_json(_CORRECTIONS_PATH, corrections)
+    _store_feedback_entry(
+        session_id=request.session_id,
+        query=request.query,
+        original_answer=request.original_answer,
+        feedback_type=request.feedback_type,
+        correction_text=request.correction_text,
+    )
 
     rule_created = False
     if request.make_rule and request.correction_text.strip():
-        rules = _read_json(_RULES_PATH, [])
-        rule_id = f"rule-{len(rules) + 1:04d}"
-        rules.append({
-            "id": rule_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "source": request.session_id,
-            "topic": "general",
-            "rule_text": request.correction_text.strip(),
-            "active": True,
-        })
-        _write_json(_RULES_PATH, rules)
+        _create_rule_from_feedback(
+            source=request.session_id,
+            topic="general",
+            rule_text=request.correction_text,
+        )
         rule_created = True
 
     return {"stored": True, "rule_created": rule_created, "message": "Feedback saved"}
@@ -633,7 +669,7 @@ def mobile_feedback(request: _MobileFeedbackRequest) -> dict[str, Any]:
 
 # Memory — corrections and rules CRUD
 
-@app.get("/memory/corrections")
+@app.get("/memory/corrections", dependencies=[Depends(require_api_key)])
 def memory_corrections(limit: int = 50) -> dict[str, Any]:
     """Return recent corrections from the mobile feedback store."""
     corrections = _read_json(_CORRECTIONS_PATH, [])
@@ -641,7 +677,7 @@ def memory_corrections(limit: int = 50) -> dict[str, Any]:
     return {"corrections": list(reversed(subset)), "total": len(corrections)}
 
 
-@app.get("/memory/rules")
+@app.get("/memory/rules", dependencies=[Depends(require_api_key)])
 def memory_rules() -> dict[str, Any]:
     """Return all active rules."""
     rules = _read_json(_RULES_PATH, [])
@@ -654,25 +690,18 @@ class _AddRuleRequest(BaseModel):
     topic: str = "general"
 
 
-@app.post("/memory/rules")
+@app.post("/memory/rules", dependencies=[Depends(require_api_key)])
 def memory_add_rule(request: _AddRuleRequest) -> dict[str, Any]:
     """Add a persistent rule that is injected into every answer when brain is ON."""
-    rules = _read_json(_RULES_PATH, [])
-    rule_id = f"rule-{len(rules) + 1:04d}"
-    rule = {
-        "id": rule_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "source": "mobile_app",
-        "topic": request.topic,
-        "rule_text": request.rule_text.strip(),
-        "active": True,
-    }
-    rules.append(rule)
-    _write_json(_RULES_PATH, rules)
+    rule = _create_rule_from_feedback(
+        source="mobile_app",
+        topic=request.topic,
+        rule_text=request.rule_text,
+    )
     return {"created": True, "rule": rule}
 
 
-@app.delete("/memory/rules/{rule_id}")
+@app.delete("/memory/rules/{rule_id}", dependencies=[Depends(require_api_key)])
 def memory_delete_rule(rule_id: str) -> dict[str, Any]:
     """Deactivate (soft-delete) a rule by ID."""
     rules = _read_json(_RULES_PATH, [])
@@ -715,7 +744,7 @@ _LLM_PRESETS: dict[str, dict[str, str]] = {
 }
 
 
-@app.get("/api/llm-mode")
+@app.get("/api/llm-mode", dependencies=[Depends(require_api_key)])
 def get_llm_mode() -> dict[str, Any]:
     """Return the currently active LLM provider mode."""
     from lios.llm.refiner import get_runtime_provider
@@ -748,7 +777,7 @@ class _LLMModeRequest(BaseModel):
     api_key: Optional[str] = None  # optional override (e.g. Groq key)
 
 
-@app.get("/api/token-usage")
+@app.get("/api/token-usage", dependencies=[Depends(require_api_key)])
 def token_usage_stats() -> dict[str, Any]:
     """Return cumulative LLM token usage and estimated cost.
 
@@ -758,7 +787,7 @@ def token_usage_stats() -> dict[str, Any]:
     return usage_summary()
 
 
-@app.get("/api/training-export")
+@app.get("/api/training-export", dependencies=[Depends(require_api_key)])
 def training_export(limit: int = 500) -> dict[str, Any]:
     """Export chat history + corrections as Azure fine-tuning JSONL.
 
@@ -812,7 +841,7 @@ def training_export(limit: int = 500) -> dict[str, Any]:
     return {"samples": len(lines), "jsonl": "\n".join(lines)}
 
 
-@app.post("/api/llm-mode")
+@app.post("/api/llm-mode", dependencies=[Depends(require_api_key)])
 def set_llm_mode(request: _LLMModeRequest) -> dict[str, Any]:
     """Switch the active LLM provider at runtime without restarting the server.
 
@@ -851,7 +880,7 @@ def set_llm_mode(request: _LLMModeRequest) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@app.get("/api/content-stack/{regulation}")
+@app.get("/api/content-stack/{regulation}", dependencies=[Depends(require_api_key)])
 async def get_content_stack_regulation(regulation: str) -> dict:
     """Return all pre-built Q&A entries for a regulation (e.g. CSRD, GDPR)."""
     try:
@@ -868,7 +897,7 @@ async def get_content_stack_regulation(regulation: str) -> dict:
         return {"regulation": regulation, "count": 0, "entries": []}
 
 
-@app.get("/api/content-stack/search")
+@app.get("/api/content-stack/search", dependencies=[Depends(require_api_key)])
 async def search_content_stack(q: str, top_k: int = 5) -> dict:
     """Instant keyword search across all pre-built Q&A entries."""
     try:
@@ -885,7 +914,7 @@ async def search_content_stack(q: str, top_k: int = 5) -> dict:
         return {"query": q, "hits": 0, "results": []}
 
 
-@app.get("/api/content-stack")
+@app.get("/api/content-stack", dependencies=[Depends(require_api_key)])
 async def content_stack_stats() -> dict:
     """Return content stack statistics — total entries, regulations covered."""
     try:

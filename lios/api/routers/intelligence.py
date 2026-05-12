@@ -8,9 +8,11 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-router = APIRouter(prefix="/intelligence", tags=["intelligence"])
+from lios.api.dependencies import require_api_key
+
+router = APIRouter(prefix="/intelligence", tags=["intelligence"], dependencies=[Depends(require_api_key)])
 
 _CORPUS_FILE         = Path("data/corpus/legal_chunks.jsonl")
 _MAP_FILE            = Path("data/memory/knowledge_map.json")

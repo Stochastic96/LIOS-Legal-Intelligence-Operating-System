@@ -1,7 +1,8 @@
 /**
  * LIOS API client — all calls to the FastAPI backend.
- * Set BASE_URL to your Mac's LAN IP:  e.g. http://192.168.1.42:8000
- * Change it in the Brain screen settings.
+ * Server URL is persisted in AsyncStorage via URL_KEY.
+ * If no value is stored yet, localhost is used (browser/simulator default).
+ * For iPhone, set System → Server-Adresse to http://<mac-lan-ip>:8000.
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,7 +16,7 @@ export async function getServerUrl(): Promise<string> {
 }
 
 export async function setServerUrl(url: string): Promise<void> {
-  await AsyncStorage.setItem(URL_KEY, url.replace(/\/$/, ""));
+  await AsyncStorage.setItem(URL_KEY, url.trim().replace(/\/$/, ""));
 }
 
 async function get<T>(path: string): Promise<T> {

@@ -55,8 +55,9 @@ jobs:
         env:
           LIOS_LLM_ENABLED: "false"   # no Ollama on CI — uses deterministic fallback
         run: |
-          uvicorn lios_server:app --host 127.0.0.1 --port 8000 \
-            > /tmp/lios_server.log 2>&1 &
+          mkdir -p logs
+          uvicorn lios.main:app --host 127.0.0.1 --port 8000 \
+            > logs/lios_server.log 2>&1 &
           echo "Server PID: $!"
 
           # Poll until healthy (max 60s)
@@ -67,7 +68,7 @@ jobs:
             fi
             if [ "$i" -eq 30 ]; then
               echo "✗ Server failed to start. Log:"
-              cat /tmp/lios_server.log
+              cat logs/lios_server.log
               exit 1
             fi
             echo "  waiting… ($i/30)"
@@ -151,5 +152,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lios-server-log
-          path: /tmp/lios_server.log
+          path: logs/lios_server.log
           retention-days: 7

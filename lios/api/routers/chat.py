@@ -70,80 +70,114 @@ def chat_workspace_react() -> str:
 @router.post("/chat/api/message", dependencies=[Depends(require_api_key)])
 async def chat_message(payload: ChatMessageRequest) -> dict[str, Any]:
     """Process one chat message and persist the turn locally for training workflows."""
+    return await process_chat_message(payload)
+
+
+def _citation_rows(result: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for citation in (getattr(result, "citations", None) or []):
+        rows.append(
+            {
+                "regulation": getattr(citation, "regulation", ""),
+                "article_id": getattr(citation, "article_id", ""),
+                "title": getattr(citation, "title", ""),
+                "relevance_score": getattr(citation, "relevance_score", 0),
+                "url": getattr(citation, "url", ""),
+            }
+        )
+    return rows
+
+
+def _safe_confidence(value: Any, default: float = 0.0) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        numeric = default
+    return max(0.0, min(1.0, numeric))
+
+
+def _confidence_label(score: float) -> str:
+    if score >= 0.75:
+        return "high"
+    if score >= 0.5:
+        return "medium"
+    return "low"
+
+
+async def process_chat_message(payload: ChatMessageRequest) -> dict[str, Any]:
+    """Shared chat-message processor used by web and mobile aliases."""
     import asyncio
 
     session_id = payload.session_id or str(uuid.uuid4())
     company_profile = payload.company_profile.model_dump() if payload.company_profile else None
     jurisdictions = payload.jurisdictions
 
-    direction_hint = training_store.infer_session_direction(session_id=session_id, window=3)
+    try:
+        direction_hint = training_store.infer_session_direction(session_id=session_id, window=3)
 
-    result = await asyncio.get_event_loop().run_in_executor(
-        None,
-        lambda: engine.route_query(
-            query=payload.query,
-            company_profile=company_profile,
-            jurisdictions=jurisdictions,
-            preferred_intent=(direction_hint or {}).get("intent"),
-            preferred_regulation=(direction_hint or {}).get("regulation"),
-            lightweight=None if company_profile else True,
-            concise=True,
-        ),
-    )
-
-    citation_rows = [
-        {
-            "regulation": c.regulation,
-            "article_id": c.article_id,
-            "title": c.title,
-            "relevance_score": c.relevance_score,
-            "url": c.url,
-        }
-        for c in result.citations
-    ]
-
-    training_store.append_turn(
-        ChatTurn(
-            timestamp=LocalTrainingStore.now_iso(),
-            session_id=session_id,
-            user_query=payload.query,
-            answer=result.answer,
-            intent=result.intent,
-            citations=citation_rows,
-            metadata={
-                "consensus_reached": result.consensus_result.consensus_reached,
-                "confidence": result.consensus_result.confidence,
-                "direction_hint": direction_hint,
-                "agent_count": len(result.consensus_result.agent_responses),
-            },
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: engine.route_query(
+                query=payload.query,
+                company_profile=company_profile,
+                jurisdictions=jurisdictions,
+                preferred_intent=(direction_hint or {}).get("intent"),
+                preferred_regulation=(direction_hint or {}).get("regulation"),
+                lightweight=None if company_profile else True,
+                concise=True,
+            ),
         )
-    )
 
-    grounding_score = getattr(result, "grounding_score", result.consensus_result.confidence)
-    grounding_label = (
-        "high" if grounding_score >= 0.75
-        else "medium" if grounding_score >= 0.5
-        else "low"
-    )
+        citation_rows = _citation_rows(result)
+        consensus_result = getattr(result, "consensus_result", None)
+        consensus_confidence = _safe_confidence(getattr(consensus_result, "confidence", 0.0))
+        grounding_score = _safe_confidence(
+            getattr(result, "grounding_score", consensus_confidence), default=consensus_confidence
+        )
+        agent_count = len(getattr(consensus_result, "agent_responses", []) or [])
+        consensus_reached = bool(getattr(consensus_result, "consensus_reached", False))
+        grounding_label = _confidence_label(grounding_score)
 
-    return {
-        "session_id": session_id,
-        "answer": result.answer,
-        "intent": result.intent,
-        "question_type": getattr(result, "question_type", "GENERAL"),
-        "citations": citation_rows,
-        "confidence": round(grounding_score, 3),
-        "grounding": grounding_label,
-        "consensus": {
-            "reached": result.consensus_result.consensus_reached,
-            "confidence": result.consensus_result.confidence,
-        },
-        "mode": {
-            "lightweight": (None if company_profile else True),
-            "agent_count": len(result.consensus_result.agent_responses),
-            "direction_hint": direction_hint,
-        },
-    }
+        training_store.append_turn(
+            ChatTurn(
+                timestamp=LocalTrainingStore.now_iso(),
+                session_id=session_id,
+                user_query=payload.query,
+                answer=result.answer,
+                intent=result.intent,
+                citations=citation_rows,
+                metadata={
+                    "consensus_reached": consensus_reached,
+                    "confidence": consensus_confidence,
+                    "direction_hint": direction_hint,
+                    "agent_count": agent_count,
+                },
+            )
+        )
+
+        return {
+            "session_id": session_id,
+            "answer": result.answer,
+            "intent": result.intent,
+            "question_type": getattr(result, "question_type", "GENERAL"),
+            "citations": citation_rows,
+            "confidence": round(grounding_score, 3),
+            "grounding": grounding_label,
+            "consensus": {
+                "reached": consensus_reached,
+                "confidence": round(consensus_confidence, 3),
+            },
+            "mode": {
+                "lightweight": (None if company_profile else True),
+                "agent_count": agent_count,
+                "direction_hint": direction_hint,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Failed to process chat message for session=%s", session_id, exc_info=True)
+        raise HTTPException(status_code=500, detail={"error": "Failed to process chat message"})
 
 
 @router.get("/chat/api/history", dependencies=[Depends(require_api_key)])
@@ -447,4 +481,3 @@ async def get_session_summary(session_id: str) -> SessionSummaryResponse:
             status_code=500,
             detail={"error": "Failed to generate session summary", "details": str(e)},
         )
-

@@ -2,6 +2,14 @@
 # LIOS Startup Verification for M1 MacBook
 # Run this to verify all prerequisites are met before starting the server
 
+set -euo pipefail
+
+get_lan_ip() {
+    ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true
+}
+
+LAN_IP="$(get_lan_ip)"
+
 echo "🔍 LIOS Pre-Startup Verification"
 echo "=================================="
 echo ""
@@ -10,11 +18,10 @@ echo ""
 echo "✓ Checking Ollama..."
 if pgrep -x "ollama" > /dev/null; then
     echo "  ✅ Ollama service is RUNNING"
-    OLLAMA_CHECK=$(curl -s http://localhost:11434/api/tags 2>/dev/null | grep -c "name" || echo "0")
-    if [ "$OLLAMA_CHECK" -gt "0" ]; then
+    if curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1; then
         echo "  ✅ Ollama API responding"
     else
-        echo "  ⚠️ Ollama API not responding yet - wait a moment"
+        echo "  ⚠️ Ollama API not responding yet - wait a moment (http://localhost:11434/api/tags)"
     fi
 else
     echo "  ⚠️ Ollama NOT running"
@@ -65,5 +72,16 @@ echo "Ready to start LIOS. Run:"
 echo ""
 echo "  uvicorn lios.main:app --host 0.0.0.0 --port 8000 --reload"
 echo ""
-echo "Then open: http://localhost:8000/chat"
+echo "Then verify health:"
+echo "  curl http://localhost:8000/health"
+if [ -n "$LAN_IP" ]; then
+    echo "  curl http://$LAN_IP:8000/health"
+fi
+echo ""
+echo "Open in browser: http://localhost:8000/chat"
+if [ -n "$LAN_IP" ]; then
+    echo "Use on iPhone app (stored in AsyncStorage): http://$LAN_IP:8000"
+else
+    echo "Use on iPhone app: http://<your-mac-lan-ip>:8000"
+fi
 echo ""

@@ -218,7 +218,7 @@ def run(args: argparse.Namespace):
     if not client.ping():
         print(_c(RED, " FAILED"))
         print(_c(RED, "\n  Server not reachable. Start LIOS with:"))
-        print(_c(WHITE, "    uvicorn lios_server:app --host 0.0.0.0 --port 8000"))
+        print(_c(WHITE, "    uvicorn lios.main:app --host 0.0.0.0 --port 8000"))
         sys.exit(1)
     print(_c(GREEN, " OK"))
     print()

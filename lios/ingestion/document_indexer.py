@@ -1,14 +1,13 @@
 """Document indexer — extract, chunk, and append uploaded documents to the retrieval corpus.
 
-Supports PDF (via pypdf), DOCX (via python-docx if available), and plain text.
-After indexing, the HybridRetriever singleton is refreshed so new content is
-immediately searchable without restarting the server.
+Supports PDF, DOCX, TXT, PPTX, and XLSX uploads. After indexing, the
+HybridRetriever singleton is refreshed so new content is immediately searchable
+without restarting the server.
 """
 
 from __future__ import annotations
 
 import json
-import re
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
@@ -21,6 +20,51 @@ logger = get_logger(__name__)
 _CORPUS_PATH = Path("data/corpus/legal_chunks.jsonl")
 _CHUNK_SIZE_WORDS = 400
 _CHUNK_OVERLAP_WORDS = 50
+SUPPORTED_UPLOAD_FORMATS: dict[str, str] = {
+    "pdf": ".pdf",
+    "docx": ".docx",
+    "txt": ".txt",
+    "pptx": ".pptx",
+    "xlsx": ".xlsx",
+}
+
+_MIME_HINTS: dict[str, str] = {
+    "pdf": "pdf",
+    "docx": "wordprocessingml",
+    "txt": "text/plain",
+    "pptx": "presentationml",
+    "xlsx": "spreadsheetml",
+}
+
+
+class UnsupportedDocumentFormatError(ValueError):
+    """Raised when an upload format is unsupported."""
+
+
+def supported_upload_extensions() -> list[str]:
+    """Return supported upload extensions in API-facing order."""
+    return list(SUPPORTED_UPLOAD_FORMATS.values())
+
+
+def detect_upload_format(filename: str, content_type: str) -> str:
+    """Resolve an upload format from file extension or content type."""
+    fname_lower = (filename or "").lower()
+    content_type_lower = (content_type or "").lower()
+
+    for fmt, ext in SUPPORTED_UPLOAD_FORMATS.items():
+        if fname_lower.endswith(ext):
+            return fmt
+
+    for fmt, hint in _MIME_HINTS.items():
+        if hint in content_type_lower:
+            return fmt
+
+    supported = ", ".join(supported_upload_extensions())
+    raise UnsupportedDocumentFormatError(
+        f"Unsupported file format for '{filename or 'upload'}' "
+        f"(content_type='{content_type or 'unknown'}'). "
+        f"Supported formats: {supported}."
+    )
 
 
 def _extract_text_pdf(content: bytes) -> str:
@@ -51,18 +95,73 @@ def _extract_text_docx(content: bytes) -> str:
         raise ValueError(f"Failed to parse DOCX: {exc}") from exc
 
 
-def _extract_text(content: bytes, filename: str, content_type: str) -> str:
-    """Dispatch to the correct extractor based on file type."""
-    fname_lower = filename.lower()
-    if fname_lower.endswith(".pdf") or "pdf" in content_type:
-        return _extract_text_pdf(content)
-    if fname_lower.endswith(".docx") or "wordprocessingml" in content_type:
-        return _extract_text_docx(content)
-    # Fall back to plain text
+def _extract_text_txt(content: bytes) -> str:
+    """Extract text from a plain text byte buffer with explicit encoding fallbacks."""
+    for encoding in ("utf-8", "utf-16", "latin-1"):
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("Failed to decode TXT file using utf-8, utf-16, or latin-1.")
+
+
+def _extract_text_pptx(content: bytes) -> str:
+    """Extract text from a PPTX byte buffer using python-pptx."""
     try:
-        return content.decode("utf-8")
-    except UnicodeDecodeError:
-        return content.decode("latin-1", errors="replace")
+        import io
+        from pptx import Presentation  # type: ignore
+
+        presentation = Presentation(io.BytesIO(content))
+        lines: list[str] = []
+        for slide in presentation.slides:
+            for shape in slide.shapes:
+                text = getattr(shape, "text", "")
+                if text and str(text).strip():
+                    lines.append(str(text).strip())
+        return "\n\n".join(lines)
+    except ImportError:
+        raise ImportError("python-pptx is required for PPTX uploads. Install with: pip install python-pptx")
+    except Exception as exc:
+        raise ValueError(f"Failed to parse PPTX: {exc}") from exc
+
+
+def _extract_text_xlsx(content: bytes) -> str:
+    """Extract text from an XLSX byte buffer using openpyxl."""
+    try:
+        import io
+        from openpyxl import load_workbook  # type: ignore
+
+        workbook = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+        sheet_blocks: list[str] = []
+        for sheet in workbook.worksheets:
+            row_lines: list[str] = []
+            for row in sheet.iter_rows(values_only=True):
+                cells = [str(value).strip() for value in row if value is not None and str(value).strip()]
+                if cells:
+                    row_lines.append(" | ".join(cells))
+            if row_lines:
+                sheet_blocks.append(f"{sheet.title}\n" + "\n".join(row_lines))
+        return "\n\n".join(sheet_blocks)
+    except ImportError:
+        raise ImportError("openpyxl is required for XLSX uploads. Install with: pip install openpyxl")
+    except Exception as exc:
+        raise ValueError(f"Failed to parse XLSX: {exc}") from exc
+
+
+def _extract_text(content: bytes, filename: str, content_type: str) -> str:
+    """Dispatch to the correct extractor based on validated upload format."""
+    upload_format = detect_upload_format(filename, content_type)
+    if upload_format == "pdf":
+        return _extract_text_pdf(content)
+    if upload_format == "docx":
+        return _extract_text_docx(content)
+    if upload_format == "txt":
+        return _extract_text_txt(content)
+    if upload_format == "pptx":
+        return _extract_text_pptx(content)
+    if upload_format == "xlsx":
+        return _extract_text_xlsx(content)
+    raise UnsupportedDocumentFormatError(f"No extractor registered for upload format: {upload_format}")
 
 
 def _chunk_text(text: str, chunk_size: int = _CHUNK_SIZE_WORDS, overlap: int = _CHUNK_OVERLAP_WORDS) -> list[str]:
