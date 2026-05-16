@@ -1,27 +1,55 @@
 /**
  * LIOS API client — all calls to the FastAPI backend.
- * Server URL is persisted in AsyncStorage via URL_KEY.
- * If no value is stored yet, localhost is used (browser/simulator default).
- * For iPhone, set System → Server-Adresse to http://<mac-lan-ip>:8000.
+ * Server URL is auto-detected from the Expo Metro host (same machine as the backend).
+ * Works on any network without manual configuration.
+ * Set System → Server-Adresse only when pointing to a different machine.
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 
 const DEFAULT_URL = "http://localhost:8000";
 const URL_KEY = "lios_server_url";
 const API_KEY_KEY = "lios_api_key";
 
+function getAutoUrl(): string {
+  // In Expo Go, hostUri is "<LAN_IP>:<metro_port>" — same machine as the backend.
+  const hostUri =
+    (Constants.expoConfig as any)?.hostUri ??
+    (Constants.manifest as any)?.debuggerHost ??
+    "";
+  const host = hostUri.split(":")[0];
+  if (host && host !== "localhost" && host !== "127.0.0.1") {
+    return `http://${host}:8000`;
+  }
+  return DEFAULT_URL;
+}
+
+export function getAutoDetectedUrl(): string {
+  return getAutoUrl();
+}
+
 export async function getServerUrl(): Promise<string> {
   const stored = await AsyncStorage.getItem(URL_KEY);
-  return stored || DEFAULT_URL;
+  if (stored) return stored;  // explicit manual override
+  return getAutoUrl();        // auto-detect from Expo host
+}
+
+export async function getStoredServerUrl(): Promise<string> {
+  return (await AsyncStorage.getItem(URL_KEY)) ?? "";
 }
 
 export async function setServerUrl(url: string): Promise<void> {
-  await AsyncStorage.setItem(URL_KEY, url.trim().replace(/\/$/, ""));
+  const normalized = url.trim().replace(/\/$/, "");
+  if (!normalized) {
+    await AsyncStorage.removeItem(URL_KEY);  // empty = back to auto
+  } else {
+    await AsyncStorage.setItem(URL_KEY, normalized);
+  }
 }
 
 export async function getApiKey(): Promise<string> {
-  return (await AsyncStorage.getItem(API_KEY_KEY)) || "";
+  return (await AsyncStorage.getItem(API_KEY_KEY)) || "lios-local-dev";
 }
 
 export async function setApiKey(apiKey: string): Promise<void> {

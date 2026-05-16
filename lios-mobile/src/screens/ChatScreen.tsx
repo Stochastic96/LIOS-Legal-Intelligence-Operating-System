@@ -18,7 +18,8 @@ import {
   BrainStatus,
   ChatResponse,
   getApiKey,
-  getServerUrl,
+  getAutoDetectedUrl,
+  getStoredServerUrl,
   LLMModeStatus,
   setApiKey,
   setServerUrl,
@@ -31,10 +32,10 @@ import { C, F, R, S, W } from "../theme";
 const SESSION_ID = "lios-" + Date.now();
 
 const QUICK_STARTS = [
-  "Wer muss CSRD einhalten?",
-  "Was sind ESRS-Berichtsstandards?",
-  "EU-Taxonomie: grüne Kriterien",
-  "SFDR-Klassifizierung von Fonds",
+  "Who must comply with CSRD?",
+  "What are ESRS reporting standards?",
+  "EU Taxonomy: green criteria explained",
+  "SFDR fund classification overview",
 ];
 
 interface Message {
@@ -48,7 +49,7 @@ interface Message {
 }
 
 const CONF_LABEL: Record<string, string> = {
-  high: "Hoch", medium: "Mittel", low: "Niedrig",
+  high: "High", medium: "Medium", low: "Low",
 };
 
 const CONF_COLOR: Record<string, string> = {
@@ -61,10 +62,10 @@ const CONF_BG: Record<string, string> = {
 
 function relativeTime(ts: number): string {
   const s = (Date.now() - ts) / 1000;
-  if (s < 60)    return "Gerade eben";
-  if (s < 3600)  return `vor ${Math.floor(s / 60)} Min.`;
-  if (s < 86400) return `vor ${Math.floor(s / 3600)} Std.`;
-  return new Date(ts).toLocaleDateString("de-DE");
+  if (s < 60)    return "Just now";
+  if (s < 3600)  return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} hr ago`;
+  return new Date(ts).toLocaleDateString("en-GB");
 }
 
 
@@ -89,7 +90,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     api.health().then(() => setOnline(true)).catch(() => setOnline(false));
-    getServerUrl().then(setServerUrlState);
+    getStoredServerUrl().then(setServerUrlState);
     getApiKey().then(setApiKeyState);
     Animated.timing(mountAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, []);
@@ -143,7 +144,7 @@ export default function ChatScreen() {
         ...p,
         {
           id: `e${Date.now()}`, role: "assistant", feedback: null, timestamp: Date.now(),
-          text: "Server nicht erreichbar.\n\nBitte starten: bash start.sh\niPhone: System → Server-Adresse = http://<Mac-LAN-IP>:8000\n(localhost funktioniert nur auf Mac/Simulator).",
+          text: "Server nicht erreichbar. Starte: bash start.sh\n(iPhone und Mac müssen im selben WLAN sein.)",
         },
       ]);
     } finally {
@@ -205,7 +206,7 @@ export default function ChatScreen() {
               {item.brain_used && (
                 <View style={s.brainBadge}>
                   <Feather name="cpu" size={10} color={C.primary} />
-                  <Text style={s.brainBadgeText}>KI aktiv</Text>
+                  <Text style={s.brainBadgeText}>AI active</Text>
                 </View>
               )}
               <Text style={s.aiTs}>{relativeTime(item.timestamp)}</Text>
@@ -217,26 +218,26 @@ export default function ChatScreen() {
               <ScalePressable onPress={() => giveFeedback(item, "good")}>
                 <View style={s.fbBtn}>
                   <Feather name="thumbs-up" size={12} color={C.green} />
-                  <Text style={[s.fbBtnText, { color: C.green }]}>Korrekt</Text>
+                  <Text style={[s.fbBtnText, { color: C.green }]}>Correct</Text>
                 </View>
               </ScalePressable>
               <ScalePressable onPress={() => { setCorrection({ msg: item, type: "wrong" }); setCorrText(""); setMakeRule(false); }}>
                 <View style={s.fbBtn}>
                   <Feather name="thumbs-down" size={12} color={C.mid} />
-                  <Text style={s.fbBtnText}>Falsch</Text>
+                  <Text style={s.fbBtnText}>Wrong</Text>
                 </View>
               </ScalePressable>
               <ScalePressable onPress={() => { setCorrection({ msg: item, type: "partial" }); setCorrText(""); setMakeRule(false); }}>
                 <View style={s.fbBtn}>
                   <Feather name="edit-2" size={12} color={C.mid} />
-                  <Text style={s.fbBtnText}>Ergänzen</Text>
+                  <Text style={s.fbBtnText}>Add note</Text>
                 </View>
               </ScalePressable>
             </View>
           )}
           {item.feedback != null && (
             <Text style={s.fbDone}>
-              {item.feedback === "good" ? "✓ Bestätigt" : item.feedback === "wrong" ? "Korrektur gespeichert" : "Ergänzung gespeichert"}
+              {item.feedback === "good" ? "✓ Confirmed" : item.feedback === "wrong" ? "Correction saved" : "Note saved"}
             </Text>
           )}
         </View>
@@ -254,13 +255,13 @@ export default function ChatScreen() {
           </View>
           <View>
             <Text style={s.title}>LIOS</Text>
-            <Text style={s.subtitle}>Rechts­intelligenz</Text>
+            <Text style={s.subtitle}>Legal Intelligence</Text>
           </View>
         </View>
         <View style={s.headerActions}>
           <View style={s.statusPill}>
             <View style={[s.statusDot, { backgroundColor: online === true ? C.online : online === false ? C.offline : C.dim }]} />
-            <Text style={s.statusLabel}>{online === true ? "Verbunden" : online === false ? "Offline" : "…"}</Text>
+            <Text style={s.statusLabel}>{online === true ? "Connected" : online === false ? "Offline" : "…"}</Text>
           </View>
           <ScalePressable onPress={() => setUploadOpen(true)}>
             <View style={s.gearBtn}>
@@ -284,23 +285,23 @@ export default function ChatScreen() {
           <FlatList
             ref={listRef}
             data={messages}
-            keyExtractor={(m) => m.id}
+            keyExtractor={(m, i) => m.id ?? String(i)}
             renderItem={renderItem}
             style={s.flex}
             contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.listContent}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={toBottom}
-            ListEmptyComponent={
+            ListEmptyComponent={() => (
               <View style={s.empty}>
                 <View style={s.emptyIcon}>
                   <Feather name="shield" size={28} color={C.primary} />
                 </View>
-                <Text style={s.emptyTitle}>Compliance-Assistent</Text>
+                <Text style={s.emptyTitle}>Compliance Assistant</Text>
                 <Text style={s.emptySub}>
-                  CSRD · ESRS · EU-Taxonomie · SFDR · DSGVO
+                  CSRD · ESRS · EU Taxonomy · SFDR · GDPR
                 </Text>
                 <View style={s.divider} />
-                <Text style={s.quickLabel}>HÄUFIGE FRAGEN</Text>
+                <Text style={s.quickLabel}>COMMON QUESTIONS</Text>
                 <View style={s.chipsGrid}>
                   {QUICK_STARTS.map((q) => (
                     <ScalePressable key={q} onPress={() => send(q)}>
@@ -312,7 +313,7 @@ export default function ChatScreen() {
                   ))}
                 </View>
               </View>
-            }
+            )}
           />
         </Animated.View>
 
@@ -326,7 +327,7 @@ export default function ChatScreen() {
             onChangeText={setInput}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder="Frage zum EU-Recht stellen…"
+            placeholder="Ask a legal question…"
             placeholderTextColor={C.dim}
             multiline
             maxLength={500}
@@ -356,21 +357,21 @@ export default function ChatScreen() {
               {brainLoading ? (
                 <View style={s.statusRow}>
                   <Feather name="cpu" size={14} color={C.dim} />
-                  <Text style={s.statusSectionText}>Lade Systemstatus…</Text>
+                  <Text style={s.statusSectionText}>Loading system status…</Text>
                 </View>
               ) : brainStatus ? (
                 <>
                   <View style={s.statusRow}>
                     <View style={[s.statusDot, { backgroundColor: brainStatus.llm_reachable ? C.online : C.offline }]} />
                     <Text style={s.statusSectionText}>
-                      KI: {brainStatus.llm_reachable ? "Erreichbar" : "Nicht erreichbar"}
+                      AI: {brainStatus.llm_reachable ? "Reachable" : "Unreachable"}
                       {llmMode ? `  ·  ${llmMode.label}` : ""}
                     </Text>
                   </View>
                   <View style={s.statusRow}>
                     <Feather name="cpu" size={13} color={brainStatus.brain_on ? C.primary : C.dim} />
                     <Text style={s.statusSectionText}>
-                      Gehirn: {brainStatus.brain_on ? "Aktiv" : "Inaktiv"}
+                      Brain: {brainStatus.brain_on ? "Active" : "Inactive"}
                     </Text>
                     <Pressable
                       style={[s.brainToggle, brainStatus.brain_on && s.brainToggleOn]}
@@ -381,42 +382,42 @@ export default function ChatScreen() {
                       }}
                     >
                       <Text style={[s.brainToggleText, brainStatus.brain_on && s.brainToggleTextOn]}>
-                        {brainStatus.brain_on ? "Ein" : "Aus"}
+                        {brainStatus.brain_on ? "On" : "Off"}
                       </Text>
                     </Pressable>
                   </View>
                   <View style={s.statusRow}>
                     <Feather name="database" size={13} color={C.dim} />
                     <Text style={s.statusSectionText}>
-                      {brainStatus.knowledge_chunks} Chunks · {brainStatus.active_rules} Regeln · {brainStatus.total_corrections} Korrekturen
+                      {brainStatus.knowledge_chunks} Chunks · {brainStatus.active_rules} Rules · {brainStatus.total_corrections} Corrections
                     </Text>
                   </View>
                 </>
               ) : (
                 <View style={s.statusRow}>
                   <View style={[s.statusDot, { backgroundColor: C.offline }]} />
-                  <Text style={s.statusSectionText}>Systemstatus nicht verfügbar</Text>
+                  <Text style={s.statusSectionText}>System status unavailable</Text>
                 </View>
               )}
             </View>
 
             <View style={s.sectionDivider} />
-            <Text style={s.sheetSubtitle}>Server-Adresse</Text>
+            <Text style={s.sheetSubtitle}>Server Address</Text>
             <TextInput
               style={s.corrInput}
               value={serverUrl}
               onChangeText={setServerUrlState}
-              placeholder="http://192.168.x.x:8000"
+              placeholder={getAutoDetectedUrl()}
               placeholderTextColor={C.dim}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
             />
             <Text style={s.statusSectionText}>
-              iPhone im selben WLAN: http://&lt;Mac-LAN-IP&gt;:8000 · localhost nur für Mac/Simulator.
+              Auto-erkannt vom Expo-Server. Leer lassen für automatische Erkennung. Nur ändern wenn der LIOS-Server auf einem anderen Gerät läuft.
             </Text>
             <View style={s.sectionDivider} />
-            <Text style={s.sheetSubtitle}>API-Key</Text>
+            <Text style={s.sheetSubtitle}>API Key</Text>
             <TextInput
               style={s.corrInput}
               value={apiKey}
@@ -427,15 +428,15 @@ export default function ChatScreen() {
               autoCorrect={false}
             />
             <Text style={s.statusSectionText}>
-              Wird lokal gespeichert und als X-API-Key an Chat, Lernen, Upload und Intelligenz gesendet.
+              Saved locally and sent as X-API-Key to Chat, Learn, Upload and Intelligence.
             </Text>
             <View style={s.sheetBtns}>
               <ScalePressable onPress={() => setSettingsOpen(false)} style={{ flex: 1 }}>
-                <View style={s.btnCancel}><Text style={s.btnCancelText}>Abbrechen</Text></View>
+                <View style={s.btnCancel}><Text style={s.btnCancelText}>Cancel</Text></View>
               </ScalePressable>
               <ScalePressable onPress={saveServerUrl} style={{ flex: 2 }}>
                 <View style={s.btnSave}>
-                  <Text style={s.btnSaveText}>Speichern</Text>
+                  <Text style={s.btnSaveText}>Save</Text>
                 </View>
               </ScalePressable>
             </View>
@@ -458,13 +459,13 @@ export default function ChatScreen() {
           <View style={s.sheet}>
             <View style={s.sheetHandle} />
             <Text style={s.sheetTitle}>
-              {correction?.type === "wrong" ? "Was ist korrekt?" : "Was fehlt in der Antwort?"}
+              {correction?.type === "wrong" ? "What's correct?" : "What's missing from the answer?"}
             </Text>
             <TextInput
               style={s.corrInput}
               value={corrText}
               onChangeText={setCorrText}
-              placeholder="Korrekte Information eingeben…"
+              placeholder="Enter correct information…"
               placeholderTextColor={C.dim}
               multiline
               autoFocus
@@ -474,15 +475,15 @@ export default function ChatScreen() {
               <View style={[s.checkbox, makeRule && s.checkboxOn]}>
                 {makeRule && <Feather name="check" size={10} color={C.card} />}
               </View>
-              <Text style={s.ruleLabel}>Als dauerhafter Merksatz speichern</Text>
+              <Text style={s.ruleLabel}>Save as a permanent rule</Text>
             </Pressable>
             <View style={s.sheetBtns}>
               <ScalePressable onPress={() => setCorrection(null)} style={{ flex: 1 }}>
-                <View style={s.btnCancel}><Text style={s.btnCancelText}>Abbrechen</Text></View>
+                <View style={s.btnCancel}><Text style={s.btnCancelText}>Cancel</Text></View>
               </ScalePressable>
               <ScalePressable onPress={submitCorr} disabled={!corrText.trim()} style={{ flex: 2 }}>
                 <View style={[s.btnSave, !corrText.trim() && s.btnOff]}>
-                  <Text style={s.btnSaveText}>Speichern</Text>
+                  <Text style={s.btnSaveText}>Save</Text>
                 </View>
               </ScalePressable>
             </View>

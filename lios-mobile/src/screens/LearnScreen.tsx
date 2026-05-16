@@ -42,12 +42,12 @@ type LearnMsg =
   | { kind: "mastered"; id: string };
 
 const STATUS_LABEL: Record<string, string> = {
-  mastered:   "Beherrscht",
-  functional: "Funktional",
-  connected:  "Vernetzt",
-  learning:   "In Bearbeitung",
-  seed:       "Einführung",
-  unknown:    "Unbekannt",
+  mastered:   "Mastered",
+  functional: "Functional",
+  connected:  "Connected",
+  learning:   "In Progress",
+  seed:       "Intro",
+  unknown:    "Unknown",
 };
 
 // ── Animated progress bar (inline, lightweight) ────────────────────────────────
@@ -89,12 +89,12 @@ function DashboardCard({ map: m, readyPct, isReady, cats }: {
             <Feather name="cpu" size={16} color={C.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={st.dashTitle}>LIOS Wissensprofil</Text>
-            <Text style={st.dashSub}>EU-Recht · EuGH-Rechtsprechung · Deutsches Recht</Text>
+            <Text style={st.dashTitle}>LIOS Knowledge Profile</Text>
+            <Text style={st.dashSub}>EU Law · CJEU Case Law · German Law</Text>
           </View>
           <View style={[st.readyBadge, { backgroundColor: isReady ? C.greenBg : C.amberBg }]}>
             <Text style={[st.readyText, { color: isReady ? C.green : C.amber }]}>
-              {isReady ? "Mandatsbereit" : "In Ausbildung"}
+              {isReady ? "Practice Ready" : "In Training"}
             </Text>
           </View>
         </View>
@@ -110,10 +110,10 @@ function DashboardCard({ map: m, readyPct, isReady, cats }: {
         {/* Stat tiles */}
         <View style={st.statRow}>
           {[
-            { label: "Beherrscht", count: m.mastered,   color: C.green,   bg: C.greenBg },
-            { label: "Funktional", count: m.functional, color: C.primary, bg: C.primaryDim },
-            { label: "In Bearb.",  count: m.learning,   color: C.amber,   bg: C.amberBg },
-            { label: "Unbekannt",  count: m.unknown,    color: C.dim,     bg: C.s2 },
+            { label: "Mastered",    count: m.mastered,   color: C.green,   bg: C.greenBg },
+            { label: "Functional",  count: m.functional, color: C.primary, bg: C.primaryDim },
+            { label: "In Progress", count: m.learning,   color: C.amber,   bg: C.amberBg },
+            { label: "Unknown",     count: m.unknown,    color: C.dim,     bg: C.s2 },
           ].map(({ label, count, color, bg }) => (
             <View key={label} style={[st.statTile, { backgroundColor: bg }]}>
               <Text style={[st.statCount, { color }]}>{count}</Text>
@@ -281,7 +281,7 @@ export default function LearnScreen() {
             <View style={st.questionMeta}>
               <View style={st.fragenLabel}>
                 <Feather name="help-circle" size={11} color={C.primary} />
-                <Text style={st.fragenText}>FRAGE</Text>
+                <Text style={st.fragenText}>QUESTION</Text>
               </View>
               <View style={st.catPill}>
                 <Text style={st.catText}>{item.category}</Text>
@@ -314,7 +314,7 @@ export default function LearnScreen() {
         return (
           <View style={st.errorBubble}>
             <Feather name="alert-circle" size={14} color={C.red} />
-            <Text style={st.errorText}>Verbindungsfehler — bitte erneut versuchen.</Text>
+            <Text style={st.errorText}>Connection error — please try again.</Text>
           </View>
         );
       }
@@ -325,7 +325,7 @@ export default function LearnScreen() {
           <View style={st.resultBody}>
             <View style={st.resultTop}>
               <View>
-                <Text style={st.resultLabel}>ERGEBNIS</Text>
+                <Text style={st.resultLabel}>RESULT</Text>
                 <Text style={[st.resultStatus, { color: col }]}>
                   {STATUS_LABEL[item.status] ?? item.status}
                 </Text>
@@ -334,10 +334,10 @@ export default function LearnScreen() {
             </View>
             <ProgressBar value={item.newPct} color={col} height={6} />
             {item.nextTopic && (
-              <Text style={st.nextHint}>Nächstes: {item.nextTopic}</Text>
+              <Text style={st.nextHint}>Next: {item.nextTopic}</Text>
             )}
             <TouchableOpacity style={st.weiterBtn} onPress={loadNext} activeOpacity={0.75}>
-              <Text style={st.weiterText}>Weiter</Text>
+              <Text style={st.weiterText}>Continue</Text>
               <Feather name="arrow-right" size={14} color={C.card} />
             </TouchableOpacity>
           </View>
@@ -351,11 +351,11 @@ export default function LearnScreen() {
           <View style={[st.masteredIcon]}>
             <Feather name="award" size={28} color={C.green} />
           </View>
-          <Text style={st.masteredTitle}>Alle Themen beherrscht!</Text>
-          <Text style={st.masteredSub}>Sie haben alle EU-Compliance-Themen abgeschlossen.</Text>
+          <Text style={st.masteredTitle}>All topics mastered!</Text>
+          <Text style={st.masteredSub}>You've completed all EU compliance topics.</Text>
           <TouchableOpacity style={st.weiterBtn} onPress={loadNext} activeOpacity={0.75}>
             <Feather name="refresh-cw" size={14} color={C.card} />
-            <Text style={st.weiterText}>Neu starten</Text>
+            <Text style={st.weiterText}>Restart</Text>
           </TouchableOpacity>
         </View>
       );
@@ -370,7 +370,7 @@ export default function LearnScreen() {
     <SafeAreaView style={st.root} edges={["top"]}>
       {/* Header */}
       <View style={st.header}>
-        <Text style={st.headerTitle}>Lernen</Text>
+        <Text style={st.headerTitle}>Learn</Text>
         <View style={st.headerRight}>
           {streak > 0 && (
             <View style={st.streakBadge}>
@@ -395,21 +395,21 @@ export default function LearnScreen() {
         <FlatList
           ref={listRef}
           data={messages}
-          keyExtractor={(m) => m.id}
+          keyExtractor={(m, i) => m.id ?? String(i)}
           renderItem={renderItem}
           style={st.flex}
           contentContainerStyle={messages.length === 0 ? st.emptyContainer : st.listContent}
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={toBottom}
-          ListEmptyComponent={
+          ListEmptyComponent={() => (
             <View style={st.emptyState}>
               <View style={st.emptyIcon}>
                 <Feather name="book-open" size={26} color={C.primary} />
               </View>
-              <Text style={st.emptyTitle}>EU-Compliance Lernmodus</Text>
-              <Text style={st.emptySub}>CSRD · ESRS · EU-Taxonomie · SFDR · DSGVO</Text>
+              <Text style={st.emptyTitle}>EU Compliance Learn Mode</Text>
+              <Text style={st.emptySub}>CSRD · ESRS · EU Taxonomy · SFDR · GDPR</Text>
             </View>
-          }
+          )}
         />
 
         {(loading || submitting) && <TypingIndicator />}
@@ -421,7 +421,7 @@ export default function LearnScreen() {
               style={st.refInput}
               value={refText}
               onChangeText={setRefText}
-              placeholder="Quelle (z.B. CSRD Art. 19a) — optional"
+              placeholder="Source (e.g. CSRD Art. 19a) — optional"
               placeholderTextColor={C.dim}
             />
           )}
@@ -439,7 +439,7 @@ export default function LearnScreen() {
               onChangeText={setAnswer}
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
-              placeholder={awaitingNext ? "Tippen Sie auf Weiter…" : "Ihre Antwort eingeben…"}
+              placeholder={awaitingNext ? "Tap Continue…" : "Type your answer…"}
               placeholderTextColor={C.dim}
               multiline
               maxLength={800}
