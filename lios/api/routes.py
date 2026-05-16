@@ -590,32 +590,81 @@ class _MobileChatRequest(BaseModel):
     messages: list[dict[str, str]] = Field(default_factory=list)
 
 
-@app.post("/chat", dependencies=[Depends(require_api_key)])
-async def mobile_chat(request: _MobileChatRequest) -> dict[str, Any]:
-    """Chat endpoint for the mobile app with compatibility fields."""
+import concurrent.futures as _cf
+
+_llm_executor = _cf.ThreadPoolExecutor(max_workers=1, thread_name_prefix="lios-llm")
+
+
+def _synthesize_answer(query: str) -> dict[str, Any]:
+    """Instant corpus-only answer — BM25 + semantic retrieval, no LLM."""
+    from lios.intelligence.answer_synthesizer import AnswerSynthesizer
+    from lios.intelligence.question_classifier import QuestionClassifier
+    retriever = get_retriever()
+    retrieved = retriever.search(query, top_k=5)
+    chunks = [rc.chunk for rc in retrieved]
+    answer = AnswerSynthesizer().synthesize(query, chunks)
+    question_type = QuestionClassifier().classify(query).value
+    citations = [
+        {"regulation": rc.chunk.get("regulation", ""), "article": rc.chunk.get("article", ""),
+         "title": rc.chunk.get("title", ""), "score": round(rc.total_score, 4)}
+        for rc in retrieved
+    ]
+    return {"answer": answer, "intent": question_type, "citations": citations,
+            "confidence": "medium", "grounding": "medium"}
+
+
+def _llm_chat_sync(query: str, session_id: str) -> dict[str, Any]:
+    """Run the async LLM pipeline synchronously inside a thread."""
+    import asyncio
     from lios.api.routers.chat import process_chat_message
     from lios.models.validation import ChatMessageRequest
-
+    loop = asyncio.new_event_loop()
     try:
-        contract = await process_chat_message(
-            ChatMessageRequest(query=request.query, session_id=request.session_id)
+        return loop.run_until_complete(
+            process_chat_message(ChatMessageRequest(query=query, session_id=session_id))
         )
-        confidence_label = contract.get("grounding", "low")
-        confidence_score = contract.get("confidence", 0.0)
-        return {
-            **contract,
-            "message_id": str(uuid.uuid4()),
-            "confidence_score": confidence_score,
-            "confidence_label": confidence_label,
-            "confidence": confidence_label,
-            "source": contract.get("intent", "GENERAL"),
-            "brain_used": _brain_state().get("enabled", True),
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        logger.error("mobile_chat error", exc_info=True)
-        raise HTTPException(status_code=500, detail={"error": "Failed to process chat message"})
+    finally:
+        loop.close()
+
+
+@app.post("/chat", dependencies=[Depends(require_api_key)])
+async def mobile_chat(request: _MobileChatRequest) -> dict[str, Any]:
+    """Chat: tries LLM in a thread (25 s cap), falls back to instant synthesizer."""
+    import asyncio
+
+    brain_on = _brain_state().get("enabled", True)
+    contract: dict[str, Any] | None = None
+
+    if brain_on:
+        loop = asyncio.get_event_loop()
+        future = loop.run_in_executor(
+            _llm_executor, _llm_chat_sync, request.query, request.session_id
+        )
+        try:
+            contract = await asyncio.wait_for(asyncio.shield(future), timeout=25.0)
+        except asyncio.TimeoutError:
+            logger.warning("LLM timed out — falling back to synthesizer")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.error("mobile_chat LLM error", exc_info=True)
+
+    if not contract or not contract.get("answer"):
+        contract = await asyncio.get_event_loop().run_in_executor(
+            None, _synthesize_answer, request.query
+        )
+
+    confidence_label = contract.get("grounding") or contract.get("confidence") or "medium"
+    confidence_score = contract.get("confidence_score", 0.5)
+    return {
+        **contract,
+        "message_id": str(uuid.uuid4()),
+        "confidence_score": confidence_score,
+        "confidence_label": confidence_label,
+        "confidence": confidence_label,
+        "source": contract.get("intent", "GENERAL"),
+        "brain_used": brain_on,
+    }
 
 
 @app.get("/chat/history/{session_id}", dependencies=[Depends(require_api_key)])
