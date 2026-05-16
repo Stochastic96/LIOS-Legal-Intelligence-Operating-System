@@ -15,6 +15,7 @@ Usage:
 import argparse
 import asyncio
 import os
+import pathlib
 import sys
 import time
 from datetime import datetime
@@ -24,11 +25,21 @@ try:
 except ImportError:
     sys.exit("Missing dependency: pip install httpx")
 
+# ── Auto-load .env from project root ──────────────────────────────────────────
+_env_file = pathlib.Path(__file__).parent.parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            os.environ.setdefault(_k.strip(), _v.strip())
+
 # ── Config ─────────────────────────────────────────────────────────────────────
 
 DEFAULT_LIOS_URL   = "http://localhost:8000"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
-MODEL = os.getenv("LIOS_LLM_MODEL", "mistral:latest")
+MODEL   = os.getenv("LIOS_LLM_MODEL", "mistral:latest")
+API_KEY = os.getenv("LIOS_API_KEY", "")
 
 SYSTEM_PROMPT = (
     "You are an EU legal compliance expert with deep knowledge of CSRD, ESRS, "
@@ -65,9 +76,13 @@ class _Counter:
 
 # ── API helpers ────────────────────────────────────────────────────────────────
 
+def _headers() -> dict:
+    return {"X-API-Key": API_KEY} if API_KEY else {}
+
+
 async def get_next_question(client: httpx.AsyncClient, lios_url: str) -> dict | None:
     try:
-        r = await client.get(f"{lios_url}/learn/next", timeout=10)
+        r = await client.get(f"{lios_url}/learn/next", timeout=10, headers=_headers())
         r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -110,6 +125,7 @@ async def submit_answer(
         r = await client.post(
             f"{lios_url}/learn/answer",
             json={"topic_id": topic_id, "answer_text": answer},
+            headers=_headers(),
             timeout=10,
         )
         r.raise_for_status()
@@ -143,7 +159,7 @@ async def worker(
             if data.get("all_mastered"):
                 await counter.inc_cycle()
                 cycle = counter.cycles
-                overall_r = await client.get(f"{lios_url}/learn/map", timeout=10)
+                overall_r = await client.get(f"{lios_url}/learn/map", timeout=10, headers=_headers())
                 overall_pct = "?"
                 try:
                     m = overall_r.json()
@@ -216,7 +232,7 @@ async def run(workers: int, target: int | None, lios_url: str, ollama_url: str):
     # Verify connectivity
     async with httpx.AsyncClient() as client:
         try:
-            r = await client.get(f"{lios_url}/health", timeout=5)
+            r = await client.get(f"{lios_url}/health", timeout=5, headers=_headers())
             print(f"✓ LIOS backend reachable ({lios_url})")
         except Exception:
             sys.exit(f"✗ Cannot reach LIOS backend at {lios_url}\n  Run: ./start.sh")
@@ -233,7 +249,7 @@ async def run(workers: int, target: int | None, lios_url: str, ollama_url: str):
 
         # Print current knowledge map state
         try:
-            r = await client.get(f"{lios_url}/learn/map", timeout=5)
+            r = await client.get(f"{lios_url}/learn/map", timeout=5, headers=_headers())
             m = r.json()
             topics = m.get("topics") or []
             if topics:

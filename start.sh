@@ -109,11 +109,13 @@ if [[ -n "$LAN_IP" ]]; then
   echo "  iPhone:   $LAN_URL"
   echo ""
   echo "  iPhone setup (one-time):"
-  echo "    1. Open Expo Go — make sure phone is on the same WiFi as this Mac"
-  echo "    2. In the LIOS app: Chat tab -> gear icon (top right)"
-  echo "    3. Server-Adresse: $LAN_URL"
-  echo "    4. API-Key: leave empty"
+  echo "    1. Open Expo Go — same WiFi as this Mac"
+  echo "    2. Chat tab → gear icon → Server URL: $LAN_URL"
 fi
+echo ""
+echo "  To train LIOS knowledge (open a new terminal):"
+echo "    source .venv/bin/activate"
+echo "    python3 scripts/autolearn_ollama.py --workers 3"
 echo "========================================"
 echo ""
 
