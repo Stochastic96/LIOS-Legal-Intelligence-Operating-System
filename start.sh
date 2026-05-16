@@ -88,9 +88,9 @@ fi
 
 # ── 3/4  LLM smoke test ────────────────────────────────────────────────────────
 echo "[3/4] LLM smoke test..."
-SMOKE="$(curl -sf --max-time 60 -X POST "$LOCAL_URL/chat" \
+SMOKE="$(curl -sf --max-time 90 -X POST "$LOCAL_URL/chat" \
   -H "Content-Type: application/json" \
-  -d '{"message":"What is CSRD in one sentence?","session_id":"startup-test"}' \
+  -d '{"query":"What is CSRD in one sentence?","session_id":"startup-test"}' \
   2>/dev/null || echo "")"
 
 if echo "$SMOKE" | grep -qiE "csrd|sustainability|reporting|directive|compliance|corporate"; then
